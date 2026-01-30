@@ -18,4 +18,5 @@
         "datacollector",
         "pytest"
     ],
+    "makefile.configureOnOpen": false,
 }

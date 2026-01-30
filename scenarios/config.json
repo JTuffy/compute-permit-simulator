@@ -1,0 +1,32 @@
+{
+    "scenario_1": {
+        "description": "Baseline - Low Enforcement",
+        "n_agents": 20,
+        "token_cap": 10,
+        "base_audit_prob": 0.05,
+        "high_audit_prob": 0.05,
+        "signal_fpr": 0.5,
+        "signal_tpr": 0.5,
+        "penalty": 0.2
+    },
+    "scenario_2": {
+        "description": "High Deterrence",
+        "n_agents": 20,
+        "token_cap": 10,
+        "base_audit_prob": 0.2,
+        "high_audit_prob": 0.2,
+        "signal_fpr": 0.5,
+        "signal_tpr": 0.5,
+        "penalty": 0.8
+    },
+    "scenario_3": {
+        "description": "Targeted Auditing (The Signal)",
+        "n_agents": 20,
+        "token_cap": 10,
+        "base_audit_prob": 0.05,
+        "high_audit_prob": 0.8,
+        "signal_fpr": 0.1,
+        "signal_tpr": 0.9,
+        "penalty": 0.5
+    }
+}
