@@ -13,4 +13,9 @@
     "python.testing.pytestEnabled": true,
     "python.analysis.typeCheckingMode": "standard",
     "autoDocstring.docstringFormat": "google-notypes",
+    "cSpell.words": [
+        "aisc",
+        "datacollector",
+        "pytest"
+    ],
 }
