@@ -5,46 +5,28 @@
         "token_cap": 10,
         "base_audit_prob": 0.05,
         "high_audit_prob": 0.05,
-        "signal_fpr": 0.5,
-        "signal_tpr": 0.5,
-        "penalty": 0.2,
-        "capability_min": 1.0,
-        "capability_max": 10.0,
-        "allowance_min": 0.0,
-        "allowance_max": 5.0,
-        "collateral_min": 0.5,
-        "collateral_max": 2.0
+        "false_positive_rate": 0.5,
+        "false_negative_rate": 0.5,
+        "penalty": 0.5
     },
     "scenario_2": {
         "description": "High Deterrence",
         "n_agents": 20,
         "token_cap": 10,
-        "base_audit_prob": 0.2,
-        "high_audit_prob": 0.2,
-        "signal_fpr": 0.5,
-        "signal_tpr": 0.5,
-        "penalty": 0.8,
-        "capability_min": 1.0,
-        "capability_max": 10.0,
-        "allowance_min": 0.0,
-        "allowance_max": 5.0,
-        "collateral_min": 0.5,
-        "collateral_max": 2.0
+        "base_audit_prob": 0.3,
+        "high_audit_prob": 0.3,
+        "false_positive_rate": 0.5,
+        "false_negative_rate": 0.5,
+        "penalty": 3.0
     },
     "scenario_3": {
         "description": "Targeted Auditing (The Signal)",
         "n_agents": 20,
         "token_cap": 10,
         "base_audit_prob": 0.05,
-        "high_audit_prob": 0.8,
-        "signal_fpr": 0.1,
-        "signal_tpr": 0.9,
-        "penalty": 0.5,
-        "capability_min": 1.0,
-        "capability_max": 10.0,
-        "allowance_min": 0.0,
-        "allowance_max": 5.0,
-        "collateral_min": 0.5,
-        "collateral_max": 2.0
+        "high_audit_prob": 0.9,
+        "false_positive_rate": 0.1,
+        "false_negative_rate": 0.1,
+        "penalty": 3.0
     }
 }

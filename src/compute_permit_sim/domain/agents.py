@@ -1,4 +1,14 @@
-"""Agent / Lab logic for compliance interactions."""
+"""Agent / Lab logic for compliance decisions.
+
+Implements the deterrence model from Emlyn's AISC Week 2 notes:
+    Compliance condition: p * B >= g
+    where p = detection probability, B = total penalty, g = gain from cheating.
+
+    Detection: p = p_eff (computed by Governor, passed in)
+    Penalty:   B = penalty + reputation_sensitivity
+    Gain:      g = delta_c + V  where V = racing_factor * capability_value
+               delta_c = market_price for binary q in {0, 1}
+"""
 
 
 class Lab:
@@ -7,8 +17,13 @@ class Lab:
     Attributes:
         lab_id: Unique identifier.
         gross_value: The value (v_i) the lab generates from a training run.
-        risk_profile: Logic/parameter determining risk sensitivity.
-        is_compliant: State of the last decision.
+        risk_profile: Multiplier on perceived penalty (>1 = risk-averse, <1 = risk-seeking).
+        capability_value: V_b, baseline value of model capabilities from training.
+        racing_factor: c_r, urgency multiplier on capability value.
+        reputation_sensitivity: R, perceived reputation cost if caught.
+        audit_coefficient: c(i), firm-specific scaling on base audit rate.
+        is_compliant: State of the last compliance decision.
+        has_permit: Whether the lab holds a valid permit this period.
     """
 
     def __init__(
@@ -16,127 +31,103 @@ class Lab:
         lab_id: int,
         gross_value: float,
         risk_profile: float = 1.0,
-        capability: float = 10.0,
-        allowance: float = 0.0,
-        collateral: float = 0.0,
+        capability_value: float = 0.0,
+        racing_factor: float = 1.0,
+        reputation_sensitivity: float = 0.0,
+        audit_coefficient: float = 1.0,
     ) -> None:
         """Initialize the Lab.
 
         Args:
             lab_id: Unique ID.
-            gross_value: v_i - Value of the run (per unit or total? abstract value).
-            risk_profile: Modifier for risk calculation (default=1.0).
-            capability: Max compute possible (q_max).
-            allowance: Initial permits allocated (a_i).
-            collateral: Collateral posted (K_i).
+            gross_value: v_i, value of the training run.
+            risk_profile: Multiplier for perceived penalty (default 1.0).
+            capability_value: V_b, baseline capability value (default 0.0).
+            racing_factor: c_r, urgency multiplier (default 1.0).
+            reputation_sensitivity: R, reputation cost if caught (default 0.0).
+            audit_coefficient: c(i), firm-specific audit scaling (default 1.0).
         """
         self.lab_id: int = lab_id
         self.gross_value: float = gross_value
         self.risk_profile: float = risk_profile
-        self.capability: float = capability
-        self.allowance: float = allowance
-        self.collateral: float = collateral
-
-        # Compliance State
-        self.has_permit: bool = False  # Legacy boolean, transitioning to quanitative
+        self.capability_value: float = capability_value
+        self.racing_factor: float = racing_factor
+        self.reputation_sensitivity: float = reputation_sensitivity
+        self.audit_coefficient: float = audit_coefficient
         self.is_compliant: bool = True
+        self.has_permit: bool = False
 
-        # Quantitative State
-        self.true_compute: float = 0.0
-        self.reported_compute: float = 0.0
+    def get_bid(self, cost: float = 0.0) -> float:
+        """Return willingness to pay for a permit.
 
-    def decide_strategy(
+        Args:
+            cost: Operational cost (c) deducted from gross value.
+
+        Returns:
+            Non-negative bid value.
+        """
+        return max(0.0, self.gross_value - cost)
+
+    def decide_compliance(
         self,
         market_price: float,
         penalty: float,
         detection_prob: float,
-        cost_per_unit: float = 0.0,
-    ) -> tuple[float, float]:
-        """Decide Run Size (q) and Reported Size (r).
+        cost: float = 0.0,
+    ) -> bool:
+        """Decide whether to comply, applying the deterrence condition p * B >= g.
 
-        Model:
-            Maximize U = Benefit(q) - Cost(q) - ExpectedPenalty(q, r)
+        Decision logic (Emlyn deterrence doc p.1):
+            1. If has_permit -> compliant (already paid for legal usage).
+            2. Compute gain from cheating: g = delta_c + V.
+            3. If g <= 0 -> compliant (no incentive to cheat).
+            4. Compute perceived penalty: B_total = (penalty + reputation) * risk_profile.
+            5. If detection_prob * B_total >= g -> compliant (deterred).
+            6. Otherwise -> non-compliant (cheat).
 
-            Benefit(q): gross_value * q (Assuming linear value scale for MVP)
-                        OR gross_value is just a scalar multiplier.
-                        Let's assume Benefit = gross_value * q.
+        Args:
+            market_price: Current permit price (used as delta_c for binary q).
+            penalty: The effective penalty amount (P).
+            detection_prob: Effective detection probability (p_eff).
+            cost: Operational cost (c).
 
-            Cost(q): cost_per_unit * q (Operational) + market_price * (q - allowance)?
-                     For now, assume Permits are pre-allocated (allowance).
-                     If we want to trade later, we add that.
-
-            ExpectedPenalty(q, r):
-                If q <= allowance: 0
-                If q > allowance:
-                    Non-Compliance Amount x = q - allowance
-                    But wait, regulator only knows 'r'.
-
-                    If r <= allowance: Looks compliant.
-                        But if audited, we are caught if q > allowance.
-                        Penalty ~ P * (q - allowance)? Or P fixed?
-                        Paper says L (Liability) or P.
-
-                    If r > allowance: Admitting non-compliance.
-                        Pay fine immediately? Or buy permits?
-
-            Heuristic Strategy for MVP:
-            1. Desired Q: Limit by capability.
-               If value is high, push Q to capability.
-               If value is low, maybe Q = 0.
-
-            2. Report R:
-               If Q <= allowance: Report Q (Honest).
-               If Q > allowance:
-                   Report allowance (Hide excess).
-                   Risk: Audit probability * Penalty.
+        Returns:
+            True if compliant, False if non-compliant.
         """
-        # 1. Determine Desired Q (True Compute)
-        # Simple Logic: If value > cost, run at max capability.
-        # Refined: Run at max unless risk of audit is too high.
+        # 1. Permitted firms are compliant
+        if self.has_permit:
+            self.is_compliant = True
+            return True
 
-        # For MVP: "The Greedy Lab"
-        # Always run at max capability if value is positive.
-        target_q = self.capability
+        # 2. Gain from cheating: g = delta_c + V
+        #    delta_c = market_price (savings from not buying permit)
+        #    BUT if v_i < market_price, the agent wouldn't buy anyway.
+        #    So the benefit of cheating is getting to run (worth v_i) vs not running (0).
+        #    Thus effective delta_c = min(market_price, self.gross_value)
+        delta_c = min(market_price, self.gross_value)
+        capability_gain = self.racing_factor * self.capability_value
+        gain = delta_c + capability_gain
 
-        # 2. Determine Report R
-        # If covered by allowance, report honestly.
-        if target_q <= self.allowance:
-            target_r = target_q
-        else:
-            # Not covered. Defect?
-            # Decision: Hide the excess?
-            # Gap = target_q - allowance.
+        # 3. No gain -> compliant (don't run or no incentive)
+        if gain <= 0:
+            self.is_compliant = True
+            return True
 
-            # Expected Cost of Cheating:
-            # E[Cost] = detection_prob * (Penalty + (target_q - allowance) * Price?)
-            # Let's simplify: Expected Penalty = detection_prob * penalty
-            # Benefit of Cheating = (target_q - allowance) * Value
+        # Also check: is running profitable at all?
+        # If gross_value - cost <= 0, the firm wouldn't run regardless
+        if self.gross_value - cost <= 0:
+            self.is_compliant = True
+            return True
 
-            benefit_of_excess = (target_q - self.allowance) * self.gross_value
-            cost_of_risk = detection_prob * penalty * self.risk_profile
+        # 4. Perceived total penalty: B = (penalty + reputation) * risk_profile
+        b_total = (penalty + self.reputation_sensitivity) * self.risk_profile
 
-            if benefit_of_excess > cost_of_risk:
-                # Cheat: Run max, Report allowance (hide it)
-                target_r = self.allowance
-                # Note: We could report 0 to be safer?
-                # But reporting allowance uses the permits we have.
-            else:
-                # Compliant: Restrict Q to allowance
-                target_q = self.allowance
-                target_r = self.allowance
+        # 5. Deterrence condition: p * B >= g
+        expected_penalty = detection_prob * b_total
+        if expected_penalty >= gain:
+            self.is_compliant = True
+            return True
 
-        self.true_compute = target_q
-        self.reported_compute = target_r
-
-        # Legacy flags for compatibility
-        self.is_compliant = self.true_compute <= self.allowance + 0.01  # tolerance
-
-        return self.true_compute, self.reported_compute
-
-    # Legacy methods for compatibility (optional, or remove if confident)
-    def decide_compliance(self, *args, **kwargs):
-        self.decide_strategy(*args, **kwargs)
-        return self.is_compliant
-
-    def decide_reporting(self):
-        return self.reported_compute
+        # 6. Not deterred -> cheat
+        self.is_compliant = False
+        return False

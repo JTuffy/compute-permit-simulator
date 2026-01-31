@@ -36,7 +36,7 @@ def ParamView(config):
         with solara.lab.Tab("Audit", style={"min-width": "auto"}):
             with solara.Column(gap="0px", style="opacity: 0.8; font-size: 0.9em;"):
                 solara.InputFloat(
-                    label="Penalty (P)",
+                    label="Penalty Amount",
                     value=config.audit.penalty_amount,
                     disabled=True,
                 )
@@ -51,14 +51,13 @@ def ParamView(config):
                     disabled=True,
                 )
                 solara.InputFloat(
-                    label="Signal TPR", value=config.audit.signal_tpr, disabled=True
+                    label="P(False Neg) 1-TPR",
+                    value=config.audit.false_negative_rate,
+                    disabled=True,
                 )
                 solara.InputFloat(
-                    label="Signal FPR", value=config.audit.signal_fpr, disabled=True
-                )
-                solara.InputInt(
-                    label="Audit Budget (Count)",
-                    value=config.audit.audit_budget,
+                    label="P(False Pos) FPR",
+                    value=config.audit.false_positive_rate,
                     disabled=True,
                 )
 
@@ -74,20 +73,15 @@ def ParamView(config):
                     config.lab.risk_profile_min,
                     config.lab.risk_profile_max,
                 )
-                RangeView(
-                    "Capability Range",
-                    config.lab.capability_min,
-                    config.lab.capability_max,
+                solara.InputFloat(
+                    label="Capability Value (V_b)",
+                    value=config.lab.capability_value,
+                    disabled=True,
                 )
-                RangeView(
-                    "Allowance Range",
-                    config.lab.allowance_min,
-                    config.lab.allowance_max,
-                )
-                RangeView(
-                    "Collateral Range",
-                    config.lab.collateral_min,
-                    config.lab.collateral_max,
+                solara.InputFloat(
+                    label="Racing Factor (c_r)",
+                    value=config.lab.racing_factor,
+                    disabled=True,
                 )
 
 
@@ -126,7 +120,7 @@ def RunHistoryItem(run, is_selected):
         f"Run: {run.id}\n"
         f"Time: {ts_str}\n"
         f"cfg: {c.n_agents} agents, {c.steps} steps\n"
-        f"Token Cap: {c.market.token_cap}, Budget: {c.audit.audit_budget}"
+        f"Token Cap: {c.market.token_cap}"
     )
 
     if run.metrics and "fraud_detected" in run.metrics:
@@ -340,17 +334,20 @@ def InspectorTab():
                 # Show table but maybe select specific columns to avoid clutter
                 # We want: ID, Capability, Allowance, True, Reported, Compliant?
                 cols = [
-                    "AgentID",
-                    "Capability",
-                    "Allowance",
-                    "True_Compute",
-                    "Reported_Compute",
-                    "Compliant",
+                    "ID",
+                    "Value",
+                    "Net_Value",
+                    "Audited",
+                    "Caught",
+                    "Penalty",
                     "Wealth",
                 ]
                 # Filter cols if they exist
-                valid_cols = [c for c in cols if c in agents_df.columns]
-                solara.DataFrame(agents_df[valid_cols], items_per_page=10)
+                if agents_df is not None and not agents_df.empty:
+                    valid_cols = [c for c in cols if c in agents_df.columns]
+                    solara.DataFrame(agents_df[valid_cols], items_per_page=10)
+                else:
+                    solara.Markdown("No agent data available for this step.")
     else:
         solara.Markdown("No agent data.")
 
@@ -381,15 +378,11 @@ def ConfigPanel():
 
         with solara.lab.Tab("Audit"):
             solara.Markdown("**Governor (Audit) Policy**")
-            solara.InputFloat(label="Penalty (P)", value=manager.penalty)
+            solara.InputFloat(label="Penalty Amount", value=manager.penalty)
             solara.InputFloat(label="Base Prob (pi_0)", value=manager.base_prob)
             solara.InputFloat(label="High Prob (pi_1)", value=manager.high_prob)
             solara.InputFloat(label="Signal TPR", value=manager.signal_tpr)
             solara.InputFloat(label="Signal FPR", value=manager.signal_fpr)
-            solara.InputInt(
-                label="Audit Budget (Count)",
-                value=manager.audit_budget,
-            )
 
         with solara.lab.Tab("Lab"):
             solara.Markdown("**Lab Agent Generation**")
@@ -399,14 +392,15 @@ def ConfigPanel():
             RangeController(
                 "Risk Profile Range", manager.risk_profile_min, manager.risk_profile_max
             )
-            RangeController(
-                "Capability Range", manager.capability_min, manager.capability_max
+            solara.InputFloat(
+                label="Capability Value (V_b)", value=manager.capability_value
             )
-            RangeController(
-                "Allowance Range", manager.allowance_min, manager.allowance_max
+            solara.InputFloat(label="Racing Factor (c_r)", value=manager.racing_factor)
+            solara.InputFloat(
+                label="Reputation Sensitivity", value=manager.reputation_sensitivity
             )
-            RangeController(
-                "Collateral Range", manager.collateral_min, manager.collateral_max
+            solara.InputFloat(
+                label="Audit Coefficient", value=manager.audit_coefficient
             )
 
     solara.Markdown("---")
@@ -478,8 +472,12 @@ def Page():
         with solara.lab.Tabs():
             with solara.lab.Tab("Dashboard"):
                 Dashboard()
-            with solara.lab.Tab("Inspector"):
-                InspectorTab()
+            with solara.lab.Tab("Details"):
+                # Use manager values for key
+                r = manager.selected_run.value
+                sc = manager.step_count.value
+                key_id = f"{r.id if r else 'live'}_{sc}"
+                InspectorTab().key(key_id)
 
     # Run History at the bottom
     solara.Markdown("---")

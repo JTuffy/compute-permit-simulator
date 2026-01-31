@@ -1,23 +1,27 @@
-"""Enforcement logic for the Governor/Auditor."""
+"""Enforcement logic for the Governor/Auditor.
+
+Implements the signal-contingent audit model from the technical specification:
+    - Governor observes noisy signal s_i in {0, 1} per firm.
+    - P(s=1 | compliant)     = false_positive_rate (alpha)
+    - P(s=0 | non-compliant) = false_negative_rate (1 - beta)
+    - Audit triggered with pi_1 (high suspicion) or pi_0 (low suspicion).
+
+Effective detection probability (tech spec section 3):
+    p_s  = beta * pi_1 + (1 - beta) * pi_0
+    p_eff = p_s + (1 - p_s) * backcheck_prob
+"""
 
 import random
-from dataclasses import dataclass
 
-
-@dataclass
-class AuditConfig:
-    """Configuration for audit policies."""
-
-    base_prob: float  # pi_0
-    high_prob: float  # pi_1 (targeted)
-    signal_fpr: float  # alpha
-    signal_tpr: float  # beta
-    penalty_amount: float  # P
-    audit_budget: int = 5  # Max audits per step
+from ..schemas import AuditConfig
 
 
 class Governor:
-    """The Governor agent handling audits and enforcement."""
+    """The Governor agent handling audits and enforcement.
+
+    Attributes:
+        config: Audit policy configuration.
+    """
 
     def __init__(self, config: AuditConfig) -> None:
         """Initialize the Governor.
@@ -27,60 +31,49 @@ class Governor:
         """
         self.config = config
 
-    def generate_signal(self, true_compute: float, reported_compute: float) -> bool:
-        """Generate a signal based on discrepancy between observed Energy and Report.
+    def compute_effective_detection(self, audit_coefficient: float = 1.0) -> float:
+        """Compute the effective detection probability for a firm.
 
-        Model:
-            Observed Energy E = true_compute + Noise
-            Noise ~ Normal(0, sigma)  (For now, we can use simple uniform noise)
-
-            Signal = 1 if (E - reported_compute) > Threshold
-
-            Threshold determination:
-            We essentially want to maintain the FPR/TPR from config if possible,
-            or we define the threshold dynamically.
-
-            Let's use a simple heuristic for MVP:
-            Noise magnitude = 0.5 * true_compute (approx) or fixed amount?
-
-            Let's say Regulator allows some tolerance.
-            Discrepancy D = (true_compute + random.gauss(0, 0.1)) - reported_compute
-
-            If D > Tolerance (e.g. 0.2), Signal = True.
+        Formula (Emlyn deterrence doc p.1, tech spec section 3):
+            beta = 1 - false_negative_rate  (true positive rate)
+            p_s  = beta * pi_1 + (1 - beta) * pi_0
+            p_s  = p_s * audit_coefficient   (firm-specific scaling)
+            p_eff = p_s + (1 - p_s) * backcheck_prob
 
         Args:
-            true_compute: Actual usage (q).
-            reported_compute: What lab reported (r).
+            audit_coefficient: Firm-specific scaling factor c(i) for audit rate.
 
         Returns:
-            True if suspicious (Signal=1), False otherwise.
+            The effective detection probability p_eff in [0, 1].
         """
-        # Noise factor (sigma). Could be config, but hardcoding for MVP
-        # to ensure it's 'interesting' relative to the 0-10 scale.
-        # Capability is 1-10.
-        sigma = 0.5
-        noise = random.gauss(0, sigma)
+        beta = 1.0 - self.config.false_negative_rate
+        p_s = beta * self.config.high_prob + (1.0 - beta) * self.config.base_prob
+        p_s = min(1.0, p_s * audit_coefficient)
+        p_eff = p_s + (1.0 - p_s) * self.config.backcheck_prob
+        return p_eff
 
-        observed_energy = true_compute + noise
+        """Generate a noisy signal based on compliance status.
 
-        # Regulator Logic
-        # They compare Observed to Reported.
-        discrepancy = observed_energy - reported_compute
+        Args:
+            is_compliant: True if the lab is compliant (clean).
 
-        # Threshold: How much variance do we tolerate?
-        # If strict, threshold = 0. But allows false positives due to noise.
-        # We want approx 10% FPR (per config)?
-        # For Normal(0, 0.5), 10% tail is at approx 1.28 * sigma = 0.64
-        threshold = 0.64
-
-        return discrepancy > threshold
+        Returns:
+            True if a suspicious signal is observed (s=1), False otherwise (s=0).
+        """
+        if is_compliant:
+            # False Positive: compliant but signal = 1
+            return random.random() < self.config.false_positive_rate
+        else:
+            # True Positive: non-compliant and signal = 1
+            # P(s=1 | non-compliant) = 1 - false_negative_rate = beta
+            return random.random() < (1.0 - self.config.false_negative_rate)
 
     def decide_audit(self, signal: bool) -> bool:
         """Decide whether to audit based on the signal.
 
         Policy:
-            If signal=1 (High Suspicion) -> Audit with prob pi_1
-            If signal=0 (Low Suspicion) -> Audit with prob pi_0
+            signal=1 (high suspicion) -> audit with prob pi_1
+            signal=0 (low suspicion)  -> audit with prob pi_0
 
         Args:
             signal: The observed signal value.
@@ -91,21 +84,17 @@ class Governor:
         prob = self.config.high_prob if signal else self.config.base_prob
         return random.random() < prob
 
-    def apply_budget(self, candidates: list) -> list:
-        """Filter and sort audit candidates based on budget and priority.
+    def apply_penalty(self, is_compliant: bool, has_permit: bool) -> float:
+        """Compute the penalty for a firm that was audited.
 
         Args:
-            candidates: List of tuples (agent, signal, is_compliant, ...).
-                       We expect index 1 to be the signal (bool).
+            is_compliant: Whether the firm complied this period.
+            has_permit: Whether the firm holds a valid permit.
 
         Returns:
-            The subset of candidates to actually audit.
+            The penalty amount to deduct from the firm's wealth.
+            Returns 0.0 if the firm is compliant or holds a permit.
         """
-        # Sort: Signal=True (1) first, then Signal=False (0)
-        # Randomize order within same priority to be fair
-        # Note: In Python, sort is stable. So if we shuffle first, then sort by key,
-        # we get randomized groups.
-        random.shuffle(candidates)
-        candidates.sort(key=lambda x: x[1], reverse=True)
-
-        return candidates[: self.config.audit_budget]
+        if is_compliant or has_permit:
+            return 0.0
+        return self.config.penalty_amount

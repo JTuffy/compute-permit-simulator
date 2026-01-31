@@ -1,150 +1,94 @@
+# Technical Specification: Compute Permit Simulator
+
+## 1. Project Overview
+
+A simulation of an AI Compute Permit Market to model the interaction between AI Labs and a Regulator (Governor). The simulation explores the **Deterrence Model**: under what conditions do rational agents choose compliance?
+
+### 1.1 Project Structure
+
+```text
 compute_permit_sim/
 ├── domain/                # Economic & Enforcement logic (Pure Python)
 │   ├── agents.py          # Lab/Firm logic: compute value, compliance check
-│   ├── enforcement.py     # Auditor logic: signals, penalties, collateral
+│   ├── enforcement.py     # Auditor logic: signals, penalties
 │   └── market.py          # Trading logic: permit prices, market clearing
-├── infrastructure/        # Simulation engine (Mesa/AgentPy integration)
+├── infrastructure/        # Simulation engine (Mesa integration)
 │   ├── model.py           # The global world state and turn-scheduler
 │   └── data_collect.py    # Metrics: total welfare, risk violations
-├── scenarios/             # YAML/JSON configs for Scenarios 1, 2, and 3
-└── main.py                # Entry point for the Apart sprint
-2. Core Model Specifications
-Agent: Lab (Firm)
-The primary decision-maker. Labs are heterogeneous in their Gross Value (v 
-i
-​
- ) and Risk Profile.
+├── scenarios/             # JSON configs for scenarios (audit params, market type)
+└── main.py                # Entry point
+```
 
-Decision Rule: Choose usage q 
-i
-​
- ∈{0,1}.
+## 2. Core Model Specification
 
-Compliance Logic: If unpermitted, run if v 
-i
-​
- −c>E[Penalty].
+### 2.1 Agents (Labs)
+Labs are profit-maximizing entities that make a binary decision: **Comply** (buy permit) or **Defect** (train without permit).
 
-Expected Penalty: P⋅[βπ 
-1
-​
- +(1−β)π 
-0
-​
- ].
+**Key Attributes:**
+- `gross_value` ($v_i$): Value generated from a training run.
+- `risk_profile`: Multiplier on perceived penalty.
+- `compliance_decision`: Based on the condition $p_{eff} \cdot B \ge g$.
+  - $p_{eff}$: Effective detection probability.
+  - $B$: Total effective penalty (Fine + Reputation).
+  - $g$: Gain from cheating (Permit Cost + Racing Value).
 
-Agent: Governor (Regulator)
-The entity enforcing the Aggregate Cap (Q).
+### 2.2 Governor (Auditor)
+The Governor enforces compliance through audits based on noisy signals.
 
-Enforcement Policy: Sets the effective penalty P and audit probabilities π 
-1
-​
-  (high-suspicion) and π 
-0
-​
-  (low-suspicion).
+**Signal Model:**
+- **False Positive Rate ($\alpha$)**: $P(\text{signal}=1 | \text{compliant})$
+- **False Negative Rate ($1-\beta$)**: $P(\text{signal}=0 | \text{non-compliant})$
 
-Signal Monitoring: Observes noisy signals s 
-i
-​
- ∈{0,1} with False Positive Rate α and True Positive Rate β.
+**Audit Strategy:**
+- If Signal=1 (Suspicious): Audit with probability $\pi_1$ (`high_prob`).
+- If Signal=0 (Clean): Audit with probability $\pi_0$ (`base_prob`).
 
-3. Key Variables & Parameters
-Ground the simulator in the following "source of truth" variables from recent work:
+**Effective Detection:**
+$$ p_{eff} = p_s + (1 - p_s) \cdot p_b $$
+Where $p_s$ is the probability of a signal-triggered audit, and $p_b$ is the backcheck probability.
 
-Component	Variable	Definition	Recommended Value/Range
-Deterrence	P	Effective Punishment (Collateral K + Fine ϕ)	0.2→0.8
-Monitoring	p	Detection Probability (p 
-eff
-​
- =p 
-s
-​
- +(1−p 
-s
-​
- )p 
-b
-​
- )	0.25→0.75
-Market	p	Market-clearing price (p=v 
-∗
- −c)	Endogenous
-Auditing	π 
-1
-∗
-​
- 	Optimal high-suspicion audit probability	min{1, 
-Pβ
-v 
-∗
- −c
-​
- }
+### 2.3 Market
+The market determines permit allocation and pricing. Two modes are supported:
 
-Export to Sheets
+1.  **Clearing Market (Cap-and-Trade):**
+    - Supply is fixed at $Q$ (`token_cap`).
+    - Price is set by the $Q$-th highest bid (marginal pricing).
+    - Highest $Q$ bidders receive permits.
 
-4. Implementation Spec for AI Agents
-To ensure an AI agent can build this effectively during the Apart Sprint, use this focused instruction set:
+2.  **Fixed Price Market (Carbon Tax / Unlimited):**
+    - Price is fixed (`fixed_price`).
+    - Supply is effectively unlimited.
+    - Any agent with $v_i \ge \text{price}$ purchases a permit.
 
-Strict Rule Separation: Do not mix market-clearing logic with agent decision logic. Use a Central Exchange class to resolve permit prices after agents submit their initial demand.
+## 3. Simulation Loop (Turn Sequence)
 
-Turn Sequence: (1) Market Price Discovery → (2) Permit Allocation → (3) Labs decide to Run (Compliance Choice) → (4) Signals Realize → (5) Governor Audits → (6) Penalties/Refunds processed.
+1.  **Trading Phase:**
+    - Agents submit bids (willingness to pay).
+    - Market resolves price and allocates permits.
+    - Agents pay for permits (reducing wealth).
 
-Visualization: Prioritize a Deterrence Heatmap. Show P on the X-axis, p on the Y-axis, and color-code by Compliance Rate to find the "behavior flip" point.
+2.  **Compliance Phase:**
+    - Agents without permits decide whether to run without one (defect).
+    - Agents with permits always comply (run legally).
 
-Recommended Package: PyMarket + Mesa
-Using PyMarket for the "high-lift" market clearing and Mesa for the agent interactions will save significant development time during the 3-day sprint.
+3.  **Enforcement Phase:**
+    - Governor monitors signals for all running agents.
+    - Audits are triggered based on signal and policy.
+    - Non-compliant agents caught are penalized (fine deducted).
 
-Would you like me to write the domain/enforcement.py module to handle the signal-contingent audit logic now?
+## 4. Key Variables & Parameters
 
-Simulating Markets with Python This video is relevant because it introduces PyMarket, a Python library specifically designed to simplify the design and simulation of various market mechanisms, which directly supports the project's goal of modeling permit trading.
+| Component | Variable | Definition | Recommended Value/Range |
+|---|---|---|---|
+| Deterrence | $P$ | Effective Punishment | 0.2 $\to$ 0.8 |
+| Monitoring | $p_{eff}$ | Detection Probability | 0.25 $\to$ 0.75 |
+| Market | $p$ | Clearing or Fixed Price | Endogenous or Fixed |
+| Auditing | $\pi_1$ | High-suspicion audit probability | $\min(1, \frac{P\beta}{v^*-c})$ |
 
-The "Pro" Architecture
-We aren't just writing one giant script. We are separating the Economic Logic (the rules of the game) from the Simulation Engine (the clock that runs the game).
-+1
+## 5. Configuration
 
-The Theory Brain (Domain): This is where all the math lives. It calculates things like whether a lab thinks it’s "worth it" to cheat based on the current penalty and the chance of getting caught.
-+4
+Scenarios are defined in `scenarios/config.json`. Key configuration sections:
 
-The Simulation Engine (Infrastructure): This is the manager. It handles the passage of time (the "turns"), collects data on who is winning, and manages the visual output for the research team.
-+1
-
-The Scenario Vault: We keep our experiment settings separate. This allows us to quickly switch from a "no-enforcement" world to a "targeted-audit" world without rewriting any code.
-+2
-
-The Key Players (Models)
-We define the world through three main roles:
-
-
-The Lab (The Actor): Each lab has its own "personality"—some get more value from compute than others. They are constantly weighing the cost of a legal permit against the risk of an unauthorized training run.
-+4
-
-
-The Governor (The Regulator): This player is trying to keep total compute under a specific limit. They don't have perfect vision, so they rely on suspicious "signals" (like sudden spikes in electricity use) to decide who to audit.
-+4
-
-The Market: This is the meeting ground. It’s where permits are traded, and the price of a permit is naturally set by how badly everyone wants to use compute that month.
-+2
-
-The "Game Loop" Sequence
-Every "month" in the simulation follows a strict order to ensure the results are scientifically valid:
-
-
-Phase 1: Trading: Labs buy and sell permits based on their needs.
-
-
-Phase 2: The Choice: Labs decide if they will stick to their permits or "overclock" and hope they don't get caught.
-
-
-Phase 3: The Signal: The Governor sees "blips" on the radar for everyone, some of which are true violations and some of which are just noise.
-+2
-
-
-Phase 4: Enforcement: The Governor picks labs to audit, seizes collateral from violators, and refunds the "clean" labs.
-+2
-
-This structure ensures that the simulation isn't just a toy, but a rigorous tool for testing AI governance policies before they are tried in the real world.
-+1
-
-Would you like me to walk through the "Optimal Audit" logic for Scenario 3 to see how the Governor decides who to pick?
+- `audit`: Detection probabilities, signal rates ($\alpha, \beta$), penalties.
+- `market`: `token_cap` (quantity) or `fixed_price`.
+- `lab`: Ranges for `gross_value` and `risk_profile` to generate heterogeneous agents.
