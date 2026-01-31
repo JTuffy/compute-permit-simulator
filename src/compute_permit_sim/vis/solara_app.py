@@ -25,8 +25,8 @@ def reset_model():
     audit_config = {
         "base_prob": detection_prob.value,
         "high_prob": detection_prob.value,  # Simplify for UI: pi_0 = pi_1
-        "signal_fpr": 0.1,
-        "signal_tpr": 0.9,
+        "false_positive_rate": 0.1,
+        "false_negative_rate": 0.1,  # Corresponds to TPR = 0.9
         "penalty_amount": penalty.value,
     }
 

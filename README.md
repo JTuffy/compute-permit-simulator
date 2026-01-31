@@ -76,8 +76,22 @@ src/compute_permit_sim/
 
 We enforce strict code quality using `ruff`.
 
--   **Lint**: `make lint`
--   **Format**: `make format`
+-   **Lint**: `make lint` or `uv run ruff check`
+-   **Format**: `make format` or `uv run ruff format`
+
+### Pre-commit Hooks
+
+To automatically run linting and formatting on every commit:
+
+```bash
+uv run pre-commit install
+```
+
+To run checks manually on all files:
+
+```bash
+uv run pre-commit run --all-files
+```
 
 ## Key Concepts
 

@@ -1,4 +1,14 @@
-"""Agent / Lab logic for compliance interactions."""
+"""Agent / Lab logic for compliance decisions.
+
+Implements the deterrence model from Emlyn's AISC Week 2 notes:
+    Compliance condition: p * B >= g
+    where p = detection probability, B = total penalty, g = gain from cheating.
+
+    Detection: p = p_eff (computed by Governor, passed in)
+    Penalty:   B = penalty + reputation_sensitivity
+    Gain:      g = delta_c + V  where V = racing_factor * capability_value
+               delta_c = market_price for binary q in {0, 1}
+"""
 
 
 class Lab:
@@ -7,25 +17,56 @@ class Lab:
     Attributes:
         lab_id: Unique identifier.
         gross_value: The value (v_i) the lab generates from a training run.
-        risk_profile: Logic/parameter determining risk sensitivity.
-        is_compliant: State of the last decision.
+        risk_profile: Multiplier on perceived penalty (>1 = risk-averse, <1 = risk-seeking).
+        capability_value: V_b, baseline value of model capabilities from training.
+        racing_factor: c_r, urgency multiplier on capability value.
+        reputation_sensitivity: R, perceived reputation cost if caught.
+        audit_coefficient: c(i), firm-specific scaling on base audit rate.
+        is_compliant: State of the last compliance decision.
+        has_permit: Whether the lab holds a valid permit this period.
     """
 
     def __init__(
-        self, lab_id: int, gross_value: float, risk_profile: float = 1.0
+        self,
+        lab_id: int,
+        gross_value: float,
+        risk_profile: float = 1.0,
+        capability_value: float = 0.0,
+        racing_factor: float = 1.0,
+        reputation_sensitivity: float = 0.0,
+        audit_coefficient: float = 1.0,
     ) -> None:
         """Initialize the Lab.
 
         Args:
             lab_id: Unique ID.
-            gross_value: v_i - Value of the run.
-            risk_profile: Modifier for risk calculation (default=1.0).
+            gross_value: v_i, value of the training run.
+            risk_profile: Multiplier for perceived penalty (default 1.0).
+            capability_value: V_b, baseline capability value (default 0.0).
+            racing_factor: c_r, urgency multiplier (default 1.0).
+            reputation_sensitivity: R, reputation cost if caught (default 0.0).
+            audit_coefficient: c(i), firm-specific audit scaling (default 1.0).
         """
         self.lab_id: int = lab_id
         self.gross_value: float = gross_value
         self.risk_profile: float = risk_profile
+        self.capability_value: float = capability_value
+        self.racing_factor: float = racing_factor
+        self.reputation_sensitivity: float = reputation_sensitivity
+        self.audit_coefficient: float = audit_coefficient
         self.is_compliant: bool = True
         self.has_permit: bool = False
+
+    def get_bid(self, cost: float = 0.0) -> float:
+        """Return willingness to pay for a permit.
+
+        Args:
+            cost: Operational cost (c) deducted from gross value.
+
+        Returns:
+            Non-negative bid value.
+        """
+        return max(0.0, self.gross_value - cost)
 
     def decide_compliance(
         self,
@@ -34,55 +75,59 @@ class Lab:
         detection_prob: float,
         cost: float = 0.0,
     ) -> bool:
-        """Decide whether to comply (buy permit) or defect (run without permit).
+        """Decide whether to comply, applying the deterrence condition p * B >= g.
 
-        Decision Rule:
-            If unpermitted, run if: v_i - c > Expected Penalty
-            Expected Penalty = P * (beta * pi_1 + (1-beta) * pi_0)
-            Or simplified: P * detection_prob
+        Decision logic (Emlyn deterrence doc p.1):
+            1. If has_permit -> compliant (already paid for legal usage).
+            2. Compute gain from cheating: g = delta_c + V.
+            3. If g <= 0 -> compliant (no incentive to cheat).
+            4. Compute perceived penalty: B_total = (penalty + reputation) * risk_profile.
+            5. If detection_prob * B_total >= g -> compliant (deterred).
+            6. Otherwise -> non-compliant (cheat).
 
         Args:
-            market_price: Current cost of a permit (p).
-            penalty: The effective penalty (P).
-            detection_prob: The effective probability of detection (p_eff).
+            market_price: Current permit price (used as delta_c for binary q).
+            penalty: The effective penalty amount (P).
+            detection_prob: Effective detection probability (p_eff).
             cost: Operational cost (c).
 
         Returns:
-            True if compliant (buys permit or doesn't run if priced out),
-            False if non-compliant (runs without permit).
+            True if compliant, False if non-compliant.
         """
-        # Net value of running legally
-        profit_legal = self.gross_value - cost - market_price
-
-        # Net value of running illegally (expected)
-        expected_penalty = penalty * detection_prob
-        # Risk adjustment: A risk-averse agent might weigh penalty higher?
-        # Spec says: risk_profile. Scales expected penalty perception?
-        # Or perhaps it's just the 'beta' in the spec?
-        # For now, we'll treat risk_profile as a multiplier on Disutility of Penalty.
-        # Spec: v_i - c > E[Penalty]
-        profit_illegal = (self.gross_value - cost) - (
-            expected_penalty * self.risk_profile
-        )
-
-        # 3 Options:
-        # 1. Buy permit (if affordable / creates profit) -> Compliant
-        # 2. Don't run (if neither is profitable) -> Compliant (0 emissions)
-        # 3. Run illegally -> Non-Compliant
-
-        # If we have a permit, we are compliant (assuming we bought it)
+        # 1. Permitted firms are compliant
         if self.has_permit:
+            self.is_compliant = True
             return True
 
-        if profit_legal >= 0:
-            if profit_legal >= profit_illegal:
-                return True
-            else:
-                return False  # Cheating is more profitable
-        else:
-            # Legal is not profitable (priced out)
-            # Check if illegal is profitable
-            if profit_illegal > 0:
-                return False  # Cheat
-            else:
-                return True  # Don't run (Compliant)
+        # 2. Gain from cheating: g = delta_c + V
+        #    delta_c = market_price (savings from not buying permit)
+        #    BUT if v_i < market_price, the agent wouldn't buy anyway.
+        #    So the benefit of cheating is getting to run (worth v_i) vs not running (0).
+        #    Thus effective delta_c = min(market_price, self.gross_value)
+        delta_c = min(market_price, self.gross_value)
+        capability_gain = self.racing_factor * self.capability_value
+        gain = delta_c + capability_gain
+
+        # 3. No gain -> compliant (don't run or no incentive)
+        if gain <= 0:
+            self.is_compliant = True
+            return True
+
+        # Also check: is running profitable at all?
+        # If gross_value - cost <= 0, the firm wouldn't run regardless
+        if self.gross_value - cost <= 0:
+            self.is_compliant = True
+            return True
+
+        # 4. Perceived total penalty: B = (penalty + reputation) * risk_profile
+        b_total = (penalty + self.reputation_sensitivity) * self.risk_profile
+
+        # 5. Deterrence condition: p * B >= g
+        expected_penalty = detection_prob * b_total
+        if expected_penalty >= gain:
+            self.is_compliant = True
+            return True
+
+        # 6. Not deterred -> cheat
+        self.is_compliant = False
+        return False

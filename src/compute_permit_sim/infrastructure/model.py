@@ -14,11 +14,27 @@ class MesaLab(mesa.Agent):
     """Mesa wrapper for the Lab domain logic."""
 
     def __init__(
-        self, unique_id: int, model: mesa.Model, gross_value: float, risk_profile: float
+        self,
+        unique_id: int,
+        model: mesa.Model,
+        gross_value: float,
+        risk_profile: float,
+        capability_value: float = 0.0,
+        racing_factor: float = 1.0,
+        reputation_sensitivity: float = 0.0,
+        audit_coefficient: float = 1.0,
     ) -> None:
         super().__init__(model)
         self.unique_id = unique_id
-        self.domain_agent = Lab(unique_id, gross_value, risk_profile)
+        self.domain_agent = Lab(
+            unique_id,
+            gross_value,
+            risk_profile,
+            capability_value=capability_value,
+            racing_factor=racing_factor,
+            reputation_sensitivity=reputation_sensitivity,
+            audit_coefficient=audit_coefficient,
+        )
         self.wealth: float = 0.0
 
     def step(self) -> None:
@@ -48,6 +64,8 @@ class ComputePermitModel(mesa.Model):
 
         # Initialize Market and Governor
         self.market = SimpleClearingMarket(token_cap=config.market.token_cap)
+        if config.market.fixed_price is not None:
+            self.market.set_fixed_price(config.market.fixed_price)
         self.governor = Governor(config.audit)
 
         # Initialize Agents
@@ -58,7 +76,17 @@ class ComputePermitModel(mesa.Model):
             risk_profile = random.uniform(
                 config.lab.risk_profile_min, config.lab.risk_profile_max
             )
-            MesaLab(i, self, gross_value, risk_profile)
+            # Pass all extended parameters to the agent
+            MesaLab(
+                i,
+                self,
+                gross_value,
+                risk_profile,
+                capability_value=config.lab.capability_value,
+                racing_factor=config.lab.racing_factor,
+                reputation_sensitivity=config.lab.reputation_sensitivity,
+                audit_coefficient=config.lab.audit_coefficient,
+            )
             # Agent is automatically added to self.agents in Mesa 3.x
 
         # Data Collection
@@ -76,37 +104,34 @@ class ComputePermitModel(mesa.Model):
         # 1. Trading Phase
         # Collect bids (valuations) from all agents
         # For simplicity, valuation ~ gross_value (assume 1 permit needed)
+        # Bids are tuples of (lab_id, valuation)
         bids = [
-            a.domain_agent.gross_value for a in self.agents if isinstance(a, MesaLab)
+            (a.domain_agent.lab_id, a.domain_agent.get_bid())
+            for a in self.agents
+            if isinstance(a, MesaLab)
         ]
-        clearing_price = self.market.resolve_price(bids)
 
-        # Allocate permits based on bids vs price
-        # Agents who value it > price get a permit
-        # Re-do allocation properly:
-        # Sort agents by value
-        sorted_agents = sorted(
-            [a for a in self.agents if isinstance(a, MesaLab)],
-            key=lambda x: x.domain_agent.gross_value,
-            reverse=True,
-        )
+        # Market handles price discovery and allocation
+        clearing_price, winning_ids = self.market.allocate(bids)
 
-        permits_available = int(self.market.max_supply)
-        for i, agent in enumerate(sorted_agents):
-            if (
-                i < permits_available
-                and agent.domain_agent.gross_value >= clearing_price
-            ):
-                agent.domain_agent.has_permit = True
-                agent.wealth -= clearing_price
-            else:
-                agent.domain_agent.has_permit = False
+        # Apply results to agents
+        winning_set = set(winning_ids)
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                if agent.domain_agent.lab_id in winning_set:
+                    agent.domain_agent.has_permit = True
+                    agent.wealth -= clearing_price
+                else:
+                    agent.domain_agent.has_permit = False
 
         # 2. Choice Phase (Run / Compliance)
-        detection_prob = (
-            self.config.audit.signal_tpr * self.config.audit.high_prob
-            + (1 - self.config.audit.signal_tpr) * self.config.audit.base_prob
-        )  # Simplified p_eff for agent decision
+        # TPR = 1 - FNR (beta)
+        tpr = 1.0 - self.config.audit.false_negative_rate
+        p_s = (
+            tpr * self.config.audit.high_prob
+            + (1.0 - tpr) * self.config.audit.base_prob
+        )
+        detection_prob = p_s + (1.0 - p_s) * self.config.audit.backcheck_prob
 
         for agent in self.agents:
             if isinstance(agent, MesaLab):

@@ -6,7 +6,7 @@ import seaborn as sns
 from tqdm import tqdm
 
 from ..infrastructure.model import ComputePermitModel
-from ..schemas import AuditConfig, MarketConfig, ScenarioConfig
+from ..schemas import ScenarioConfig
 
 
 def generate_heatmap(
