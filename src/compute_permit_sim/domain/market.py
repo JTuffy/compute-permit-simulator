@@ -77,8 +77,6 @@ class SimpleClearingMarket:
         self.current_price = clearing_price
         return clearing_price
 
-
-
     def allocate(self, bids: list[tuple[int, float]]) -> tuple[float, list[int]]:
         """Resolve price and allocate permits to the highest bidders.
 
