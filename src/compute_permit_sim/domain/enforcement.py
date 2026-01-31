@@ -13,6 +13,7 @@ class AuditConfig:
     signal_fpr: float  # alpha
     signal_tpr: float  # beta
     penalty_amount: float  # P
+    audit_budget: int = 5  # Max audits per step
 
 
 class Governor:

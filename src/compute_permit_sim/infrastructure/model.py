@@ -118,17 +118,38 @@ class ComputePermitModel(mesa.Model):
                 )
 
         # 3. Signal Phase & 4. Enforcement Phase
+        # Collect candidates first to enforce budget
+        audit_candidates = []
+
         for agent in self.agents:
             if isinstance(agent, MesaLab):
                 is_compliant = agent.domain_agent.is_compliant
                 signal = self.governor.generate_signal(is_compliant)
-                is_audited = self.governor.decide_audit(signal)
+                # Governor decides if they WANT to audit this agent
+                should_audit = self.governor.decide_audit(signal)
 
-                if is_audited:
-                    # Enforce
-                    if not is_compliant and not agent.domain_agent.has_permit:
-                        # Caught cheating!
-                        agent.wealth -= self.config.audit.penalty_amount
-                    # If compliant, maybe refund? (Spec mentions refunds)
+                if should_audit:
+                    # Queue for budget check
+                    # We store 'signal' to prioritize high suspicion (signal=True)
+                    audit_candidates.append((agent, signal, is_compliant))
+
+        # Sort candidates: Signal=True (1) first, then Signal=False (0)
+        # Randomize order within same priority to be fair
+        random.shuffle(audit_candidates)
+        audit_candidates.sort(key=lambda x: x[1], reverse=True)
+
+        # Apply Budget
+        budget = self.config.audit.audit_budget
+        audits_conducted = 0
+
+        for agent, signal, is_compliant in audit_candidates:
+            if audits_conducted >= budget:
+                break
+
+            # Perform Audit / Enforcement
+            audits_conducted += 1
+            if not is_compliant and not agent.domain_agent.has_permit:
+                # Caught cheating!
+                agent.wealth -= self.config.audit.penalty_amount
 
         self.datacollector.collect(self)
