@@ -26,11 +26,19 @@ class SimulationManager:
     def __init__(self):
         # --- Full Configuration State ---
         # Lab Config
-        self.n_agents = solara.reactive(20)
+        self.n_agents = solara.reactive(5)
         self.gross_value_min = solara.reactive(0.5)
         self.gross_value_max = solara.reactive(1.5)
         self.risk_profile_min = solara.reactive(0.8)
         self.risk_profile_max = solara.reactive(1.2)
+
+        # New Quantitative Ranges
+        self.capability_min = solara.reactive(1.0)
+        self.capability_max = solara.reactive(10.0)
+        self.allowance_min = solara.reactive(0.0)
+        self.allowance_max = solara.reactive(5.0)
+        self.collateral_min = solara.reactive(0.5)
+        self.collateral_max = solara.reactive(2.0)
 
         # Market Config
         self.token_cap = solara.reactive(5)
@@ -44,7 +52,7 @@ class SimulationManager:
         self.audit_budget = solara.reactive(5)
 
         # Sim Config
-        self.steps = solara.reactive(50)
+        self.steps = solara.reactive(10)
 
         # --- Model State ---
         self.model = solara.reactive(None)
@@ -78,9 +86,9 @@ class SimulationManager:
             c = self.scenarios.value[name]
 
             # Apply Top Level
-            self.n_agents.value = c.get("n_agents", 20)
+            self.n_agents.value = c.get("n_agents", 5)
             self.token_cap.value = c.get("token_cap", 5)
-            self.steps.value = c.get("steps", 50)
+            self.steps.value = c.get("steps", 10)
 
             # Audit
             self.base_prob.value = c.get("base_audit_prob", 0.1)
@@ -89,6 +97,20 @@ class SimulationManager:
             self.signal_tpr.value = c.get("signal_tpr", 0.9)
             self.penalty.value = c.get("penalty", 0.5)
             self.audit_budget.value = c.get("audit_budget", 5)
+
+            # Lab
+            # We assume the config.json might not have these yet, so provide safe defaults
+            # matching LabConfig defaults in schemas.py
+            self.gross_value_min.value = c.get("gross_value_min", 0.5)
+            self.gross_value_max.value = c.get("gross_value_max", 1.5)
+            self.risk_profile_min.value = c.get("risk_profile_min", 0.8)
+            self.risk_profile_max.value = c.get("risk_profile_max", 1.2)
+            self.capability_min.value = c.get("capability_min", 1.0)
+            self.capability_max.value = c.get("capability_max", 10.0)
+            self.allowance_min.value = c.get("allowance_min", 0.0)
+            self.allowance_max.value = c.get("allowance_max", 5.0)
+            self.collateral_min.value = c.get("collateral_min", 0.5)
+            self.collateral_max.value = c.get("collateral_max", 2.0)
 
             self.selected_scenario.value = name
             self.reset_model()
@@ -113,6 +135,12 @@ class SimulationManager:
                 gross_value_max=self.gross_value_max.value,
                 risk_profile_min=self.risk_profile_min.value,
                 risk_profile_max=self.risk_profile_max.value,
+                capability_min=self.capability_min.value,
+                capability_max=self.capability_max.value,
+                allowance_min=self.allowance_min.value,
+                allowance_max=self.allowance_max.value,
+                collateral_min=self.collateral_min.value,
+                collateral_max=self.collateral_max.value,
             ),
             seed=None,
         )
@@ -170,6 +198,10 @@ class SimulationManager:
                         ),
                         "Compliant": d.is_compliant,
                         "Permit": d.has_permit,
+                        "True_Compute": getattr(d, "true_compute", 0.0),
+                        "Reported_Compute": getattr(d, "reported_compute", 0.0),
+                        "Capability": getattr(d, "capability", 0.0),
+                        "Allowance": getattr(d, "allowance", 0.0),
                         "Wealth": round(a.wealth, 2),
                     }
                 )
@@ -252,6 +284,12 @@ class SimulationManager:
         self.gross_value_max.value = c.lab.gross_value_max
         self.risk_profile_min.value = c.lab.risk_profile_min
         self.risk_profile_max.value = c.lab.risk_profile_max
+        self.capability_min.value = getattr(c.lab, "capability_min", 1.0)
+        self.capability_max.value = getattr(c.lab, "capability_max", 10.0)
+        self.allowance_min.value = getattr(c.lab, "allowance_min", 0.0)
+        self.allowance_max.value = getattr(c.lab, "allowance_max", 5.0)
+        self.collateral_min.value = getattr(c.lab, "collateral_min", 0.5)
+        self.collateral_max.value = getattr(c.lab, "collateral_max", 2.0)
 
         # Ideally, we switch the "Scenario Selector" to specific "Restored" or "Custom"
         # so it doesn't look like it belongs to the previous scenario.

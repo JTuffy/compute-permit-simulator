@@ -31,6 +31,15 @@ class LabConfig(BaseModel):
     gross_value_max: float = 1.5
     risk_profile_min: float = 0.8
     risk_profile_max: float = 1.2
+    # Capability: Max compute a lab can run (defines their 'scale')
+    capability_min: float = 1.0
+    capability_max: float = 10.0
+    # Allowance: Initial permits allocated (Grandfathering)
+    allowance_min: float = 0.0
+    allowance_max: float = 5.0
+    # Collateral: Amount posted by lab (seized on fraud)
+    collateral_min: float = 0.5
+    collateral_max: float = 2.0
 
     model_config = ConfigDict(frozen=True)
 
@@ -40,7 +49,7 @@ class ScenarioConfig(BaseModel):
 
     name: str = "Scenario"
     description: str = ""
-    n_agents: int = Field(10, gt=0)
+    n_agents: int = Field(5, gt=0)
     steps: int = Field(10, gt=0)
 
     # Sub-configs

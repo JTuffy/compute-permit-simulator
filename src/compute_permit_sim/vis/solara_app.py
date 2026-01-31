@@ -2,6 +2,11 @@ import pandas as pd
 import solara
 import solara.lab
 
+from compute_permit_sim.vis.components import (
+    QuantitativeScatterPlot,
+    RangeController,
+    RangeView,
+)
 from compute_permit_sim.vis.state import manager
 
 # --- Components ---
@@ -59,20 +64,98 @@ def ParamView(config):
 
         with solara.lab.Tab("Lab", style={"min-width": "auto"}):
             with solara.Column(gap="0px", style="opacity: 0.8; font-size: 0.9em;"):
-                solara.Markdown("*Gross Value Range*")
-                solara.InputFloat(
-                    label="Min", value=config.lab.gross_value_min, disabled=True
+                RangeView(
+                    "Gross Value Range",
+                    config.lab.gross_value_min,
+                    config.lab.gross_value_max,
                 )
-                solara.InputFloat(
-                    label="Max", value=config.lab.gross_value_max, disabled=True
+                RangeView(
+                    "Risk Profile Range",
+                    config.lab.risk_profile_min,
+                    config.lab.risk_profile_max,
                 )
-                solara.Markdown("*Risk Profile Range*")
-                solara.InputFloat(
-                    label="Min", value=config.lab.risk_profile_min, disabled=True
+                RangeView(
+                    "Capability Range",
+                    config.lab.capability_min,
+                    config.lab.capability_max,
                 )
-                solara.InputFloat(
-                    label="Max", value=config.lab.risk_profile_max, disabled=True
+                RangeView(
+                    "Allowance Range",
+                    config.lab.allowance_min,
+                    config.lab.allowance_max,
                 )
+                RangeView(
+                    "Collateral Range",
+                    config.lab.collateral_min,
+                    config.lab.collateral_max,
+                )
+
+
+@solara.component
+def RunHistoryItem(run, is_selected):
+    """Individual item in the history list."""
+
+    # Label generation
+    if run.metrics:
+        comp = run.metrics.get("final_compliance", 0)
+        price = run.metrics.get("final_price", 0)
+        try:
+            display_id = run.id.split("_")[1]
+        except IndexError:
+            display_id = run.id
+        label = f"{display_id} (C:{comp:.0%} ${price:.0f})"
+    else:
+        label = f"{run.id} ({len(run.steps)})"
+
+    # Actions
+    def load_config():
+        manager.restore_config(run)
+
+    def view_run():
+        manager.selected_run.value = run
+
+    # Rich Tooltip Construction
+    try:
+        parts = run.id.split("_")
+        ts_str = f"{parts[0]}-{parts[1]}"
+    except IndexError:
+        ts_str = "Unknown"
+
+    c = run.config
+    tooltip_text = (
+        f"Run: {run.id}\n"
+        f"Time: {ts_str}\n"
+        f"cfg: {c.n_agents} agents, {c.steps} steps\n"
+        f"Token Cap: {c.market.token_cap}, Budget: {c.audit.audit_budget}"
+    )
+
+    if run.metrics and "fraud_detected" in run.metrics:
+        tooltip_text += f"\nFraud Caught: {run.metrics['fraud_detected']}"
+
+    bg_color = "#e0f2f1" if is_selected else "transparent"
+
+    with solara.Row(
+        style=(f"background-color: {bg_color}; padding: 2px; align-items: center;"),
+        classes=["hover-bg"],
+    ):
+        # View Button (Main interaction)
+        with solara.Tooltip(tooltip_text):
+            solara.Button(
+                label,
+                on_click=view_run,
+                text=True,
+                style="text-transform: none; text-align: left; flex-grow: 1;",
+                color="primary" if is_selected else None,
+            )
+
+        # Load Config Button
+        with solara.Tooltip("Load these parameters to Config Panel"):
+            solara.Button(
+                icon_name="mdi-upload",
+                on_click=load_config,
+                icon=True,
+                small=True,
+            )
 
 
 @solara.component
@@ -87,67 +170,39 @@ def RunHistoryList():
             is_selected = (manager.selected_run.value is not None) and (
                 manager.selected_run.value.id == run.id
             )
-            bg_color = "#e0f2f1" if is_selected else "transparent"
+            RunHistoryItem(run, is_selected)
 
-            # Label generation
-            if run.metrics:
-                comp = run.metrics.get("final_compliance", 0)
-                price = run.metrics.get("final_price", 0)
-                try:
-                    display_id = run.id.split("_")[1]
-                except IndexError:
-                    display_id = run.id
-                label = f"{display_id} (C:{comp:.0%} ${price:.0f})"
+
+@solara.component
+def RunGraphs(compliance_series, price_series):
+    """Reusable component for displaying run metrics graphs."""
+    with solara.Columns([1, 1]):
+        with solara.Column():
+            if compliance_series:
+                from matplotlib.figure import Figure
+
+                fig = Figure(figsize=(6, 3))
+                ax = fig.subplots()
+                ax.plot(compliance_series, label="Compliance", color="green")
+                ax.set_ylim(-0.05, 1.05)
+                ax.legend()
+                ax.grid(True)
+                solara.FigureMatplotlib(fig)
             else:
-                label = f"{run.id} ({len(run.steps)})"
+                solara.Markdown("No Data")
 
-            # Actions
-            def load_config(r=run):
-                manager.restore_config(r)
+        with solara.Column():
+            if price_series:
+                from matplotlib.figure import Figure
 
-            def view_run(r=run):
-                manager.selected_run.value = r
-
-            # Rich Tooltip Construction
-            # Parse ID for timestamp: YYYYMMDD_HHMMSS
-            try:
-                parts = run.id.split("_")
-                ts_str = f"{parts[0]}-{parts[1]}"
-            except IndexError:
-                ts_str = "Unknown"
-
-            c = run.config
-            tooltip_text = (
-                f"Run: {run.id}\n"
-                f"Time: {ts_str}\n"
-                f"cfg: {c.n_agents} agents, {c.steps} steps\n"
-                f"Token Cap: {c.market.token_cap}, Budget: {c.audit.audit_budget}"
-            )
-
-            with solara.Row(
-                style=(
-                    f"background-color: {bg_color}; padding: 2px; align-items: center;"
-                ),
-                classes=["hover-bg"],
-            ):
-                # View Button (Main interaction)
-                with solara.Tooltip(tooltip_text):
-                    solara.Button(
-                        label,
-                        on_click=view_run,
-                        text=True,
-                        style="text-transform: none; text-align: left; flex-grow: 1;",
-                        color="primary" if is_selected else None,
-                    )
-
-                # Load Config Button
-                with solara.Tooltip("Load these parameters to Config Panel"):
-                    solara.Button(
-                        icon_name="mdi-upload",
-                        on_click=load_config,
-                        icon=True,
-                        small=True,
-                    )
+                fig = Figure(figsize=(6, 3))
+                ax = fig.subplots()
+                ax.plot(price_series, label="Price", color="blue")
+                ax.legend()
+                ax.grid(True)
+                solara.FigureMatplotlib(fig)
+            else:
+                solara.Markdown("No Data")
 
 
 @solara.component
@@ -206,29 +261,7 @@ def Dashboard():
 
         # Graphs (Full Width Bottom)
         solara.Markdown("### Run Graphs")
-        with solara.Columns([1, 1]):
-            with solara.Column():
-                if compliance_series:
-                    from matplotlib.figure import Figure
-
-                    fig = Figure(figsize=(6, 3))
-                    ax = fig.subplots()
-                    ax.plot(compliance_series, label="Compliance", color="green")
-                    ax.set_ylim(-0.05, 1.05)
-                    ax.legend()
-                    ax.grid(True)
-                    solara.FigureMatplotlib(fig)
-
-            with solara.Column():
-                if price_series:
-                    from matplotlib.figure import Figure
-
-                    fig = Figure(figsize=(6, 3))
-                    ax = fig.subplots()
-                    ax.plot(price_series, label="Price", color="blue")
-                    ax.legend()
-                    ax.grid(True)
-                    solara.FigureMatplotlib(fig)
+        RunGraphs(compliance_series, price_series)
 
     else:
         # Live Monitoring View
@@ -240,41 +273,7 @@ def Dashboard():
                 solara.Markdown(f"**Current Price:** {price_series[-1]:.2f}")
 
         # Live Graphs
-        with solara.Columns([1, 1]):
-            # ... (existing graph code but condensed if needed)
-            pass
-            # For brevity, reusing the existing graph blocks below mostly unchanged,
-            # but ensuring they only render if we are in live mode
-            # or they are part of the 'else' block above.
-
-        # Start existing graph block replication for Live Mode
-        with solara.Columns([1, 1]):
-            with solara.Column():
-                if compliance_series:
-                    from matplotlib.figure import Figure
-
-                    fig = Figure(figsize=(6, 4))
-                    ax = fig.subplots()
-                    ax.plot(compliance_series, label="Compliance", color="green")
-                    ax.set_ylim(-0.05, 1.05)
-                    ax.legend()
-                    ax.grid(True)
-                    solara.FigureMatplotlib(fig)
-                else:
-                    solara.Markdown("No Data")
-
-            with solara.Column():
-                if price_series:
-                    from matplotlib.figure import Figure
-
-                    fig = Figure(figsize=(6, 4))
-                    ax = fig.subplots()
-                    ax.plot(price_series, label="Price", color="blue")
-                    ax.legend()
-                    ax.grid(True)
-                    solara.FigureMatplotlib(fig)
-                else:
-                    solara.Markdown("No Data")
+        RunGraphs(compliance_series, price_series)
 
 
 @solara.component
@@ -295,7 +294,7 @@ def InspectorTab():
     if is_live:
         price = manager.model.value.market.current_price if manager.model.value else 0
         supply = manager.model.value.market.max_supply if manager.model.value else 0
-        n_agents = manager.model.value.n_agents if manager.model.value else 0
+        # n_agents (Unused)
         agents_df = manager.agents_df.value
     else:
         # For history, use slider
@@ -314,24 +313,44 @@ def InspectorTab():
 
             price = step.market.get("price", 0)
             supply = step.market.get("supply", 0)
-            n_agents = len(step.agents)
+            # n_agents (Unused)
             agents_df = pd.DataFrame(step.agents)
         else:
             price = 0
             supply = 0
-            n_agents = 0
             agents_df = None
 
     # Use existing components for display
     # Market Summary
     with solara.Card("Market Phase"):
         solara.Markdown(f"**Clearing Price:** {price:.2f}")
-        solara.Markdown(f"**Permits Available:** {supply} / {n_agents}")
+        solara.Markdown(f"**Permits Available:** {supply:.2f} (Total Allowance)")
 
-    # Agent Table
+    # Agent Inspection
     if agents_df is not None:
-        solara.Markdown("#### Agent Phase (Decisions & outcomes)")
-        solara.DataFrame(agents_df, items_per_page=10)
+        solara.Markdown("#### Quantitative Risk Analysis")
+
+        with solara.Columns([1, 1]):
+            with solara.Column():
+                solara.Markdown("**True vs Reported Risk**")
+                QuantitativeScatterPlot(agents_df)
+
+            with solara.Column():
+                solara.Markdown("**Agent Details**")
+                # Show table but maybe select specific columns to avoid clutter
+                # We want: ID, Capability, Allowance, True, Reported, Compliant?
+                cols = [
+                    "AgentID",
+                    "Capability",
+                    "Allowance",
+                    "True_Compute",
+                    "Reported_Compute",
+                    "Compliant",
+                    "Wealth",
+                ]
+                # Filter cols if they exist
+                valid_cols = [c for c in cols if c in agents_df.columns]
+                solara.DataFrame(agents_df[valid_cols], items_per_page=10)
     else:
         solara.Markdown("No agent data.")
 
@@ -374,12 +393,21 @@ def ConfigPanel():
 
         with solara.lab.Tab("Lab"):
             solara.Markdown("**Lab Agent Generation**")
-            solara.Markdown("*Gross Value Range*")
-            solara.InputFloat(label="Min", value=manager.gross_value_min)
-            solara.InputFloat(label="Max", value=manager.gross_value_max)
-            solara.Markdown("*Risk Profile Range*")
-            solara.InputFloat(label="Min", value=manager.risk_profile_min)
-            solara.InputFloat(label="Max", value=manager.risk_profile_max)
+            RangeController(
+                "Gross Value Range", manager.gross_value_min, manager.gross_value_max
+            )
+            RangeController(
+                "Risk Profile Range", manager.risk_profile_min, manager.risk_profile_max
+            )
+            RangeController(
+                "Capability Range", manager.capability_min, manager.capability_max
+            )
+            RangeController(
+                "Allowance Range", manager.allowance_min, manager.allowance_max
+            )
+            RangeController(
+                "Collateral Range", manager.collateral_min, manager.collateral_max
+            )
 
     solara.Markdown("---")
     with solara.Row():
