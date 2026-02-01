@@ -20,7 +20,7 @@ solara:
 	uv run solara run src/compute_permit_sim/vis/solara_app.py
 
 heatmap:
-	uv run src/compute_permit_sim/vis/heatmap.py
+	uv run python -m compute_permit_sim.vis.heatmap
 
 lint:
 	uv run ruff check .

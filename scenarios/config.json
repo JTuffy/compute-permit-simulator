@@ -5,8 +5,8 @@
         "token_cap": 10,
         "base_audit_prob": 0.05,
         "high_audit_prob": 0.05,
-        "signal_fpr": 0.5,
-        "signal_tpr": 0.5,
+        "false_positive_rate": 0.5,
+        "false_negative_rate": 0.5,
         "penalty": 0.2
     },
     "scenario_2": {
@@ -15,8 +15,8 @@
         "token_cap": 10,
         "base_audit_prob": 0.2,
         "high_audit_prob": 0.2,
-        "signal_fpr": 0.5,
-        "signal_tpr": 0.5,
+        "false_positive_rate": 0.5,
+        "false_negative_rate": 0.5,
         "penalty": 0.8
     },
     "scenario_3": {
@@ -25,8 +25,8 @@
         "token_cap": 10,
         "base_audit_prob": 0.05,
         "high_audit_prob": 0.8,
-        "signal_fpr": 0.1,
-        "signal_tpr": 0.9,
+        "false_positive_rate": 0.1,
+        "false_negative_rate": 0.1,
         "penalty": 0.5
     }
 }

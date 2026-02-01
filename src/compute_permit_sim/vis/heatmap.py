@@ -6,7 +6,7 @@ import seaborn as sns
 from tqdm import tqdm
 
 from ..infrastructure.model import ComputePermitModel
-from ..schemas import AuditConfig, MarketConfig, ScenarioConfig
+from ..schemas import ScenarioConfig
 
 
 def generate_heatmap(
@@ -37,8 +37,8 @@ def generate_heatmap(
             audit_config = {
                 "base_prob": p_det,
                 "high_prob": p_det,
-                "signal_fpr": 0.5,  # Irrelevant if pi_0=pi_1
-                "signal_tpr": 0.5,
+                "false_positive_rate": 0.5,  # Irrelevant if pi_0=pi_1
+                "false_negative_rate": 0.5,
                 "penalty_amount": penalty,
             }
 

@@ -19,8 +19,8 @@ def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:
     audit_config = {
         "base_prob": config_dict.get("base_audit_prob"),
         "high_prob": config_dict.get("high_audit_prob"),
-        "signal_fpr": config_dict.get("signal_fpr"),
-        "signal_tpr": config_dict.get("signal_tpr"),
+        "false_positive_rate": config_dict.get("false_positive_rate", 0.0),
+        "false_negative_rate": config_dict.get("false_negative_rate", 0.0),
         "penalty_amount": config_dict.get("penalty"),
     }
 

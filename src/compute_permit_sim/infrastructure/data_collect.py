@@ -19,7 +19,7 @@ def compute_compliance_rate(model: mesa.Model) -> float:
     return compliant_count / len(agents)
 
 
-def compute_average_price(model: mesa.Model) -> float:
+def compute_current_price(model: mesa.Model) -> float:
     """Get the current market price.
 
     Args:
