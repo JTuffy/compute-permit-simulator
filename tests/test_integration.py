@@ -52,10 +52,8 @@ def test_fixed_price_integration():
         penalty_amount=0.5,
         backcheck_prob=0.0,
     )
-    # Fixed price 1.0, effectively unlimited cap (or cap ignored by current logic if implementation allows)
-    # Actually logic uses 'available_permits' unless we bypassed it properly.
-    # In 'allocate', if fixed_price is set, we return winners based only on bid vs price.
-    # We DO NOT check token_cap in that branch.
+    # Fixed price 1.0, effectively unlimited cap.
+    # In 'allocate', if fixed_price is set, we return winners based only on price.
     market_config = MarketConfig(token_cap=1, fixed_price=1.0)
 
     config = ScenarioConfig(
@@ -64,7 +62,7 @@ def test_fixed_price_integration():
         steps=3,
         audit=audit_config,
         market=market_config,
-        audit_coefficient_min=1.0,  # wait, LabConfig params are on LabConfig
+        audit_coefficient_min=1.0,
     )
 
     model = ComputePermitModel(config)

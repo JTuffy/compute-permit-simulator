@@ -170,9 +170,6 @@ class SimulationManager:
             self.price_history.value = df["Price"].tolist()
 
         # Capture Granular Agent State
-        # We also want to capture "Phase" info if possible, but Mesa step is atomic.
-        # For now, we capture the post-step state.
-        # Capture Granular Agent State
         # Delegate to model to keep View logic simple
         agents_data = self.model.value.get_agent_snapshots()
         self.agents_df.value = pd.DataFrame(agents_data)
@@ -262,13 +259,6 @@ class SimulationManager:
         # Ideally, we switch the "Scenario Selector" to specific "Restored" or "Custom"
         # so it doesn't look like it belongs to the previous scenario.
         self.selected_scenario.value = "Restored"
-
-        # Reset model to apply these changes immediately (optional, or let user click reset)
-        # But if we are in "History View" mode, restoring config shouldn't auto-run.
-        # It should just set the values.
-        # But we DO want to exit history view maybe?
-        # User said: "then takes us to more details... there is a butotn to load the paras for that one to the active params."
-        # Does not imply auto-switch. We'll let the UI handle the switch back to live if desired.
 
     def save_run(self, name_prefix="run"):
         """Persist structured run."""

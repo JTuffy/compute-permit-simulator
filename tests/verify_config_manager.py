@@ -22,9 +22,6 @@ def test_manager():
     assert config.audit.base_prob == 0.05
 
     print("Saving test scenario...")
-    # config_copy = config.model_copy()
-    # Pydantic v2 copy/update might differ, let's just save as is for now or assume immutability
-    # standard pydantic doesn't let you easily mutate frozen=.
     # We will just save the loaded one as test_save.json
     save_scenario(config, "test_save.json")
 
