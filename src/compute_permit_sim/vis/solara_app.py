@@ -273,6 +273,7 @@ def Dashboard():
 @solara.component
 def InspectorTab():
     run = manager.selected_run.value
+    _ = manager.step_count.value  # Force dependency on step count
     is_live = run is None
 
     # Hook must be unconditional.
@@ -337,6 +338,11 @@ def InspectorTab():
                     "ID",
                     "Value",
                     "Net_Value",
+                    "Capability",
+                    # "Allowance",  # Removed from model
+                    "True_Compute",
+                    "Reported_Compute",
+                    "Compliant",
                     "Audited",
                     "Caught",
                     "Penalty",
@@ -473,11 +479,7 @@ def Page():
             with solara.lab.Tab("Dashboard"):
                 Dashboard()
             with solara.lab.Tab("Details"):
-                # Use manager values for key
-                r = manager.selected_run.value
-                sc = manager.step_count.value
-                key_id = f"{r.id if r else 'live'}_{sc}"
-                InspectorTab().key(key_id)
+                InspectorTab()
 
     # Run History at the bottom
     solara.Markdown("---")

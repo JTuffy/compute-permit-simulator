@@ -34,8 +34,36 @@ def QuantitativeScatterPlot(agents_df):
     fig = Figure(figsize=(6, 5))
     ax = fig.subplots()
 
+    # Color coding logic
+    # Default is blue
+    colors = []
+    # sizes = []
+
+    # We need access to status columns.
+    # agents_df is a DataFrame.
+    # Check if we have the columns
+    has_status = "Compliant" in agents_df.columns and "Caught" in agents_df.columns
+
+    if has_status:
+        for _, row in agents_df.iterrows():
+            if row["Caught"]:
+                colors.append("black")  # Caught
+            elif not row["Compliant"]:
+                colors.append("red")  # Cheating successfully
+            else:
+                colors.append("green")  # Compliant
+    else:
+        colors = "blue"
+
     # Simple scatter
-    ax.scatter(reported_compute, true_compute, alpha=0.6, edgecolors="b", label="Labs")
+    ax.scatter(
+        reported_compute,
+        true_compute,
+        c=colors,
+        alpha=0.6,
+        edgecolors="k",
+        label="Labs",
+    )
 
     # Diagonal Line (True = Reported) aka "Honest Reporting"
     max_val = (

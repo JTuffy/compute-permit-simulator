@@ -33,12 +33,10 @@ class SimulationManager:
         self.risk_profile_max = solara.reactive(1.2)
 
         # New Quantitative Ranges
-        self.capability_min = solara.reactive(1.0)
-        self.capability_max = solara.reactive(10.0)
-        self.allowance_min = solara.reactive(0.0)
-        self.allowance_max = solara.reactive(5.0)
-        self.collateral_min = solara.reactive(0.5)
-        self.collateral_max = solara.reactive(2.0)
+        self.capability_value = solara.reactive(0.0)
+        self.racing_factor = solara.reactive(1.0)
+        self.reputation_sensitivity = solara.reactive(0.0)
+        self.audit_coefficient = solara.reactive(1.0)
 
         # Market Config
         self.token_cap = solara.reactive(5)
@@ -47,9 +45,13 @@ class SimulationManager:
         self.base_prob = solara.reactive(0.1)
         self.high_prob = solara.reactive(0.1)  # Default equal for simple start
         self.signal_fpr = solara.reactive(0.1)
-        self.signal_tpr = solara.reactive(0.9)
+        self.signal_tpr = solara.reactive(
+            0.9
+        )  # Storing TPR for UI intuitive, maps to 1-FNR
         self.penalty = solara.reactive(0.5)
-        self.audit_budget = solara.reactive(5)
+        self.penalty = solara.reactive(0.5)
+        # audit_budget removed from AuditConfig
+        self.backcheck_prob = solara.reactive(0.0)
 
         # Sim Config
         self.steps = solara.reactive(10)
@@ -91,12 +93,20 @@ class SimulationManager:
             self.steps.value = c.get("steps", 10)
 
             # Audit
+            # Audit
             self.base_prob.value = c.get("base_audit_prob", 0.1)
             self.high_prob.value = c.get("high_audit_prob", self.base_prob.value)
-            self.signal_fpr.value = c.get("signal_fpr", 0.1)
-            self.signal_tpr.value = c.get("signal_tpr", 0.9)
+
+            # Map JSON keys (false_positive/negative) to State keys (signal_fpr/tpr)
+            fpr = c.get("false_positive_rate", c.get("signal_fpr", 0.1))
+            fnr = c.get("false_negative_rate", 0.1)
+
+            self.signal_fpr.value = fpr
+            self.signal_tpr.value = 1.0 - fnr  # Convert FNR to TPR
+
             self.penalty.value = c.get("penalty", 0.5)
-            self.audit_budget.value = c.get("audit_budget", 5)
+            # self.audit_budget.value = c.get("audit_budget", 5)
+            self.backcheck_prob.value = c.get("backcheck_prob", 0.0)
 
             # Lab
             # We assume the config.json might not have these yet, so provide safe defaults
@@ -105,12 +115,10 @@ class SimulationManager:
             self.gross_value_max.value = c.get("gross_value_max", 1.5)
             self.risk_profile_min.value = c.get("risk_profile_min", 0.8)
             self.risk_profile_max.value = c.get("risk_profile_max", 1.2)
-            self.capability_min.value = c.get("capability_min", 1.0)
-            self.capability_max.value = c.get("capability_max", 10.0)
-            self.allowance_min.value = c.get("allowance_min", 0.0)
-            self.allowance_max.value = c.get("allowance_max", 5.0)
-            self.collateral_min.value = c.get("collateral_min", 0.5)
-            self.collateral_max.value = c.get("collateral_max", 2.0)
+            self.capability_value.value = c.get("capability_value", 0.0)
+            self.racing_factor.value = c.get("racing_factor", 1.0)
+            self.reputation_sensitivity.value = c.get("reputation_sensitivity", 0.0)
+            self.audit_coefficient.value = c.get("audit_coefficient", 1.0)
 
             self.selected_scenario.value = name
             self.reset_model()
@@ -124,10 +132,10 @@ class SimulationManager:
             audit=AuditConfig(
                 base_prob=self.base_prob.value,
                 high_prob=self.high_prob.value,
-                signal_fpr=self.signal_fpr.value,
-                signal_tpr=self.signal_tpr.value,
+                false_positive_rate=self.signal_fpr.value,
+                false_negative_rate=1.0 - self.signal_tpr.value,
                 penalty_amount=self.penalty.value,
-                audit_budget=int(self.audit_budget.value),
+                backcheck_prob=self.backcheck_prob.value,
             ),
             market=MarketConfig(token_cap=float(self.token_cap.value)),
             lab=LabConfig(
@@ -135,12 +143,10 @@ class SimulationManager:
                 gross_value_max=self.gross_value_max.value,
                 risk_profile_min=self.risk_profile_min.value,
                 risk_profile_max=self.risk_profile_max.value,
-                capability_min=self.capability_min.value,
-                capability_max=self.capability_max.value,
-                allowance_min=self.allowance_min.value,
-                allowance_max=self.allowance_max.value,
-                collateral_min=self.collateral_min.value,
-                collateral_max=self.collateral_max.value,
+                capability_value=self.capability_value.value,
+                racing_factor=self.racing_factor.value,
+                reputation_sensitivity=self.reputation_sensitivity.value,
+                audit_coefficient=self.audit_coefficient.value,
             ),
             seed=None,
         )
@@ -198,11 +204,22 @@ class SimulationManager:
                         ),
                         "Compliant": d.is_compliant,
                         "Permit": d.has_permit,
-                        "True_Compute": getattr(d, "true_compute", 0.0),
-                        "Reported_Compute": getattr(d, "reported_compute", 0.0),
-                        "Capability": getattr(d, "capability", 0.0),
-                        "Allowance": getattr(d, "allowance", 0.0),
+                        "True_Compute": d.gross_value,
+                        "Reported_Compute": d.gross_value
+                        if (d.has_permit or d.is_compliant)
+                        else 0.0,
+                        "Capability": d.capability_value,
+                        # "Allowance": removed
                         "Wealth": round(a.wealth, 2),
+                        "Audited": getattr(a, "last_audit_status", {}).get(
+                            "audited", False
+                        ),
+                        "Penalty": getattr(a, "last_audit_status", {}).get(
+                            "penalty", 0.0
+                        ),
+                        "Caught": getattr(a, "last_audit_status", {}).get(
+                            "caught", False
+                        ),
                     }
                 )
         self.agents_df.value = pd.DataFrame(agents_data)
@@ -274,22 +291,20 @@ class SimulationManager:
         # Audit
         self.base_prob.value = c.audit.base_prob
         self.high_prob.value = c.audit.high_prob
-        self.signal_fpr.value = c.audit.signal_fpr
-        self.signal_tpr.value = c.audit.signal_tpr
         self.penalty.value = c.audit.penalty_amount
-        self.audit_budget.value = c.audit.audit_budget
+        # self.audit_budget.value = c.audit.audit_budget (Removed)
 
         # Lab
         self.gross_value_min.value = c.lab.gross_value_min
         self.gross_value_max.value = c.lab.gross_value_max
         self.risk_profile_min.value = c.lab.risk_profile_min
         self.risk_profile_max.value = c.lab.risk_profile_max
-        self.capability_min.value = getattr(c.lab, "capability_min", 1.0)
-        self.capability_max.value = getattr(c.lab, "capability_max", 10.0)
-        self.allowance_min.value = getattr(c.lab, "allowance_min", 0.0)
-        self.allowance_max.value = getattr(c.lab, "allowance_max", 5.0)
-        self.collateral_min.value = getattr(c.lab, "collateral_min", 0.5)
-        self.collateral_max.value = getattr(c.lab, "collateral_max", 2.0)
+        self.capability_value.value = getattr(c.lab, "capability_value", 0.0)
+        self.racing_factor.value = getattr(c.lab, "racing_factor", 1.0)
+        self.reputation_sensitivity.value = getattr(
+            c.lab, "reputation_sensitivity", 0.0
+        )
+        self.audit_coefficient.value = getattr(c.lab, "audit_coefficient", 1.0)
 
         # Ideally, we switch the "Scenario Selector" to specific "Restored" or "Custom"
         # so it doesn't look like it belongs to the previous scenario.

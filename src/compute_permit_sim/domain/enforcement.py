@@ -52,6 +52,7 @@ class Governor:
         p_eff = p_s + (1.0 - p_s) * self.config.backcheck_prob
         return p_eff
 
+    def generate_signal(self, is_compliant: bool) -> bool:
         """Generate a noisy signal based on compliance status.
 
         Args:
