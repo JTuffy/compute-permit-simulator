@@ -1,3 +1,5 @@
+"""Basic tests for domain model and agent initialization."""
+
 from compute_permit_sim.domain.agents import Lab
 from compute_permit_sim.domain.enforcement import Auditor
 from compute_permit_sim.domain.market import SimpleClearingMarket
@@ -5,6 +7,7 @@ from compute_permit_sim.schemas import AuditConfig
 
 
 def test_lab_initialization():
+    """Verify that a Lab agent correctly initializes with provided values and defaults."""
     lab = Lab(lab_id=1, gross_value=1.5)
     assert lab.lab_id == 1
     assert lab.gross_value == 1.5
@@ -14,6 +17,7 @@ def test_lab_initialization():
 
 
 def test_auditor_initialization():
+    """Verify that the Auditor correctly initializes and computes effective detection probability."""
     config = AuditConfig(
         base_prob=0.1,
         high_prob=0.5,
@@ -31,6 +35,7 @@ def test_auditor_initialization():
 
 
 def test_market_initialization():
+    """Verify that the SimpleClearingMarket initializes with correct supply and default price."""
     market = SimpleClearingMarket(token_cap=10)
     assert market.max_supply == 10
     assert market.current_price == 0.0

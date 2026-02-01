@@ -56,7 +56,9 @@ class MarketConfig(BaseModel):
         None, ge=0, description="Fixed price for unlimited permits (optional)"
     )
 
-    model_config = ConfigDict(frozen=True)
+    def set_fixed_price(self, price: float) -> None:
+        """Set a fixed price for the market (unlimited supply mode)."""
+        object.__setattr__(self, "fixed_price", price)
 
 
 class LabConfig(BaseModel):

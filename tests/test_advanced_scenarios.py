@@ -1,3 +1,5 @@
+"""Advanced integration tests for complex simulation scenarios."""
+
 from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import (
     AuditConfig,
@@ -29,6 +31,17 @@ def get_base_configs():
 
 
 def run_model_get_compliance(audit, market, lab, steps=1):
+    """Helper function to run a model for N steps and return the final compliance rate.
+
+    Args:
+        audit: Auditor configuration.
+        market: Market configuration.
+        lab: Lab configuration.
+        steps: Number of steps to run.
+
+    Returns:
+        Final compliance rate as a float.
+    """
     config = ScenarioConfig(
         name="Test",
         n_agents=10,
@@ -80,7 +93,7 @@ def test_higher_backcheck_reduces_false_compliance():
     - Moderate Base Audit (0.1).
     """
     audit, market, lab = get_base_configs()
-    market = market.model_copy(update={"fixed_price": 2.0})
+    market.set_fixed_price(2.0)
     audit = audit.model_copy(
         update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
     )
@@ -101,7 +114,7 @@ def test_higher_backcheck_reduces_false_compliance():
 def test_audit_capacity_constraint():
     """Test that max_audits_per_step limits penalized agents."""
     audit, market, lab = get_base_configs()
-    market = market.model_copy(update={"fixed_price": 2.0})
+    market.set_fixed_price(2.0)
 
     # 100% detection + low penalty so everyone cheats but audits capped
     audit = audit.model_copy(
@@ -138,7 +151,7 @@ def test_audit_targeting_efficiency():
     - Base audit parameters insufficient to deter high-value agents.
     """
     audit, market, lab = get_base_configs()
-    market = market.model_copy(update={"fixed_price": 3.0})
+    market.set_fixed_price(3.0)
     audit = audit.model_copy(
         update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
     )

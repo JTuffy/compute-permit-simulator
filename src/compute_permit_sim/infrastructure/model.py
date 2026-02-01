@@ -8,10 +8,18 @@ from ..domain.agents import Lab
 from ..domain.enforcement import Auditor
 from ..domain.market import SimpleClearingMarket
 from ..schemas import AuditConfig, LabConfig, MarketConfig, ScenarioConfig
+from .data_collect import compute_compliance_rate, compute_current_price
 
 
 class MesaLab(mesa.Agent):
-    """Mesa wrapper for the Lab domain logic."""
+    """Mesa wrapper for the Lab domain logic.
+
+    Attributes:
+        unique_id: Unique integer identifier for the agent.
+        domain_agent: The underlying Lab domain object handling compliance logic.
+        wealth: Cumulative wealth (net gains minus penalties and fees).
+        last_audit_status: Summary of the most recent audit results.
+    """
 
     def __init__(
         self,
@@ -24,6 +32,18 @@ class MesaLab(mesa.Agent):
         reputation_sensitivity: float = 0.0,
         audit_coefficient: float = 1.0,
     ) -> None:
+        """Initialize a Mesa-managed Lab agent.
+
+        Args:
+            unique_id: Unique identifier for the agent.
+            model: The Mesa model instance this agent belongs to.
+            gross_value: Baseline value (v_i) of training compute.
+            risk_profile: Multiplier for perceived penalty (deterrence sensitivity).
+            capability_value: Baseline model capability value (V_b).
+            racing_factor: Multiplier for urgency-driven capability gain (c_r).
+            reputation_sensitivity: Perceived cost of being caught (R).
+            audit_coefficient: Firm-specific audit probability multiplier (c_i).
+        """
         super().__init__(model)
         self.unique_id = unique_id
         self.domain_agent = Lab(
@@ -129,8 +149,6 @@ class ComputePermitModel(mesa.Model):
             # Agent is automatically added to self.agents in Mesa 3.x
 
         # Data Collection
-        from .data_collect import compute_compliance_rate, compute_current_price
-
         self.datacollector = mesa.DataCollector(
             model_reporters={
                 "Compliance_Rate": compute_compliance_rate,

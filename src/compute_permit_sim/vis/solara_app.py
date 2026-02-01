@@ -1,3 +1,13 @@
+"""Solara-based web UI for the Compute Permit Market Simulator.
+
+This module provides the interactive dashboard for:
+- Configuring simulation parameters
+- Running simulations with play/pause/step controls
+- Visualizing compliance rates and market prices
+- Inspecting agent-level details per step
+- Managing scenario presets and run history
+"""
+
 import pandas as pd
 import solara
 import solara.lab
@@ -194,6 +204,7 @@ def RunHistoryItem(run, is_selected):
 
 @solara.component
 def RunHistoryList():
+    """Display the list of past simulation runs with selection controls."""
     if not manager.run_history.value:
         solara.Markdown("_No runs yet._")
         return
@@ -229,6 +240,17 @@ def RunGraphs(compliance_series, price_series):
 
 
 def _create_time_series_figure(data, label, color, ylim=None):
+    """Create a matplotlib figure for time series data.
+
+    Args:
+        data: List of values to plot.
+        label: Legend label for the series.
+        color: Line color.
+        ylim: Optional tuple of (ymin, ymax) for axis limits.
+
+    Returns:
+        matplotlib Figure object.
+    """
     from matplotlib.figure import Figure
 
     fig = Figure(figsize=(6, 3))
@@ -243,7 +265,11 @@ def _create_time_series_figure(data, label, color, ylim=None):
 
 @solara.component
 def Dashboard():
-    # Helper to get data source
+    """Main dashboard showing simulation metrics and graphs.
+
+    Displays either live simulation data or historical run data
+    depending on whether a run is selected.
+    """
     run = manager.selected_run.value
     is_live = run is None
 
@@ -312,6 +338,7 @@ def Dashboard():
 
 @solara.component
 def InspectorTab():
+    """Tab for inspecting granular agent state and market details for a specific step."""
     run = manager.selected_run.value
     _ = manager.step_count.value  # Force dependency on step count
     is_live = run is None
@@ -402,6 +429,7 @@ def InspectorTab():
 
 @solara.component
 def ConfigPanel():
+    """Sidebar panel for simulation configuration and scenario management."""
     # Scenario Selection (New File-based)
     show_load, set_show_load = solara.use_state(False)
     selected_file, set_selected_file = solara.use_state(None)
@@ -509,6 +537,7 @@ def ConfigPanel():
 
 @solara.component
 def EmptyState():
+    """Display shown when no simulation data is available."""
     with solara.Column(
         style="height: 60vh; justify-content: center; align-items: center; color: #888;"
     ):
@@ -519,6 +548,7 @@ def EmptyState():
 
 @solara.component
 def LoadingState():
+    """Display shown while the simulation loop is active."""
     with solara.Column(
         style="height: 60vh; justify-content: center; align-items: center;"
     ):
@@ -528,6 +558,7 @@ def LoadingState():
 
 @solara.component
 def Page():
+    """Root page component orchestrating the entire UI layout."""
     # Inject CSS
     solara.Style(DENSITY_CSS)
 

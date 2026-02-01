@@ -36,7 +36,7 @@ class SimpleClearingMarket:
         current_price: The most recent clearing price.
     """
 
-    def __init__(self, token_cap: float) -> None:
+    def __init__(self, token_cap: float, fixed_price: float | None = None) -> None:
         """Initialize the market.
 
         Args:
@@ -47,7 +47,11 @@ class SimpleClearingMarket:
         self.fixed_price: float | None = None
 
     def set_fixed_price(self, price: float) -> None:
-        """Set a fixed price for the market (unlimited supply mode)."""
+        """Set a fixed price for the market (unlimited supply mode).
+
+        Args:
+            price: The fixed price for permits.
+        """
         self.fixed_price = price
 
     def resolve_price(self, bids: list[float]) -> float:

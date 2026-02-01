@@ -37,13 +37,16 @@ class Lab:
         """Initialize the Lab.
 
         Args:
-            lab_id: Unique ID.
-            gross_value: v_i, value of the training run.
-            risk_profile: Multiplier for perceived penalty (default 1.0).
-            capability_value: V_b, baseline capability value (default 0.0).
-            racing_factor: c_r, urgency multiplier (default 1.0).
-            reputation_sensitivity: R, reputation cost if caught (default 0.0).
-            audit_coefficient: c(i), firm-specific audit scaling (default 1.0).
+            lab_id: Unique integer identifier for this AI Lab.
+            gross_value: Base economic value (v_i) generated from a training run.
+            risk_profile: Multiplier for perceived penalty (>1: risk-averse, <1: risk-seeking).
+            capability_value: Internal model capability value (V_b) gained from training.
+            racing_factor: Urgency multiplier (c_r) scaling the capability gain.
+            reputation_sensitivity: Perceived cost of reputation loss (R) if caught violating.
+            audit_coefficient: Firm-specific audit probability scaling factor c(i).
+
+        Returns:
+            None
         """
         self.lab_id: int = lab_id
         self.gross_value: float = gross_value
