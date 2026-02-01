@@ -51,7 +51,6 @@ def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:
         market=market_config,
         # Lab config uses defaults if not present
     )
-
     print(f"--- Running {name}: {scenario_config.description} ---")
     model = ComputePermitModel(config=scenario_config)
 

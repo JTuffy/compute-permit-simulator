@@ -1,0 +1,29 @@
+{
+    "name": "High Stakes Racing (Risk)",
+    "description": "Labs have high racing incentives and capability values. Enforcement is standard but potentially insufficient to deter high-value cheating.",
+    "n_agents": 50,
+    "steps": 100,
+    "seed": 101,
+    "audit": {
+        "base_prob": 0.05,
+        "high_prob": 0.8,
+        "false_positive_rate": 0.15,
+        "false_negative_rate": 0.2,
+        "penalty_amount": 1.5,
+        "backcheck_prob": 0.0
+    },
+    "market": {
+        "token_cap": 15,
+        "fixed_price": null
+    },
+    "lab": {
+        "gross_value_min": 2.0,
+        "gross_value_max": 5.0,
+        "risk_profile_min": 0.5,
+        "risk_profile_max": 1.0,
+        "capability_value": 5.0,
+        "racing_factor": 2.0,
+        "reputation_sensitivity": 0.1,
+        "audit_coefficient": 1.0
+    }
+}
