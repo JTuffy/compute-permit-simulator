@@ -27,22 +27,24 @@ This project uses `uv` for dependency management.
 
 ## Usage
 
+### Interactive Dashboard (Solara)
+Launch the web-based interactive dashboard to adjust parameters ($P$, $p$, $Q$, $N$) in real-time, load scenarios, and visualize Compliance/Price trends:
+
+```bash
+uv run solara run app.py
+```
+
+**Features:**
+-   **Live Simulation**: Play/Pause, Step-by-step execution.
+-   **Scenario Management**: Load predefined scenarios (Baseline, High Risk, Strict Audit) or save your own experiments.
+-   **Quantitative Risk Analysis**: Scatter plots of True vs. Reported compute.
+-   **Agent Inspection**: Detailed view of each agent's state, wealth, and audit status.
+
 ### Command Line Simulation
-Run the standard scenarios (Baseline, High Deterrence, Targeted Audit) defined in `scenarios/config.json`:
+Run the standard scenarios defined in `scenarios/` via CLI:
 
 ```bash
 uv run main.py
-# OR using make
-make run
-```
-
-### Interactive Dashboard (Solara)
-Launch the web-based interactive dashboard to adjust parameters ($P$, $p$, $Q$, $N$) in real-time and visualize Compliance/Price trends:
-
-```bash
-uv run solara run src/compute_permit_sim/vis/solara_app.py
-# OR using make
-make viz
 ```
 
 ### Deterrence Heatmap
@@ -50,8 +52,6 @@ Generate a static heatmap showing Compliance Rate across a grid of Penalty vs. D
 
 ```bash
 uv run src/compute_permit_sim/vis/heatmap.py
-# OR using make
-make heatmap
 ```
 *Output saved to `deterrence_heatmap.png`.*
 
@@ -65,9 +65,11 @@ src/compute_permit_sim/
 │   └── enforcement.py         # Governor audit & signal logic
 ├── infrastructure/            # simulation framework
 │   ├── model.py               # Mesa model & step scheduler
+│   ├── config_manager.py      # Scenario I/O and Validation
 │   └── data_collect.py        # Metrics collection
 ├── vis/                       # visualization
-│   ├── solara_app.py          # Interactive dashboard
+│   ├── solara_app.py          # Interactive dashboard logic
+│   ├── state.py               # Reactive state management
 │   └── heatmap.py             # Static diagrams
 └── schemas.py                 # Pydantic configuration models
 ```
@@ -76,28 +78,14 @@ src/compute_permit_sim/
 
 We enforce strict code quality using `ruff`.
 
--   **Lint**: `make lint` or `uv run ruff check`
--   **Format**: `make format` or `uv run ruff format`
+-   **Lint**: `uv run ruff check .`
+-   **Format**: `uv run ruff format .`
 
-### Pre-commit Hooks
-
-To automatically run linting and formatting on every commit:
-
-```bash
-uv run pre-commit install
-```
-
-To run checks manually on all files:
-
-```bash
-uv run pre-commit run --all-files
-```
-
-## Key Concepts
+### Key Concepts
 
 -   **Decision Rule**: Labs run without a permit if $v_i - c > E[Penalty]$.
 -   **Expected Penalty**: $P \times p_{eff}$, where effective detection depends on Governor's signal quality ($\alpha, \beta$) and audit strategy.
 -   **Scenarios**:
-    1.  **Baseline**: Low enforcement.
-    2.  **High Deterrence**: High penalties.
-    3.  **The Signal** (Targeted Auditing): Using signals to target audits efficiently.
+    1.  **Baseline**: Standard balanced parameters.
+    2.  **High Risk**: High racing incentives, harder to deter.
+    3.  **Strict Audit**: High penalties and accurate signals.
