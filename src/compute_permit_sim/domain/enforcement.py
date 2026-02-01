@@ -1,7 +1,7 @@
-"""Enforcement logic for the Governor/Auditor.
+"""Enforcement logic for the Auditor.
 
 Implements the signal-contingent audit model from the technical specification:
-    - Governor observes noisy signal s_i in {0, 1} per firm.
+    - Auditor observes noisy signal s_i in {0, 1} per firm.
     - P(s=1 | compliant)     = false_positive_rate (alpha)
     - P(s=0 | non-compliant) = false_negative_rate (1 - beta)
     - Audit triggered with pi_1 (high suspicion) or pi_0 (low suspicion).
@@ -16,15 +16,15 @@ import random
 from ..schemas import AuditConfig
 
 
-class Governor:
-    """The Governor agent handling audits and enforcement.
+class Auditor:
+    """The Auditor agent handling audits and enforcement.
 
     Attributes:
         config: Audit policy configuration.
     """
 
     def __init__(self, config: AuditConfig) -> None:
-        """Initialize the Governor.
+        """Initialize the Auditor.
 
         Args:
             config: Audit configuration parameters.
@@ -41,7 +41,8 @@ class Governor:
             p_eff = p_s + (1 - p_s) * backcheck_prob
 
         Args:
-            audit_coefficient: Firm-specific scaling factor c(i) for audit rate.
+            audit_coefficient: Firm-specific scaling factor c(i)
+                for audit rate.
 
         Returns:
             The effective detection probability p_eff in [0, 1].
@@ -59,7 +60,8 @@ class Governor:
             is_compliant: True if the lab is compliant (clean).
 
         Returns:
-            True if a suspicious signal is observed (s=1), False otherwise (s=0).
+            True if a suspicious signal is observed (s=1),
+            False otherwise (s=0).
         """
         if is_compliant:
             # False Positive: compliant but signal = 1

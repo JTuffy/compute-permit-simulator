@@ -4,9 +4,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuditConfig(BaseModel):
-    """Configuration for audit policies (The Governor).
+    """Configuration for audit policies (The Auditor).
 
-    Signal model: The governor observes a noisy binary signal s_i for each firm.
+    Signal model: The auditor observes a noisy binary signal s_i for each firm.
         P(s=1 | compliant)     = false_positive_rate  (alpha)
         P(s=0 | non-compliant) = false_negative_rate  (1 - beta)
 
@@ -32,6 +32,17 @@ class AuditConfig(BaseModel):
     )
     backcheck_prob: float = Field(
         0.0, ge=0, le=1, description="Backcheck probability (p_b)"
+    )
+    whistleblower_prob: float = Field(
+        0.0,
+        ge=0,
+        le=1,
+        description="Probability of detection by whistleblower (p_w)",
+    )
+    max_audits_per_step: int | None = Field(
+        None,
+        ge=0,
+        description="Max number of audits allowed per step (budget constraint)",
     )
 
     model_config = ConfigDict(frozen=True)

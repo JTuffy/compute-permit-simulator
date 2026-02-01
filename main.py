@@ -16,7 +16,6 @@ def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:
         steps: Number of steps to run.
     """
     # Transform flat JSON into structured config
-    # Transform flat JSON into structured config
     # Prefer new keys, fallback to defaults or old keys if necessary
 
     fpr = config_dict.get("false_positive_rate")

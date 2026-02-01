@@ -461,7 +461,7 @@ def ConfigPanel():
             solara.InputFloat(label="Token Cap (Q)", value=manager.token_cap)
 
         with solara.lab.Tab("Audit"):
-            solara.Markdown("**Governor (Audit) Policy**")
+            solara.Markdown("**Auditor Policy**")
             solara.InputFloat(label="Penalty Amount", value=manager.penalty)
             solara.InputFloat(label="Base Prob (pi_0)", value=manager.base_prob)
             solara.InputFloat(label="High Prob (pi_1)", value=manager.high_prob)

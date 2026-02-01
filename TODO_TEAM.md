@@ -2,6 +2,12 @@
 > Reference documents: `source/`
 
 ---
+Question
+
+* Why Pydantic? Would writing a typed library be easier, avoid doubling up definitions across schemas.py and the rest of the files?
+* Should we start by redefining penalties, etc, as dollar values (in millions)? It would make it easier to compare to real-world data.
+
+---
 High Priority
 
 * Review example Mesa projects for inspiration/code structure
@@ -17,6 +23,8 @@ High Priority
 * [x] Add pytest to Makefile (Added to pyproject.toml / uv)
 * [x] Add GitHub Actions CI (ruff + pytest)
 * [ ] Add test to check highest value agents get permits
+* [ ] Implement Deterrence Model Refinements (Thresholds, Dynamic Rep, Backchecks)
+* [ ] Verify Scenarios: Compliance Transition, High Stakes, Backcheck Safety, Reputation Cascade
 * [ ] Check zero-enforcement scenario p=0
 * [ ] Check behaviour for compliance rate, undetected risk, audit hit rate, welfare proxy
 

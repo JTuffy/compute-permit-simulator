@@ -1,13 +1,10 @@
 """Agent / Lab logic for compliance decisions.
 
-Implements the deterrence model from Emlyn's AISC Week 2 notes:
+Implements the standard deterrence model:
     Compliance condition: p * B >= g
     where p = detection probability, B = total penalty, g = gain from cheating.
 
-    Detection: p = p_eff (computed by Governor, passed in)
-    Penalty:   B = penalty + reputation_sensitivity
-    Gain:      g = delta_c + V  where V = racing_factor * capability_value
-               delta_c = market_price for binary q in {0, 1}
+    Ref: technical_specification.md Section 2.1 "Agents (Labs)"
 """
 
 
@@ -17,7 +14,8 @@ class Lab:
     Attributes:
         lab_id: Unique identifier.
         gross_value: The value (v_i) the lab generates from a training run.
-        risk_profile: Multiplier on perceived penalty (>1 = risk-averse, <1 = risk-seeking).
+        risk_profile: Multiplier on perceived penalty
+            (>1 = risk-averse, <1 = risk-seeking).
         capability_value: V_b, baseline value of model capabilities from training.
         racing_factor: c_r, urgency multiplier on capability value.
         reputation_sensitivity: R, perceived reputation cost if caught.
@@ -81,7 +79,8 @@ class Lab:
             1. If has_permit -> compliant (already paid for legal usage).
             2. Compute gain from cheating: g = delta_c + V.
             3. If g <= 0 -> compliant (no incentive to cheat).
-            4. Compute perceived penalty: B_total = (penalty + reputation) * risk_profile.
+            4. Compute perceived penalty:
+               B_total = (penalty + reputation) * risk_profile.
             5. If detection_prob * B_total >= g -> compliant (deterred).
             6. Otherwise -> non-compliant (cheat).
 
@@ -102,7 +101,8 @@ class Lab:
         # 2. Gain from cheating: g = delta_c + V
         #    delta_c = market_price (savings from not buying permit)
         #    BUT if v_i < market_price, the agent wouldn't buy anyway.
-        #    So the benefit of cheating is getting to run (worth v_i) vs not running (0).
+        #    So the benefit of cheating is getting to run
+        #    (worth v_i) vs not running (0).
         #    Thus effective delta_c = min(market_price, self.gross_value)
         delta_c = min(market_price, self.gross_value)
         capability_gain = self.racing_factor * self.capability_value
@@ -123,7 +123,9 @@ class Lab:
         b_total = (penalty + self.reputation_sensitivity) * self.risk_profile
 
         # 5. Deterrence condition: p * B >= g
-        expected_penalty = detection_prob * b_total
+        # Effective P for this agent includes their specific audit profile
+        agent_specific_prob = detection_prob * self.audit_coefficient
+        expected_penalty = agent_specific_prob * b_total
         if expected_penalty >= gain:
             self.is_compliant = True
             return True
