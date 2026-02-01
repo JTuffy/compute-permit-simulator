@@ -186,7 +186,8 @@ class ComputePermitModel(mesa.Model):
         self.datacollector.collect(self)
 
     def get_agent_snapshots(self) -> list[dict]:
-        """Return a list of dictionaries representing the current state of all agents."""
+        """Return a list of dictionaries representing the current state of all
+        agents."""
         snapshots = []
         for agent in self.agents:
             if isinstance(agent, MesaLab):

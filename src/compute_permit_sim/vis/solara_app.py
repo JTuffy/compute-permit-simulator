@@ -13,7 +13,8 @@ from compute_permit_sim.vis.state import manager
 # Custom CSS for compactness and hiding Solara watermark
 DENSITY_CSS = """
 .v-application .v-card__text { padding: 8px !important; }
-.v-application .v-card__title { padding: 8px 12px !important; font-size: 1rem !important; }
+.v-application .v-card__title { padding: 8px 12px !important; 
+                                  font-size: 1rem !important; }
 .solara-markdown p { margin-bottom: 4px !important; }
 footer { display: none !important; } 
 """
