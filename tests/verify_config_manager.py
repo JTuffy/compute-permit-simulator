@@ -12,12 +12,12 @@ def test_manager():
     print("Listing scenarios...")
     scenarios = list_scenarios()
     print(f"Found: {scenarios}")
-    assert "baseline.json" in scenarios
-    assert "high_risk.json" in scenarios
-    assert "strict_audit.json" in scenarios
+    assert "EXAMPLE_baseline.json" in scenarios
+    assert "EXAMPLE_high_risk.json" in scenarios
+    assert "EXAMPLE_strict_audit.json" in scenarios
 
     print("Loading baseline...")
-    config = load_scenario("baseline.json")
+    config = load_scenario("EXAMPLE_baseline.json")
     print(f"Loaded: {config.name}")
     assert config.audit.base_prob == 0.05
 
