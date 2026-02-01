@@ -95,7 +95,7 @@ class ScenarioConfig(BaseModel):
 
     name: str = "Scenario"
     description: str = ""
-    n_agents: int = Field(10, gt=0)
+    n_agents: int = Field(5, gt=0)
     steps: int = Field(10, gt=0)
 
     # Sub-configs
@@ -104,3 +104,27 @@ class ScenarioConfig(BaseModel):
     lab: LabConfig = Field(default_factory=LabConfig)
 
     seed: int | None = None
+
+
+class StepResult(BaseModel):
+    """Snapshot of a single simulation step."""
+
+    step_id: int
+    market: dict = Field(..., description="Market state (price, volume, supply)")
+    agents: list[dict] = Field(..., description="List of all agent states")
+    audit: list[dict] = Field(
+        default_factory=list, description="Audit events this step"
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+
+class SimulationRun(BaseModel):
+    """Encapsulation of a full simulation run."""
+
+    id: str = Field(..., description="Unique run identifier (timestamp/uuid)")
+    config: ScenarioConfig
+    steps: list[StepResult] = Field(default_factory=list)
+    metrics: dict = Field(default_factory=dict, description="Aggregate metrics")
+
+    model_config = ConfigDict(frozen=True)

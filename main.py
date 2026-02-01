@@ -16,11 +16,26 @@ def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:
         steps: Number of steps to run.
     """
     # Transform flat JSON into structured config
+    # Prefer new keys, fallback to defaults or old keys if necessary
+
+    fpr = config_dict.get("false_positive_rate")
+    if fpr is None:
+        fpr = config_dict.get("signal_fpr", 0.1)
+
+    fnr = config_dict.get("false_negative_rate")
+    if fnr is None:
+        # If FNR missing, try signal_tpr
+        tpr = config_dict.get("signal_tpr")
+        if tpr is not None:
+            fnr = 1.0 - tpr
+        else:
+            fnr = 0.1
+
     audit_config = {
         "base_prob": config_dict.get("base_audit_prob"),
         "high_prob": config_dict.get("high_audit_prob"),
-        "false_positive_rate": config_dict.get("false_positive_rate", 0.0),
-        "false_negative_rate": config_dict.get("false_negative_rate", 0.0),
+        "false_positive_rate": fpr,
+        "false_negative_rate": fnr,
         "penalty_amount": config_dict.get("penalty"),
     }
 
@@ -35,7 +50,6 @@ def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:
         market=market_config,
         # Lab config uses defaults if not present
     )
-
     print(f"--- Running {name}: {scenario_config.description} ---")
     model = ComputePermitModel(config=scenario_config)
 

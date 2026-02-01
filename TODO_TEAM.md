@@ -7,7 +7,7 @@ Question
 * Why Pydantic? Would writing a typed library be easier, avoid doubling up definitions across schemas.py and the rest of the files?
 * Should we start by redefining penalties, etc, as dollar values (in millions)? It would make it easier to compare to real-world data.
 
-
+---
 High Priority
 
 * Review example Mesa projects for inspiration/code structure
