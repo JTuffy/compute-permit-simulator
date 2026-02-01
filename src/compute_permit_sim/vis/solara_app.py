@@ -2,6 +2,7 @@ import pandas as pd
 import solara
 import solara.lab
 
+from compute_permit_sim.infrastructure.config_manager import save_scenario
 from compute_permit_sim.vis.components import (
     QuantitativeScatterPlot,
     RangeController,
@@ -150,6 +151,37 @@ def RunHistoryItem(run, is_selected):
                 icon=True,
                 small=True,
             )
+
+        # Save Scenario Button
+        show_save, set_show_save = solara.use_state(False)
+        save_name, set_save_name = solara.use_state(f"scenario_{run.id}")
+
+        def perform_save():
+            # Add .json if missing
+            fname = save_name if save_name.endswith(".json") else f"{save_name}.json"
+            save_scenario(run.config, fname)
+            set_show_save(False)
+            # Maybe notify user?
+
+        with solara.Tooltip("Save as Scenario Template"):
+            solara.Button(
+                icon_name="mdi-content-save",
+                on_click=lambda: set_show_save(True),
+                icon=True,
+                small=True,
+            )
+
+        # Save Dialog
+        with solara.v.Dialog(v_model=show_save, max_width=400):
+            with solara.Card(title="Save Scenario"):
+                solara.InputText(
+                    label="Filename", value=save_name, on_value=set_save_name
+                )
+                with solara.Row(justify="end"):
+                    solara.Button(
+                        "Cancel", on_click=lambda: set_show_save(False), text=True
+                    )
+                    solara.Button("Save", on_click=perform_save, color="primary")
 
 
 @solara.component
@@ -360,17 +392,53 @@ def InspectorTab():
 
 @solara.component
 def ConfigPanel():
-    solara.Markdown("### Configuration")
+    # Scenario Selection (New File-based)
+    show_load, set_show_load = solara.use_state(False)
+    selected_file, set_selected_file = solara.use_state(None)
 
-    # Scenario Selector
-    if manager.scenarios.value:
-        solara.Select(
-            label="Load Scenario",
-            values=list(manager.scenarios.value.keys()),
-            value=manager.selected_scenario,
-            on_value=manager.apply_scenario,
+    def open_load_dialog():
+        manager.refresh_scenarios()
+        set_show_load(True)
+
+    def do_load():
+        if selected_file:
+            manager.load_from_file(selected_file)
+            set_show_load(False)
+
+    with solara.Row(style="align-items: center;", justify="space-between"):
+        solara.Markdown("### Configuration")
+        solara.Button(
+            "Load Scenario",
+            on_click=open_load_dialog,
+            icon_name="mdi-folder-open",
+            small=True,
         )
-        solara.Markdown("---")
+
+    with solara.v.Dialog(v_model=show_load, max_width=400):
+        with solara.Card(title="Load Scenario Template"):
+            if manager.available_scenarios.value:
+                solara.Select(
+                    label="Choose File",
+                    values=manager.available_scenarios.value,
+                    value=selected_file,
+                    on_value=set_selected_file,
+                )
+            else:
+                solara.Markdown("_No scenarios found in scenarios/_")
+
+            with solara.Row(justify="end", style="margin-top: 10px;"):
+                solara.Button(
+                    "Cancel", on_click=lambda: set_show_load(False), text=True
+                )
+                solara.Button(
+                    "Load",
+                    on_click=do_load,
+                    color="primary",
+                    disabled=(not selected_file),
+                )
+
+    # Old Selector (Legacy?) - optionally keep or remove. User asked for Load Button.
+    # Removing old selector to clean up UI as requested ("load button... with popup")
 
     # Live Config controls (Always enabled now)
     # Removing 'disabled' logic and Restore buttons.
@@ -380,7 +448,7 @@ def ConfigPanel():
             solara.Markdown("**Simulation Parameters**")
             solara.InputInt(label="Steps", value=manager.steps)
             solara.InputInt(label="N Agents", value=manager.n_agents)
-            solara.InputInt(label="Token Cap (Q)", value=manager.token_cap)
+            solara.InputFloat(label="Token Cap (Q)", value=manager.token_cap)
 
         with solara.lab.Tab("Audit"):
             solara.Markdown("**Governor (Audit) Policy**")

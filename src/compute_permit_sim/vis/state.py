@@ -9,6 +9,10 @@ import pandas as pd
 import solara
 import solara.lab
 
+from compute_permit_sim.infrastructure.config_manager import (
+    list_scenarios,
+    load_scenario,
+)
 from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import (
     AuditConfig,
@@ -75,6 +79,48 @@ class SimulationManager:
 
         # Load scenarios immediately
         self._load_scenarios()
+
+        # File-based scenarios
+        self.available_scenarios = solara.reactive(list_scenarios())
+
+    def refresh_scenarios(self):
+        """Refresh the list of available scenario files."""
+        self.available_scenarios.set(list_scenarios())
+
+    def load_from_file(self, filename: str):
+        """Load a scenario from a file and apply it."""
+        try:
+            config = load_scenario(filename)
+            self._apply_pydantic_config(config)
+            self.selected_scenario.value = config.name or filename
+            self.reset_model()
+        except Exception as e:
+            print(f"Error loading scenario {filename}: {e}")
+
+    def _apply_pydantic_config(self, config: ScenarioConfig):
+        """Map a ScenarioConfig object to the reactive state."""
+        # Top Level
+        self.n_agents.value = config.n_agents
+        self.steps.value = config.steps
+        self.token_cap.value = config.market.token_cap
+
+        # Audit
+        self.base_prob.value = config.audit.base_prob
+        self.high_prob.value = config.audit.high_prob
+        self.signal_fpr.value = config.audit.false_positive_rate
+        self.signal_tpr.value = 1.0 - config.audit.false_negative_rate
+        self.penalty.value = config.audit.penalty_amount
+        self.backcheck_prob.value = config.audit.backcheck_prob
+
+        # Lab
+        self.gross_value_min.value = config.lab.gross_value_min
+        self.gross_value_max.value = config.lab.gross_value_max
+        self.risk_profile_min.value = config.lab.risk_profile_min
+        self.risk_profile_max.value = config.lab.risk_profile_max
+        self.capability_value.value = config.lab.capability_value
+        self.racing_factor.value = config.lab.racing_factor
+        self.reputation_sensitivity.value = config.lab.reputation_sensitivity
+        self.audit_coefficient.value = config.lab.audit_coefficient
 
     def _load_scenarios(self):
         path = Path("scenarios/config.json")
