@@ -54,6 +54,9 @@ class Lab:
         self.audit_coefficient: float = audit_coefficient
         self.is_compliant: bool = True
         self.has_permit: bool = False
+        # Monitoring / specific state
+        self.last_gain: float = 0.0
+        self.last_expected_penalty: float = 0.0
 
     def get_bid(self, cost: float = 0.0) -> float:
         """Return willingness to pay for a permit.
@@ -96,6 +99,8 @@ class Lab:
         # 1. Permitted firms are compliant
         if self.has_permit:
             self.is_compliant = True
+            self.last_gain = 0.0
+            self.last_expected_penalty = 0.0
             return True
 
         # 2. Gain from cheating: g = delta_c + V
@@ -107,16 +112,20 @@ class Lab:
         delta_c = min(market_price, self.gross_value)
         capability_gain = self.racing_factor * self.capability_value
         gain = delta_c + capability_gain
+        # Store for UI
+        self.last_gain = gain
 
         # 3. No gain -> compliant (don't run or no incentive)
         if gain <= 0:
             self.is_compliant = True
+            self.last_expected_penalty = 0.0
             return True
 
         # Also check: is running profitable at all?
         # If gross_value - cost <= 0, the firm wouldn't run regardless
         if self.gross_value - cost <= 0:
             self.is_compliant = True
+            self.last_expected_penalty = 0.0
             return True
 
         # 4. Perceived total penalty: B = (penalty + reputation) * risk_profile
@@ -126,6 +135,10 @@ class Lab:
         # Effective P for this agent includes their specific audit profile
         agent_specific_prob = detection_prob * self.audit_coefficient
         expected_penalty = agent_specific_prob * b_total
+
+        # Store for UI
+        self.last_expected_penalty = expected_penalty
+
         if expected_penalty >= gain:
             self.is_compliant = True
             return True

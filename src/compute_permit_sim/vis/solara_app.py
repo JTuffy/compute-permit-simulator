@@ -388,6 +388,8 @@ def InspectorTab():
                     "Audited",
                     "Caught",
                     "Penalty",
+                    "Gain",
+                    "Exp_Penalty",
                     "Wealth",
                 ]
                 # Filter cols if they exist

@@ -36,35 +36,20 @@ class MesaLab(mesa.Agent):
             audit_coefficient=audit_coefficient,
         )
         self.wealth: float = 0.0
+        self.was_audited: bool = False
+        self.detected_cheating: bool = False
 
     def step(self) -> None:
-        """Execute one step of the agent.
-
-        Note: Model controls phase order explicitly.
-        step() might be empty if Model orchestrates phases.
-        We let Model orchestrate phases (trade, run, etc.) to ensure strict order.
-        """
+        """Execute one step of the agent."""
         pass
 
 
 class ComputePermitModel(mesa.Model):
-    """The central Mesa model.
-
-    Architecture Reference:
-        source/Week_2_simulation_architecture_josh.md Section 1 "High-Lift Components"
-        - Orchestrates "Actor Behavior" and "Permit Market" phases.
-    """
+    """The central Mesa model."""
 
     def __init__(self, config: ScenarioConfig = None, **kwargs) -> None:
-        """Initialize the model.
-
-        Args:
-            config: Full scenario configuration.
-            **kwargs: Overrides for configuration parameters
-                (for Mesa BatchRunner).
-        """
+        """Initialize the model."""
         if config is None:
-            # Create default config if none provided
             config = ScenarioConfig(
                 name="Default",
                 audit=AuditConfig(
@@ -78,34 +63,26 @@ class ComputePermitModel(mesa.Model):
                 lab=LabConfig(),
             )
 
-        # Apply kwargs overrides (nested update support)
         if kwargs:
-            # Convert to dict first
             config_dict = config.model_dump()
-
             for key, value in kwargs.items():
                 parts = key.split("__")
                 target = config_dict
                 for part in parts[:-1]:
                     target = target.setdefault(part, {})
                 target[parts[-1]] = value
-
-            # Re-validate to ensure nested objects are recreated:
             config = ScenarioConfig.model_validate(config_dict)
 
         super().__init__(seed=config.seed)
         self.config = config
         self.n_agents = config.n_agents
-        # Mesa 3.x handles agent management via self.agents automatically
         self.running = True
 
-        # Initialize Market and Auditor
         self.market = SimpleClearingMarket(token_cap=config.market.token_cap)
         if config.market.fixed_price is not None:
             self.market.set_fixed_price(config.market.fixed_price)
         self.auditor = Auditor(config.audit)
 
-        # Initialize Agents
         for i in range(self.n_agents):
             gross_value = random.uniform(
                 config.lab.gross_value_min, config.lab.gross_value_max
@@ -113,7 +90,6 @@ class ComputePermitModel(mesa.Model):
             risk_profile = random.uniform(
                 config.lab.risk_profile_min, config.lab.risk_profile_max
             )
-            # Pass all extended parameters to the agent
             MesaLab(
                 i,
                 self,
@@ -124,9 +100,7 @@ class ComputePermitModel(mesa.Model):
                 reputation_sensitivity=config.lab.reputation_sensitivity,
                 audit_coefficient=config.lab.audit_coefficient,
             )
-            # Agent is automatically added to self.agents in Mesa 3.x
 
-        # Data Collection
         from .data_collect import compute_compliance_rate, compute_current_price
 
         self.datacollector = mesa.DataCollector(
@@ -137,20 +111,22 @@ class ComputePermitModel(mesa.Model):
         )
 
     def step(self) -> None:
-        """Execute one step of the simulation (matches Game Loop)."""
+        """Execute one step of the simulation."""
+        # Reset per-step flags
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                agent.was_audited = False
+                agent.detected_cheating = False
+
         # 1. Trading Phase
-        # Collect bids (valuations) from all agents
-        # Bids are tuples of (lab_id, valuation)
         bids = [
             (a.domain_agent.lab_id, a.domain_agent.get_bid())
             for a in self.agents
             if isinstance(a, MesaLab)
         ]
 
-        # Market handles price discovery and allocation
         clearing_price, winning_ids = self.market.allocate(bids)
 
-        # Apply results to agents
         winning_set = set(winning_ids)
         for agent in self.agents:
             if isinstance(agent, MesaLab):
@@ -160,16 +136,13 @@ class ComputePermitModel(mesa.Model):
                 else:
                     agent.domain_agent.has_permit = False
 
-        # 2. Choice Phase (Run / Compliance)
-        # TPR = 1 - FNR (beta)
+        # 2. Compliance Decision
         tpr = 1.0 - self.config.audit.false_negative_rate
         p_s = (
             tpr * self.config.audit.high_prob
             + (1.0 - tpr) * self.config.audit.base_prob
         )
         detection_prob_audit = p_s + (1.0 - p_s) * self.config.audit.backcheck_prob
-
-        # Combine with whistleblower prob: p_eff = 1 - (1-p_audit)(1-p_wb)
         p_wb = self.config.audit.whistleblower_prob
         detection_prob = 1.0 - (1.0 - detection_prob_audit) * (1.0 - p_wb)
 
@@ -179,26 +152,19 @@ class ComputePermitModel(mesa.Model):
                     market_price=clearing_price,
                     penalty=self.config.audit.penalty_amount,
                     detection_prob=detection_prob,
-                    # cost ignored for MVP or folded into net value
                 )
 
-        # 3. Signal Phase & 4. Enforcement Phase
+        # 3. Audit Selection
         potential_audits = []
-
         for agent in self.agents:
             if isinstance(agent, MesaLab):
                 is_compliant = agent.domain_agent.is_compliant
                 signal = self.auditor.generate_signal(is_compliant)
-                # Check if auditor WANTS to audit (based on signal policy)
-                should_audit = self.auditor.decide_audit(signal)
-
-                if should_audit:
+                if self.auditor.decide_audit(signal):
                     potential_audits.append(agent)
 
-        # Apply Audit Capacity Constraint
         if self.config.audit.max_audits_per_step is not None:
             if len(potential_audits) > self.config.audit.max_audits_per_step:
-                # Randomly select subset to audit (limited resources)
                 actual_audits = random.sample(
                     potential_audits, self.config.audit.max_audits_per_step
                 )
@@ -207,12 +173,45 @@ class ComputePermitModel(mesa.Model):
         else:
             actual_audits = potential_audits
 
-        # Execute Audits
+        # 4. Enforcement
         for agent in actual_audits:
+            agent.was_audited = True
             is_compliant = agent.domain_agent.is_compliant
             # Enforce
             if not is_compliant and not agent.domain_agent.has_permit:
                 # Caught cheating!
+                agent.detected_cheating = True
                 agent.wealth -= self.config.audit.penalty_amount
 
         self.datacollector.collect(self)
+
+    def get_agent_snapshots(self) -> list[dict]:
+        """Return a list of dictionaries representing the current state of all agents."""
+        snapshots = []
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                snapshots.append(
+                    {
+                        "ID": agent.domain_agent.lab_id,
+                        "Value": agent.domain_agent.gross_value,
+                        "Net_Value": agent.domain_agent.gross_value,  # Placeholder
+                        "Capability": agent.domain_agent.capability_value,
+                        "Allowance": 1.0,  # Placeholder
+                        "True_Compute": 1.0,  # Assumption: everyone wants to run 1 unit
+                        "Reported_Compute": 1.0
+                        if agent.domain_agent.has_permit
+                        else (
+                            0.0 if agent.domain_agent.is_compliant else 0.0
+                        ),  # If compliant+no permit=0. If cheating=0 reported?
+                        "Compliant": agent.domain_agent.is_compliant,
+                        "Audited": agent.was_audited,
+                        "Caught": agent.detected_cheating,
+                        "Penalty": self.config.audit.penalty_amount
+                        if agent.detected_cheating
+                        else 0.0,
+                        "Gain": agent.domain_agent.last_gain,
+                        "Exp_Penalty": agent.domain_agent.last_expected_penalty,
+                        "Wealth": agent.wealth,
+                    }
+                )
+        return snapshots
