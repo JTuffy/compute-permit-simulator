@@ -10,6 +10,14 @@ from compute_permit_sim.vis.components import (
 )
 from compute_permit_sim.vis.state import manager
 
+# Custom CSS for compactness and hiding Solara watermark
+DENSITY_CSS = """
+.v-application .v-card__text { padding: 8px !important; }
+.v-application .v-card__title { padding: 8px 12px !important; font-size: 1rem !important; }
+.solara-markdown p { margin-bottom: 4px !important; }
+footer { display: none !important; } 
+"""
+
 # --- Components ---
 
 
@@ -205,30 +213,32 @@ def RunGraphs(compliance_series, price_series):
     with solara.Columns([1, 1]):
         with solara.Column():
             if compliance_series:
-                from matplotlib.figure import Figure
-
-                fig = Figure(figsize=(6, 3))
-                ax = fig.subplots()
-                ax.plot(compliance_series, label="Compliance", color="green")
-                ax.set_ylim(-0.05, 1.05)
-                ax.legend()
-                ax.grid(True)
+                fig = _create_time_series_figure(
+                    compliance_series, "Compliance", "green", ylim=(-0.05, 1.05)
+                )
                 solara.FigureMatplotlib(fig)
             else:
                 solara.Markdown("No Data")
 
         with solara.Column():
             if price_series:
-                from matplotlib.figure import Figure
-
-                fig = Figure(figsize=(6, 3))
-                ax = fig.subplots()
-                ax.plot(price_series, label="Price", color="blue")
-                ax.legend()
-                ax.grid(True)
+                fig = _create_time_series_figure(price_series, "Price", "blue")
                 solara.FigureMatplotlib(fig)
             else:
                 solara.Markdown("No Data")
+
+
+def _create_time_series_figure(data, label, color, ylim=None):
+    from matplotlib.figure import Figure
+
+    fig = Figure(figsize=(6, 3))
+    ax = fig.subplots()
+    ax.plot(data, label=label, color=color)
+    if ylim:
+        ax.set_ylim(ylim)
+    ax.legend()
+    ax.grid(True)
+    return fig
 
 
 @solara.component
@@ -262,32 +272,30 @@ def Dashboard():
         solara.Markdown("### Run Analysis")
         with solara.Row():
             # Left: Locked Params
-            with solara.Column(
-                style=("width: 40%; padding-right: 20px; border-right: 1px solid #eee;")
-            ):
-                solara.Markdown("**Run Configuration**")
-                ParamView(run.config)
+            with solara.Column(style=("width: 40%; padding-right: 20px;")):
+                with solara.Card("Run Configuration"):
+                    ParamView(run.config)
 
             # Right: Results
             with solara.Column(style="width: 60%; padding-left: 20px;"):
-                solara.Markdown("**Run Metrics**")
-                # Reuse the metrics display logic here or inline it
-                solara.Markdown(f"**Steps Taken:** {step_count}")
+                with solara.Card("Run Results"):
+                    # Reuse the metrics display logic here or inline it
+                    solara.Markdown(f"**Steps Taken:** {step_count}")
 
-                current_compliance = "N/A"
-                current_price = "N/A"
-                if compliance_series:
-                    current_compliance = f"{compliance_series[-1]:.2%}"
-                if price_series:
-                    current_price = f"{price_series[-1]:.2f}"
+                    current_compliance = "N/A"
+                    current_price = "N/A"
+                    if compliance_series:
+                        current_compliance = f"{compliance_series[-1]:.2%}"
+                    if price_series:
+                        current_price = f"{price_series[-1]:.2f}"
 
-                with solara.Columns([1, 1]):
-                    solara.Markdown(f"**Final Compliance:** {current_compliance}")
-                    solara.Markdown(f"**Final Price:** {current_price}")
+                    with solara.Columns([1, 1]):
+                        solara.Markdown(f"**Final Compliance:** {current_compliance}")
+                        solara.Markdown(f"**Final Price:** {current_price}")
 
         # Graphs (Full Width Bottom)
-        solara.Markdown("### Run Graphs")
-        RunGraphs(compliance_series, price_series)
+        with solara.Card("Run Graphs"):
+            RunGraphs(compliance_series, price_series)
 
     else:
         # Live Monitoring View
@@ -349,7 +357,9 @@ def InspectorTab():
 
     # Use existing components for display
     # Market Summary
-    with solara.Card("Market Phase"):
+    # Use existing components for display
+    # Market Summary
+    with solara.Card("General"):
         solara.Markdown(f"**Clearing Price:** {price:.2f}")
         solara.Markdown(f"**Permits Available:** {supply:.2f} (Total Allowance)")
 
@@ -518,6 +528,9 @@ def LoadingState():
 
 @solara.component
 def Page():
+    # Inject CSS
+    solara.Style(DENSITY_CSS)
+
     # Initialize if needed
     if manager.model.value is None:
         manager.reset_model()
@@ -544,7 +557,7 @@ def Page():
         EmptyState()
     else:
         with solara.lab.Tabs():
-            with solara.lab.Tab("Dashboard"):
+            with solara.lab.Tab("Summary"):
                 Dashboard()
             with solara.lab.Tab("Details"):
                 InspectorTab()

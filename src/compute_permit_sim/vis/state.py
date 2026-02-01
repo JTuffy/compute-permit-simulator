@@ -1,7 +1,6 @@
 """State management for the visualization infrastructure."""
 
 import asyncio
-import json
 import time
 from pathlib import Path
 
@@ -53,8 +52,6 @@ class SimulationManager:
             0.9
         )  # Storing TPR for UI intuitive, maps to 1-FNR
         self.penalty = solara.reactive(0.5)
-        self.penalty = solara.reactive(0.5)
-        # audit_budget removed from AuditConfig
         self.backcheck_prob = solara.reactive(0.0)
 
         # Sim Config
@@ -74,13 +71,8 @@ class SimulationManager:
         self.selected_run = solara.reactive(None)  # SimulationRun | None
 
         # --- Scenario State ---
-        self.scenarios = solara.reactive({})
-        self.selected_scenario = solara.reactive("Custom")
-
-        # Load scenarios immediately
-        self._load_scenarios()
-
         # File-based scenarios
+        self.selected_scenario = solara.reactive("Custom")
         self.available_scenarios = solara.reactive(list_scenarios())
 
     def refresh_scenarios(self):
@@ -121,53 +113,6 @@ class SimulationManager:
         self.racing_factor.value = config.lab.racing_factor
         self.reputation_sensitivity.value = config.lab.reputation_sensitivity
         self.audit_coefficient.value = config.lab.audit_coefficient
-
-    def _load_scenarios(self):
-        path = Path("scenarios/config.json")
-        if path.exists():
-            with open(path, "r") as f:
-                self.scenarios.value = json.load(f)
-
-    def apply_scenario(self, name):
-        """Load parameters from a named scenario."""
-        if name in self.scenarios.value:
-            c = self.scenarios.value[name]
-
-            # Apply Top Level
-            self.n_agents.value = c.get("n_agents", 5)
-            self.token_cap.value = c.get("token_cap", 5)
-            self.steps.value = c.get("steps", 10)
-
-            # Audit
-            # Audit
-            self.base_prob.value = c.get("base_audit_prob", 0.1)
-            self.high_prob.value = c.get("high_audit_prob", self.base_prob.value)
-
-            # Map JSON keys (false_positive/negative) to State keys (signal_fpr/tpr)
-            fpr = c.get("false_positive_rate", c.get("signal_fpr", 0.1))
-            fnr = c.get("false_negative_rate", 0.1)
-
-            self.signal_fpr.value = fpr
-            self.signal_tpr.value = 1.0 - fnr  # Convert FNR to TPR
-
-            self.penalty.value = c.get("penalty", 0.5)
-            # self.audit_budget.value = c.get("audit_budget", 5)
-            self.backcheck_prob.value = c.get("backcheck_prob", 0.0)
-
-            # Lab
-            # We assume the config.json might not have these yet, so provide safe defaults
-            # matching LabConfig defaults in schemas.py
-            self.gross_value_min.value = c.get("gross_value_min", 0.5)
-            self.gross_value_max.value = c.get("gross_value_max", 1.5)
-            self.risk_profile_min.value = c.get("risk_profile_min", 0.8)
-            self.risk_profile_max.value = c.get("risk_profile_max", 1.2)
-            self.capability_value.value = c.get("capability_value", 0.0)
-            self.racing_factor.value = c.get("racing_factor", 1.0)
-            self.reputation_sensitivity.value = c.get("reputation_sensitivity", 0.0)
-            self.audit_coefficient.value = c.get("audit_coefficient", 1.0)
-
-            self.selected_scenario.value = name
-            self.reset_model()
 
     def get_current_config(self) -> ScenarioConfig:
         """Construct a Pydantic config from current reactive state."""
@@ -227,47 +172,9 @@ class SimulationManager:
         # Capture Granular Agent State
         # We also want to capture "Phase" info if possible, but Mesa step is atomic.
         # For now, we capture the post-step state.
-        agents_data = []
-        for a in self.model.value.agents:
-            if hasattr(a, "domain_agent"):  # Filter for Labs
-                d = a.domain_agent
-
-                # Logic to determine if "audited". Not stored on agent persistently?
-                # We might need to look at Governor state. For now, basic state.
-
-                agents_data.append(
-                    {
-                        "ID": d.lab_id,
-                        "Value": round(d.gross_value, 2),
-                        "Net_Value": round(
-                            d.gross_value
-                            - (
-                                self.model.value.market.current_price
-                                if d.has_permit
-                                else 0
-                            ),
-                            2,
-                        ),
-                        "Compliant": d.is_compliant,
-                        "Permit": d.has_permit,
-                        "True_Compute": d.gross_value,
-                        "Reported_Compute": d.gross_value
-                        if (d.has_permit or d.is_compliant)
-                        else 0.0,
-                        "Capability": d.capability_value,
-                        # "Allowance": removed
-                        "Wealth": round(a.wealth, 2),
-                        "Audited": getattr(a, "last_audit_status", {}).get(
-                            "audited", False
-                        ),
-                        "Penalty": getattr(a, "last_audit_status", {}).get(
-                            "penalty", 0.0
-                        ),
-                        "Caught": getattr(a, "last_audit_status", {}).get(
-                            "caught", False
-                        ),
-                    }
-                )
+        # Capture Granular Agent State
+        # Delegate to model to keep View logic simple
+        agents_data = self.model.value.get_agent_snapshots()
         self.agents_df.value = pd.DataFrame(agents_data)
 
         # --- Capture StepResult ---

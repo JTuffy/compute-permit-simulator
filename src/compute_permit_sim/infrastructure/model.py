@@ -175,3 +175,40 @@ class ComputePermitModel(mesa.Model):
                     # If compliant, maybe refund? (Spec mentions refunds)
 
         self.datacollector.collect(self)
+
+    def get_agent_snapshots(self) -> list[dict]:
+        """Capture standard view of agent state for UI/Data collection.
+
+        Returns:
+            List of dictionaries containing agent metrics.
+        """
+        snapshots = []
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                d = agent.domain_agent
+
+                # Logic copied from previous state.py implementation
+                # Centralized here to keep UI view dumb.
+                snapshots.append(
+                    {
+                        "ID": d.lab_id,
+                        "Value": round(d.gross_value, 2),
+                        "Net_Value": round(
+                            d.gross_value
+                            - (self.market.current_price if d.has_permit else 0),
+                            2,
+                        ),
+                        "Compliant": d.is_compliant,
+                        "Permit": d.has_permit,
+                        "True_Compute": d.gross_value,
+                        "Reported_Compute": d.gross_value
+                        if (d.has_permit or d.is_compliant)
+                        else 0.0,
+                        "Capability": d.capability_value,
+                        "Wealth": round(agent.wealth, 2),
+                        "Audited": agent.last_audit_status.get("audited", False),
+                        "Penalty": agent.last_audit_status.get("penalty", 0.0),
+                        "Caught": agent.last_audit_status.get("caught", False),
+                    }
+                )
+        return snapshots
