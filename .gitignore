@@ -11,3 +11,6 @@ wheels/
 
 # Generated outputs
 *.png
+
+# Lock file
+uv.lock
