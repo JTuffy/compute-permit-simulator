@@ -86,11 +86,11 @@ footer { display: none !important; }
 
 /* Metric Cards */
 .metric-card { 
-  padding: 16px 20px !important; 
+  padding: 8px 12px !important; 
   background: var(--lab-metric-bg) !important;
-  border-left: 4px solid var(--lab-primary) !important;
+  border-left: 3px solid var(--lab-primary) !important;
   border-radius: 4px !important;
-  margin-bottom: 12px !important;
+  margin-bottom: 8px !important;
 }
 
 .metric-card.success { 
@@ -104,17 +104,17 @@ footer { display: none !important; }
 }
 
 .metric-value { 
-  font-size: 2.5rem !important; 
+  font-size: 1.4rem !important; 
   font-family: 'Roboto Mono', monospace !important; 
   font-weight: 700 !important;
-  line-height: 1 !important;
-  margin-bottom: 4px !important;
+  line-height: 1.2 !important;
+  margin-bottom: 2px !important;
 }
 
 .metric-label { 
-  font-size: 0.7rem !important; 
+  font-size: 0.65rem !important; 
   text-transform: uppercase !important; 
-  letter-spacing: 1px !important; 
+  letter-spacing: 0.5px !important; 
   opacity: 0.6 !important;
   font-weight: 600 !important;
 }
@@ -349,7 +349,7 @@ def RunHistoryItem(run, is_selected):
             )
 
         # Save Dialog
-        with solara.v.Dialog(v_model=show_save, max_width=400):
+        with solara.v.Dialog(v_model=show_save, max_width=500):
             with solara.Card(title="Save Scenario"):
                 solara.InputText(
                     label="Filename", value=save_name, on_value=set_save_name
@@ -479,7 +479,7 @@ def Dashboard():
     # Wrap in analysis panel styling
     with solara.Column(classes=["analysis-panel"]):
         # Header with mode indicator
-        mode_badge = "📊 Historical Analysis" if not is_live else "🔴 Live Monitoring"
+        mode_badge = "Historical Analysis" if not is_live else "Live Monitoring"
         solara.Markdown(f"### {mode_badge}")
 
         # Primary Metrics Section
@@ -579,37 +579,39 @@ def InspectorTab():
 
     # Agent Inspection
     if agents_df is not None:
-        solara.Markdown("#### Quantitative Risk Analysis")
+        # Graph Section - Constrained to 1/3 width on top
+        with solara.Card("Quantitative Risk Analysis"):
+            solara.Markdown("**True vs Reported Risk**")
+            # Use 3 columns but only put graph in first one to constrain its size
+            with solara.Columns([1, 2]):
+                with solara.Column():
+                    QuantitativeScatterPlot(agents_df)
+                with solara.Column():
+                    # Empty spacer
+                    pass
 
-        with solara.Columns([1, 1]):
-            with solara.Column():
-                solara.Markdown("**True vs Reported Risk**")
-                QuantitativeScatterPlot(agents_df)
-
-            with solara.Column():
-                solara.Markdown("**Agent Details**")
-                # Show table but maybe select specific columns to avoid clutter
-                # We want: ID, Capability, Allowance, True, Reported, Compliant?
-                cols = [
-                    "ID",
-                    "Value",
-                    "Net_Value",
-                    "Capability",
-                    # "Allowance",  # Removed from model
-                    "True_Compute",
-                    "Reported_Compute",
-                    "Compliant",
-                    "Audited",
-                    "Caught",
-                    "Penalty",
-                    "Wealth",
-                ]
-                # Filter cols if they exist
-                if agents_df is not None and not agents_df.empty:
-                    valid_cols = [c for c in cols if c in agents_df.columns]
-                    solara.DataFrame(agents_df[valid_cols], items_per_page=10)
-                else:
-                    solara.Markdown("No agent data available for this step.")
+        # Agent Details Table - Full width below
+        with solara.Card("Agent Details"):
+            cols = [
+                "ID",
+                "Value",
+                "Net_Value",
+                "Capability",
+                # "Allowance",  # Removed from model
+                "True_Compute",
+                "Reported_Compute",
+                "Compliant",
+                "Audited",
+                "Caught",
+                "Penalty",
+                "Wealth",
+            ]
+            # Filter cols if they exist
+            if agents_df is not None and not agents_df.empty:
+                valid_cols = [c for c in cols if c in agents_df.columns]
+                solara.DataFrame(agents_df[valid_cols], items_per_page=15)
+            else:
+                solara.Markdown("No agent data available for this step.")
     else:
         solara.Markdown("No agent data.")
 
@@ -644,7 +646,7 @@ def ConfigPanel():
                 text=True,
             )
 
-        with solara.v.Dialog(v_model=show_load, max_width=400):
+        with solara.v.Dialog(v_model=show_load, max_width=500):
             with solara.Card(title="Load Scenario Template"):
                 if manager.available_scenarios.value:
                     solara.Select(
