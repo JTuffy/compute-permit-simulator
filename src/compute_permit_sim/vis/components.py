@@ -6,7 +6,13 @@ from matplotlib.figure import Figure
 
 @solara.component
 def RangeView(label: str, min_val: float, max_val: float):
-    """Read-only display of a min-max range."""
+    """Read-only display of a min-max range.
+
+    Args:
+        label: Descriptive label for the range.
+        min_val: Current minimum value.
+        max_val: Current maximum value.
+    """
     solara.Markdown(f"*{label}*")
     solara.InputFloat(label="Min", value=min_val, disabled=True)
     solara.InputFloat(label="Max", value=max_val, disabled=True)
@@ -14,7 +20,13 @@ def RangeView(label: str, min_val: float, max_val: float):
 
 @solara.component
 def RangeController(label: str, min_reactive, max_reactive):
-    """Interactive control for a min-max range."""
+    """Interactive control for a min-max range using reactive variables.
+
+    Args:
+        label: Descriptive label for the range.
+        min_reactive: Solara reactive variable for the minimum value.
+        max_reactive: Solara reactive variable for the maximum value.
+    """
     solara.Markdown(f"*{label}*")
     solara.InputFloat(label="Min", value=min_reactive)
     solara.InputFloat(label="Max", value=max_reactive)
@@ -22,7 +34,12 @@ def RangeController(label: str, min_reactive, max_reactive):
 
 @solara.component
 def QuantitativeScatterPlot(agents_df):
-    """Scatter plot of Reported (X) vs True (Y) compute."""
+    """Scatter plot of Reported (X) vs True (Y) compute for risk analysis.
+
+    Args:
+        agents_df: pandas DataFrame containing agent snapshots with True_Compute,
+                  Reported_Compute, Compliant, and Caught columns.
+    """
     if agents_df is None or agents_df.empty:
         solara.Markdown("No data for scatter plot.")
         return
