@@ -29,7 +29,10 @@ def export_run_to_excel(run, output_path: str | None = None) -> str:
         Path to the created Excel file.
     """
     if output_path is None:
-        output_path = f"simulation_run_{run.id}.xlsx"
+        import os
+
+        os.makedirs("outputs", exist_ok=True)
+        output_path = f"outputs/simulation_run_{run.id}.xlsx"
 
     # Create workbook with xlsxwriter for image embedding support
     workbook = xlsxwriter.Workbook(output_path)
@@ -147,8 +150,8 @@ def _write_config_sheet(sheet, config, header_format, data_format):
     row += 1
 
     lab_params = [
-        ("Gross Value Min", config.lab.gross_value_min),
-        ("Gross Value Max", config.lab.gross_value_max),
+        ("Economic Value Min", config.lab.economic_value_min),
+        ("Economic Value Max", config.lab.economic_value_max),
         ("Risk Profile Min", config.lab.risk_profile_min),
         ("Risk Profile Max", config.lab.risk_profile_max),
         ("Capacity Min", config.lab.capacity_min),

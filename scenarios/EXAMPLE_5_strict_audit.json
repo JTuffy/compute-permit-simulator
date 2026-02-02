@@ -17,8 +17,8 @@
         "fixed_price": null
     },
     "lab": {
-        "gross_value_min": 1.0,
-        "gross_value_max": 2.0,
+        "economic_value_min": 1.0,
+        "economic_value_max": 2.0,
         "risk_profile_min": 0.9,
         "risk_profile_max": 1.1,
         "capacity_min": 1.0,

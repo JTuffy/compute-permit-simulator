@@ -64,7 +64,7 @@ class MarketConfig(BaseModel):
 class LabConfig(BaseModel):
     """Configuration for Lab agent generation.
 
-    gross_value and risk_profile use min/max ranges because each agent is drawn
+    economic_value and risk_profile use min/max ranges because each agent is drawn
     from uniform(min, max) to create heterogeneous firms — this is the core
     source of agent diversity in the model.
 
@@ -72,8 +72,8 @@ class LabConfig(BaseModel):
     for these can be added by converting to min/max ranges later.
     """
 
-    gross_value_min: float = 0.5
-    gross_value_max: float = 1.5
+    economic_value_min: float = 0.5
+    economic_value_max: float = 1.5
     risk_profile_min: float = 0.8
     risk_profile_max: float = 1.2
     capacity_min: float = Field(

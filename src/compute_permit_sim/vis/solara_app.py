@@ -245,8 +245,8 @@ def ParamView(config):
             with solara.Column(style="opacity: 0.8; font-size: 0.9em;"):
                 RangeView(
                     "Gross Value Range",
-                    config.lab.gross_value_min,
-                    config.lab.gross_value_max,
+                    config.lab.economic_value_min,
+                    config.lab.economic_value_max,
                 )
                 RangeView(
                     "Risk Profile Range",
@@ -582,9 +582,9 @@ def Dashboard():
 
         # Configuration Summary (if viewing historical run)
         if not is_live:
-            with solara.Card("Run Configuration", style="background: #F5F7FA;"):
+            with solara.Card("Run Configuration"):
                 c = run.config
-                with solara.Columns([1, 1, 1, 1]):
+                with solara.Columns([1, 1, 1]):
                     with solara.Column():
                         solara.Markdown(f"**Steps:** {c.steps}")
                         solara.Markdown(f"**Agents:** {c.n_agents}")
@@ -626,7 +626,7 @@ def InspectorTab():
     run_id = run.id if run else "live"
     step_idx, set_step_idx = solara.use_state(0, key=run_id)
 
-    solara.Markdown("### Inspect Step")
+    solara.Markdown("### Simulation Timeline")
 
     # Flatten logic
     if is_live:
@@ -639,15 +639,25 @@ def InspectorTab():
         if len(run.steps) > 0:
             # Clamp
             idx = max(0, min(step_idx, len(run.steps) - 1))
+            total = len(run.steps) - 1
             step = run.steps[idx]
 
-            solara.SliderInt(
-                label="Step View",
-                value=step_idx,
-                min=0,
-                max=len(run.steps) - 1,
-                on_value=set_step_idx,
-            )
+            # Redesigned Simulation Timeline
+            with solara.Column(align="center", style="margin: 24px 0;"):
+                # Custom styled slider
+                solara.v.Slider(
+                    v_model=idx,
+                    on_v_model=set_step_idx,
+                    min=0,
+                    max=total,
+                    step=1,
+                    track_color="grey lighten-2",
+                    track_fill_color="primary",
+                    thumb_label="always",
+                    thumb_size=24,
+                    color="primary",
+                    style_="width: 100%; max-width: 800px;",
+                )
 
             price = step.market.get("price", 0)
             supply = step.market.get("supply", 0)
@@ -794,7 +804,9 @@ def ConfigPanel():
         with solara.Card("Lab Generation", style="margin-bottom: 6px;"):
             with solara.Column():
                 RangeController(
-                    "Gross Value", manager.gross_value_min, manager.gross_value_max
+                    "Economic Value",
+                    manager.economic_value_min,
+                    manager.economic_value_max,
                 )
                 RangeController(
                     "Risk Profile", manager.risk_profile_min, manager.risk_profile_max

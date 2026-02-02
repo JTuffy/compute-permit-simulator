@@ -13,7 +13,7 @@ class Lab:
 
     Attributes:
         lab_id: Unique identifier.
-        gross_value: The value (v_i) the lab generates from a training run.
+        economic_value: The value (v_i) the lab generates from a training run.
         risk_profile: Multiplier on perceived penalty
             (>1 = risk-averse, <1 = risk-seeking).
         capacity: Maximum compute capacity (q_max) for this lab.
@@ -28,7 +28,7 @@ class Lab:
     def __init__(
         self,
         lab_id: int,
-        gross_value: float,
+        economic_value: float,
         risk_profile: float = 1.0,
         capacity: float = 1.0,
         capability_value: float = 0.0,
@@ -40,7 +40,7 @@ class Lab:
 
         Args:
             lab_id: Unique integer identifier for this AI Lab.
-            gross_value: Base economic value (v_i) generated from a training run.
+            economic_value: Base economic value (v_i) generated from a training run.
             risk_profile: Multiplier for perceived penalty (>1: risk-averse, <1: risk-seeking).
             capacity: Maximum compute capacity (q_max) for this lab.
             capability_value: Internal model capability value (V_b) gained from training.
@@ -52,7 +52,7 @@ class Lab:
             None
         """
         self.lab_id: int = lab_id
-        self.gross_value: float = gross_value
+        self.economic_value: float = economic_value
         self.risk_profile: float = risk_profile
         self.capacity: float = capacity
         self.capability_value: float = capability_value
@@ -71,7 +71,7 @@ class Lab:
         Returns:
             Non-negative bid value.
         """
-        return max(0.0, self.gross_value - cost)
+        return max(0.0, self.economic_value - cost)
 
     def decide_compliance(
         self,
@@ -110,8 +110,8 @@ class Lab:
         #    BUT if v_i < market_price, the agent wouldn't buy anyway.
         #    So the benefit of cheating is getting to run
         #    (worth v_i) vs not running (0).
-        #    Thus effective delta_c = min(market_price, self.gross_value)
-        delta_c = min(market_price, self.gross_value)
+        #    Thus effective delta_c = min(market_price, self.economic_value)
+        delta_c = min(market_price, self.economic_value)
         capability_gain = self.racing_factor * self.capability_value
         gain = delta_c + capability_gain
 
@@ -121,8 +121,8 @@ class Lab:
             return True
 
         # Also check: is running profitable at all?
-        # If gross_value - cost <= 0, the firm wouldn't run regardless
-        if self.gross_value - cost <= 0:
+        # If economic_value - cost <= 0, the firm wouldn't run regardless
+        if self.economic_value - cost <= 0:
             self.is_compliant = True
             return True
 

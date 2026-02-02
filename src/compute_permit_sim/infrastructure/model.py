@@ -25,7 +25,7 @@ class MesaLab(mesa.Agent):
         self,
         unique_id: int,
         model: mesa.Model,
-        gross_value: float,
+        economic_value: float,
         risk_profile: float,
         capacity: float = 1.0,
         capability_value: float = 0.0,
@@ -38,7 +38,7 @@ class MesaLab(mesa.Agent):
         Args:
             unique_id: Unique identifier for the agent.
             model: The Mesa model instance this agent belongs to.
-            gross_value: Baseline value (v_i) of training compute.
+            economic_value: Baseline value (v_i) of training compute.
             risk_profile: Multiplier for perceived penalty (deterrence sensitivity).
             capability_value: Baseline model capability value (V_b).
             racing_factor: Multiplier for urgency-driven capability gain (c_r).
@@ -49,7 +49,7 @@ class MesaLab(mesa.Agent):
         self.unique_id = unique_id
         self.domain_agent = Lab(
             unique_id,
-            gross_value,
+            economic_value,
             risk_profile,
             capacity=capacity,
             capability_value=capability_value,
@@ -58,6 +58,7 @@ class MesaLab(mesa.Agent):
             audit_coefficient=audit_coefficient,
         )
         self.wealth: float = 0.0
+        self.last_step_profit: float = 0.0
         # Tracking for visualization
         self.last_audit_status = {"audited": False, "caught": False, "penalty": 0.0}
 
@@ -131,8 +132,8 @@ class ComputePermitModel(mesa.Model):
 
         # Initialize Agents (IDs start at 1)
         for i in range(self.n_agents):
-            gross_value = random.uniform(
-                config.lab.gross_value_min, config.lab.gross_value_max
+            economic_value = random.uniform(
+                config.lab.economic_value_min, config.lab.economic_value_max
             )
             risk_profile = random.uniform(
                 config.lab.risk_profile_min, config.lab.risk_profile_max
@@ -142,7 +143,7 @@ class ComputePermitModel(mesa.Model):
             MesaLab(
                 i + 1,  # Start IDs at 1
                 self,
-                gross_value,
+                economic_value,
                 risk_profile,
                 capacity=capacity,
                 capability_value=config.lab.capability_value,
@@ -162,6 +163,11 @@ class ComputePermitModel(mesa.Model):
 
     def step(self) -> None:
         """Execute one step of the simulation (matches Game Loop)."""
+        # Reset per-step profit tracking
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                agent.last_step_profit = 0.0
+
         # 1. Trading Phase
         # Collect bids (valuations) from all agents
         # Bids are tuples of (lab_id, valuation)
@@ -181,6 +187,7 @@ class ComputePermitModel(mesa.Model):
                 if agent.domain_agent.lab_id in winning_set:
                     agent.domain_agent.has_permit = True
                     agent.wealth -= clearing_price
+                    agent.last_step_profit -= clearing_price
                 else:
                     agent.domain_agent.has_permit = False
 
@@ -240,6 +247,7 @@ class ComputePermitModel(mesa.Model):
             if not is_compliant and not agent.domain_agent.has_permit:
                 # Caught cheating!
                 agent.wealth -= self.config.audit.penalty_amount
+                agent.last_step_profit -= self.config.audit.penalty_amount
                 agent.last_audit_status["caught"] = True
                 agent.last_audit_status["penalty"] = self.config.audit.penalty_amount
 
@@ -259,10 +267,12 @@ class ComputePermitModel(mesa.Model):
                 d = agent.domain_agent
                 # Agents with permits ran legally - already paid permit price
                 if d.has_permit:
-                    agent.wealth += d.gross_value  # They get the value of the run
+                    agent.wealth += d.economic_value  # They get the value of the run
+                    agent.last_step_profit += d.economic_value
                 # Non-compliant agents without permits ran illegally
                 elif not d.is_compliant:
-                    agent.wealth += d.gross_value  # They get the value (cheating)
+                    agent.wealth += d.economic_value  # They get the value (cheating)
+                    agent.last_step_profit += d.economic_value
                 # Compliant agents without permits didn't run - no value gained
                 # (they chose not to run because they couldn't afford permit)
 
@@ -296,10 +306,10 @@ class ComputePermitModel(mesa.Model):
                 snapshots.append(
                     {
                         "ID": d.lab_id,
-                        "Value": round(d.gross_value, 2),
+                        "Value": round(d.economic_value, 2),
                         "Net_Value": round(
-                            agent.wealth, 2
-                        ),  # Use actual accumulated wealth
+                            agent.last_step_profit, 2
+                        ),  # Use actual step net value
                         "Compliant": d.is_compliant,
                         "Permit": d.has_permit,
                         "True_Compute": round(true_compute, 2),

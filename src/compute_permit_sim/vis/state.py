@@ -30,8 +30,8 @@ class SimulationManager:
         # --- Full Configuration State ---
         # Lab Config
         self.n_agents = solara.reactive(5)
-        self.gross_value_min = solara.reactive(0.5)
-        self.gross_value_max = solara.reactive(1.5)
+        self.economic_value_min = solara.reactive(0.5)
+        self.economic_value_max = solara.reactive(1.5)
         self.risk_profile_min = solara.reactive(0.8)
         self.risk_profile_max = solara.reactive(1.2)
         self.capacity_min = solara.reactive(1.0)
@@ -111,8 +111,8 @@ class SimulationManager:
         self.backcheck_prob.value = config.audit.backcheck_prob
 
         # Lab
-        self.gross_value_min.value = config.lab.gross_value_min
-        self.gross_value_max.value = config.lab.gross_value_max
+        self.economic_value_min.value = config.lab.economic_value_min
+        self.economic_value_max.value = config.lab.economic_value_max
         self.risk_profile_min.value = config.lab.risk_profile_min
         self.risk_profile_max.value = config.lab.risk_profile_max
         self.capacity_min.value = config.lab.capacity_min
@@ -142,8 +142,8 @@ class SimulationManager:
             ),
             market=MarketConfig(token_cap=float(self.token_cap.value)),
             lab=LabConfig(
-                gross_value_min=self.gross_value_min.value,
-                gross_value_max=self.gross_value_max.value,
+                economic_value_min=self.economic_value_min.value,
+                economic_value_max=self.economic_value_max.value,
                 risk_profile_min=self.risk_profile_min.value,
                 risk_profile_max=self.risk_profile_max.value,
                 capacity_min=self.capacity_min.value,
@@ -262,8 +262,8 @@ class SimulationManager:
         # self.audit_budget.value = c.audit.audit_budget (Removed)
 
         # Lab
-        self.gross_value_min.value = c.lab.gross_value_min
-        self.gross_value_max.value = c.lab.gross_value_max
+        self.economic_value_min.value = c.lab.economic_value_min
+        self.economic_value_max.value = c.lab.economic_value_max
         self.risk_profile_min.value = c.lab.risk_profile_min
         self.risk_profile_max.value = c.lab.risk_profile_max
         self.capacity_min.value = getattr(c.lab, "capacity_min", 1.0)
