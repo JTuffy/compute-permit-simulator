@@ -10,12 +10,146 @@ from compute_permit_sim.vis.components import (
 )
 from compute_permit_sim.vis.state import manager
 
-# Custom CSS for compactness and hiding Solara watermark
+# Research Lab Design System CSS
 DENSITY_CSS = """
-.v-application .v-card__text { padding: 8px !important; }
-.v-application .v-card__title { padding: 8px 12px !important; font-size: 1rem !important; }
-.solara-markdown p { margin-bottom: 4px !important; }
-footer { display: none !important; } 
+/* Hide Solara watermark */
+footer { display: none !important; }
+
+/* Color Palette - Research Lab Theme */
+:root {
+  --lab-primary: #2196F3;
+  --lab-success: #4CAF50;
+  --lab-warning: #FF9800;
+  --lab-error: #F44336;
+  --lab-input-bg: #F5F7FA;
+  --lab-output-bg: #FFFFFF;
+  --lab-metric-bg: #E3F2FD;
+  --lab-spacing-tight: 4px;
+  --lab-spacing-normal: 8px;
+  --lab-spacing-loose: 16px;
+}
+
+/* Left Panel: Compact Control Panel Style */
+.sidebar-compact .v-card { 
+  margin-bottom: 8px !important; 
+  background: var(--lab-input-bg) !important;
+  border-radius: 4px !important;
+}
+
+.sidebar-compact .v-input { 
+  margin-bottom: 2px !important; 
+  font-size: 0.85rem !important;
+}
+
+.sidebar-compact .v-card__text { 
+  padding: 6px 10px !important; 
+}
+
+.sidebar-compact .v-card__title { 
+  font-size: 0.75rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 0.5px !important; 
+  opacity: 0.7 !important;
+  padding: 6px 10px !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-compact .v-label {
+  font-size: 0.85rem !important;
+}
+
+/* Compact tab styling */
+.sidebar-compact .v-tab {
+  font-size: 0.8rem !important;
+  min-width: 60px !important;
+  padding: 0 8px !important;
+}
+
+/* Right Panel: Spacious Analytical Readout */
+.analysis-panel { 
+  padding: 24px !important; 
+}
+
+.analysis-panel .v-card {
+  margin-bottom: 20px !important;
+}
+
+.analysis-panel .v-card__title {
+  font-size: 1.1rem !important;
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+}
+
+.analysis-panel .v-card__text {
+  padding: 16px !important;
+}
+
+/* Metric Cards */
+.metric-card { 
+  padding: 16px 20px !important; 
+  background: var(--lab-metric-bg) !important;
+  border-left: 4px solid var(--lab-primary) !important;
+  border-radius: 4px !important;
+  margin-bottom: 12px !important;
+}
+
+.metric-card.success { 
+  border-left-color: var(--lab-success) !important; 
+  background: #E8F5E9 !important;
+}
+
+.metric-card.warning { 
+  border-left-color: var(--lab-warning) !important; 
+  background: #FFF3E0 !important;
+}
+
+.metric-value { 
+  font-size: 2.5rem !important; 
+  font-family: 'Roboto Mono', monospace !important; 
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  margin-bottom: 4px !important;
+}
+
+.metric-label { 
+  font-size: 0.7rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 1px !important; 
+  opacity: 0.6 !important;
+  font-weight: 600 !important;
+}
+
+/* Compact Run History */
+.run-history-compact {
+  max-height: 250px !important;
+  overflow-y: auto !important;
+  padding: 4px !important;
+}
+
+.run-history-compact .v-btn {
+  font-size: 0.75rem !important;
+  padding: 2px 6px !important;
+}
+
+/* General density improvements */
+.v-application .v-input--dense .v-input__control {
+  min-height: 32px !important;
+}
+
+.solara-markdown p { 
+  margin-bottom: 4px !important; 
+}
+
+/* Button hierarchy */
+.v-btn.v-btn--text {
+  text-transform: none !important;
+}
+
+/* Numeric display */
+.numeric-display {
+  font-family: 'Roboto Mono', monospace !important;
+  font-weight: 500 !important;
+}
 """
 
 # --- Components ---
@@ -26,6 +160,41 @@ def SimulationController():
     """Invisible component to handle the play loop."""
     solara.lab.use_task(manager.play_loop, dependencies=[manager.is_playing.value])
     return solara.Div(style="display: none;")
+
+
+@solara.component
+def MetricCard(label: str, value: str, color_variant: str = "primary"):
+    """Display a primary metric with visual hierarchy.
+
+    Args:
+        label: Metric label (e.g., "Final Compliance")
+        value: Formatted value (e.g., "87.5%")
+        color_variant: "primary", "success", or "warning"
+    """
+    classes = ["metric-card"]
+    if color_variant != "primary":
+        classes.append(color_variant)
+
+    with solara.Card(classes=classes):
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=f"""
+                <div class="metric-label">{label}</div>
+                <div class="metric-value">{value}</div>
+            """,
+        )
+
+
+@solara.component
+def ScenarioCard(title: str):
+    """Compact card for scenario configuration sections.
+
+    Args:
+        title: Section title (e.g., "General", "Audit Policy")
+    """
+    # This is a wrapper that children can be placed in
+    # Using context manager pattern
+    pass
 
 
 @solara.component
@@ -229,15 +398,56 @@ def RunGraphs(compliance_series, price_series):
 
 
 def _create_time_series_figure(data, label, color, ylim=None):
+    """Create publication-quality time series figure.
+
+    Args:
+        data: Time series data
+        label: Series label
+        color: Line color (can be 'green', 'blue', etc.)
+        ylim: Optional y-axis limits
+
+    Returns:
+        Matplotlib figure
+    """
     from matplotlib.figure import Figure
 
-    fig = Figure(figsize=(6, 3))
+    # Color mapping for research lab aesthetic
+    color_map = {
+        "green": "#4CAF50",
+        "blue": "#2196F3",
+        "red": "#F44336",
+        "orange": "#FF9800",
+    }
+    plot_color = color_map.get(color, color)
+
+    # Larger figure for better readability
+    fig = Figure(figsize=(8, 4), dpi=100)
     ax = fig.subplots()
-    ax.plot(data, label=label, color=color)
+
+    # Plot with publication-quality styling
+    ax.plot(data, label=label, color=plot_color, linewidth=2.5, alpha=0.9)
+
+    # Enhanced grid
+    ax.grid(True, alpha=0.25, linestyle="--", linewidth=0.8)
+
+    # Styling
+    ax.set_xlabel("Step", fontsize=11, fontweight="500")
+    ax.set_ylabel(label, fontsize=11, fontweight="500")
+    ax.legend(loc="best", framealpha=0.9, fontsize=10)
+
+    # Set ylim if provided
     if ylim:
         ax.set_ylim(ylim)
-    ax.legend()
-    ax.grid(True)
+
+    # Cleaner spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_linewidth(1.2)
+    ax.spines["bottom"].set_linewidth(1.2)
+
+    # Tighter layout
+    fig.tight_layout()
+
     return fig
 
 
@@ -256,9 +466,8 @@ def Dashboard():
         else [s.market.get("price", 0) for s in run.steps]
     )
 
-    # Placeholder for compliance in history (if missed in schema)
+    # Calculate compliance series
     if not is_live:
-        # Calculate compliance per step dynamically
         compliance_series = []
         for s in run.steps:
             compliant_count = sum(1 for a in s.agents if a.get("Compliant"))
@@ -267,47 +476,52 @@ def Dashboard():
     else:
         compliance_series = manager.compliance_history.value
 
-    # Split Dashboard Logic
-    if not is_live:
-        solara.Markdown("### Run Analysis")
-        with solara.Row():
-            # Left: Locked Params
-            with solara.Column(style=("width: 40%; padding-right: 20px;")):
-                with solara.Card("Run Configuration"):
-                    ParamView(run.config)
+    # Wrap in analysis panel styling
+    with solara.Column(classes=["analysis-panel"]):
+        # Header with mode indicator
+        mode_badge = "📊 Historical Analysis" if not is_live else "🔴 Live Monitoring"
+        solara.Markdown(f"### {mode_badge}")
 
-            # Right: Results
-            with solara.Column(style="width: 60%; padding-left: 20px;"):
-                with solara.Card("Run Results"):
-                    # Reuse the metrics display logic here or inline it
-                    solara.Markdown(f"**Steps Taken:** {step_count}")
+        # Primary Metrics Section
+        with solara.Card("Key Metrics"):
+            # Get current values
+            current_compliance = "N/A"
+            current_price = "N/A"
 
-                    current_compliance = "N/A"
-                    current_price = "N/A"
-                    if compliance_series:
-                        current_compliance = f"{compliance_series[-1]:.2%}"
-                    if price_series:
-                        current_price = f"{price_series[-1]:.2f}"
-
-                    with solara.Columns([1, 1]):
-                        solara.Markdown(f"**Final Compliance:** {current_compliance}")
-                        solara.Markdown(f"**Final Price:** {current_price}")
-
-        # Graphs (Full Width Bottom)
-        with solara.Card("Run Graphs"):
-            RunGraphs(compliance_series, price_series)
-
-    else:
-        # Live Monitoring View
-        with solara.Card("Live Metrics"):
-            solara.Markdown(f"**Step:** {step_count}")
             if compliance_series:
-                solara.Markdown(f"**Current Compliance:** {compliance_series[-1]:.2%}")
-            if price_series:
-                solara.Markdown(f"**Current Price:** {price_series[-1]:.2f}")
+                comp_val = compliance_series[-1]
+                current_compliance = f"{comp_val:.1%}"
+                comp_color = "success" if comp_val >= 0.8 else "warning"
+            else:
+                comp_color = "primary"
 
-        # Live Graphs
-        RunGraphs(compliance_series, price_series)
+            if price_series:
+                current_price = f"${price_series[-1]:.2f}"
+
+            # Display metrics in columns
+            with solara.Columns([1, 1, 1]):
+                MetricCard("Steps Completed", f"{step_count}", "primary")
+                MetricCard("Compliance Rate", current_compliance, comp_color)
+                MetricCard("Market Price", current_price, "primary")
+
+        # Configuration Summary (if viewing historical run)
+        if not is_live:
+            with solara.Card("Run Configuration", style="background: #F5F7FA;"):
+                c = run.config
+                with solara.Columns([1, 1, 1]):
+                    with solara.Column():
+                        solara.Markdown(f"**Agents:** {c.n_agents}")
+                        solara.Markdown(f"**Token Cap:** {int(c.market.token_cap)}")
+                    with solara.Column():
+                        solara.Markdown(f"**Base Audit Prob:** {c.audit.base_prob:.2%}")
+                        solara.Markdown(f"**High Audit Prob:** {c.audit.high_prob:.2%}")
+                    with solara.Column():
+                        solara.Markdown(f"**Penalty:** ${c.audit.penalty_amount:.0f}")
+                        solara.Markdown(f"**Racing Factor:** {c.lab.racing_factor:.2f}")
+
+        # Time Series Graphs - Publication Quality
+        with solara.Card("Temporal Analysis"):
+            RunGraphs(compliance_series, price_series)
 
 
 @solara.component
@@ -402,109 +616,142 @@ def InspectorTab():
 
 @solara.component
 def ConfigPanel():
-    # Scenario Selection (New File-based)
-    show_load, set_show_load = solara.use_state(False)
-    selected_file, set_selected_file = solara.use_state(None)
+    # Wrap entire panel in compact styling
+    with solara.Column(classes=["sidebar-compact"], gap="4px"):
+        # Scenario Selection (New File-based)
+        show_load, set_show_load = solara.use_state(False)
+        selected_file, set_selected_file = solara.use_state(None)
 
-    def open_load_dialog():
-        manager.refresh_scenarios()
-        set_show_load(True)
+        def open_load_dialog():
+            manager.refresh_scenarios()
+            set_show_load(True)
 
-    def do_load():
-        if selected_file:
-            manager.load_from_file(selected_file)
-            set_show_load(False)
+        def do_load():
+            if selected_file:
+                manager.load_from_file(selected_file)
+                set_show_load(False)
 
-    with solara.Row(style="align-items: center;", justify="space-between"):
-        solara.Markdown("### Configuration")
-        solara.Button(
-            "Load Scenario",
-            on_click=open_load_dialog,
-            icon_name="mdi-folder-open",
-            small=True,
-        )
+        # Header with Load button
+        with solara.Row(
+            style="align-items: center; margin-bottom: 8px;", justify="space-between"
+        ):
+            solara.Markdown("**SCENARIO**", style="font-size: 0.9rem; opacity: 0.7;")
+            solara.Button(
+                "Load",
+                on_click=open_load_dialog,
+                icon_name="mdi-folder-open",
+                small=True,
+                text=True,
+            )
 
-    with solara.v.Dialog(v_model=show_load, max_width=400):
-        with solara.Card(title="Load Scenario Template"):
-            if manager.available_scenarios.value:
-                solara.Select(
-                    label="Choose File",
-                    values=manager.available_scenarios.value,
-                    value=selected_file,
-                    on_value=set_selected_file,
+        with solara.v.Dialog(v_model=show_load, max_width=400):
+            with solara.Card(title="Load Scenario Template"):
+                if manager.available_scenarios.value:
+                    solara.Select(
+                        label="Choose File",
+                        values=manager.available_scenarios.value,
+                        value=selected_file,
+                        on_value=set_selected_file,
+                    )
+                else:
+                    solara.Markdown("_No scenarios found in scenarios/_")
+
+                with solara.Row(justify="end", style="margin-top: 10px;"):
+                    solara.Button(
+                        "Cancel", on_click=lambda: set_show_load(False), text=True
+                    )
+                    solara.Button(
+                        "Load",
+                        on_click=do_load,
+                        color="primary",
+                        disabled=(not selected_file),
+                    )
+
+        # General Parameters Card
+        with solara.Card("General", style="margin-bottom: 6px;"):
+            with solara.Column(gap="2px"):
+                solara.InputInt(label="Steps", value=manager.steps, dense=True)
+                solara.InputInt(label="N Agents", value=manager.n_agents, dense=True)
+                solara.InputFloat(
+                    label="Token Cap Q", value=manager.token_cap, dense=True
                 )
-            else:
-                solara.Markdown("_No scenarios found in scenarios/_")
 
-            with solara.Row(justify="end", style="margin-top: 10px;"):
+        # Audit Policy Card
+        with solara.Card("Audit Policy", style="margin-bottom: 6px;"):
+            with solara.Column(gap="2px"):
+                solara.InputFloat(label="Penalty $", value=manager.penalty, dense=True)
+                solara.InputFloat(label="Base π₀", value=manager.base_prob, dense=True)
+                solara.InputFloat(label="High π₁", value=manager.high_prob, dense=True)
+                solara.InputFloat(
+                    label="Signal TPR", value=manager.signal_tpr, dense=True
+                )
+                solara.InputFloat(
+                    label="Signal FPR", value=manager.signal_fpr, dense=True
+                )
+
+        # Lab Generation Card
+        with solara.Card("Lab Generation", style="margin-bottom: 6px;"):
+            with solara.Column(gap="2px"):
+                RangeController(
+                    "Gross Value", manager.gross_value_min, manager.gross_value_max
+                )
+                RangeController(
+                    "Risk Profile", manager.risk_profile_min, manager.risk_profile_max
+                )
+                solara.InputFloat(
+                    label="Capability Vb", value=manager.capability_value, dense=True
+                )
+                solara.InputFloat(
+                    label="Racing cr", value=manager.racing_factor, dense=True
+                )
+                solara.InputFloat(
+                    label="Reputation β",
+                    value=manager.reputation_sensitivity,
+                    dense=True,
+                )
+                solara.InputFloat(
+                    label="Audit Coeff", value=manager.audit_coefficient, dense=True
+                )
+
+        # Action Buttons Section
+        solara.Markdown("---")
+        with solara.Column(gap="6px"):
+            # Primary action: Play/Pause (prominent)
+            solara.Button(
+                label="⏸ Pause" if manager.is_playing.value else "▶ Play",
+                on_click=lambda: manager.is_playing.set(not manager.is_playing.value),
+                color="primary",
+                block=True,
+                style="font-weight: 600;",
+            )
+
+            # Secondary actions (smaller)
+            with solara.Row(gap="4px"):
                 solara.Button(
-                    "Cancel", on_click=lambda: set_show_load(False), text=True
+                    "Reset",
+                    on_click=manager.reset_model,
+                    color="error",
+                    small=True,
+                    text=True,
+                    style="flex: 1;",
                 )
                 solara.Button(
-                    "Load",
-                    on_click=do_load,
-                    color="primary",
-                    disabled=(not selected_file),
+                    "Step",
+                    on_click=manager.step,
+                    disabled=manager.is_playing.value,
+                    small=True,
+                    text=True,
+                    style="flex: 1;",
                 )
 
-    # Old Selector (Legacy?) - optionally keep or remove. User asked for Load Button.
-    # Removing old selector to clean up UI as requested ("load button... with popup")
-
-    # Live Config controls (Always enabled now)
-    # Removing 'disabled' logic and Restore buttons.
-
-    with solara.lab.Tabs():
-        with solara.lab.Tab("General"):
-            solara.Markdown("**Simulation Parameters**")
-            solara.InputInt(label="Steps", value=manager.steps)
-            solara.InputInt(label="N Agents", value=manager.n_agents)
-            solara.InputFloat(label="Token Cap (Q)", value=manager.token_cap)
-
-        with solara.lab.Tab("Audit"):
-            solara.Markdown("**Auditor Policy**")
-            solara.InputFloat(label="Penalty Amount", value=manager.penalty)
-            solara.InputFloat(label="Base Prob (pi_0)", value=manager.base_prob)
-            solara.InputFloat(label="High Prob (pi_1)", value=manager.high_prob)
-            solara.InputFloat(label="Signal TPR", value=manager.signal_tpr)
-            solara.InputFloat(label="Signal FPR", value=manager.signal_fpr)
-
-        with solara.lab.Tab("Lab"):
-            solara.Markdown("**Lab Agent Generation**")
-            RangeController(
-                "Gross Value Range", manager.gross_value_min, manager.gross_value_max
-            )
-            RangeController(
-                "Risk Profile Range", manager.risk_profile_min, manager.risk_profile_max
-            )
-            solara.InputFloat(
-                label="Capability Value (V_b)", value=manager.capability_value
-            )
-            solara.InputFloat(label="Racing Factor (c_r)", value=manager.racing_factor)
-            solara.InputFloat(
-                label="Reputation Sensitivity", value=manager.reputation_sensitivity
-            )
-            solara.InputFloat(
-                label="Audit Coefficient", value=manager.audit_coefficient
-            )
-
-    solara.Markdown("---")
-    with solara.Row():
-        solara.Button("Reset", on_click=manager.reset_model, color="error")
-        # Hiding Step button for batch-mode feel, or keep it?
-        # User said "when run is done... auto load".
-        # Keeping manual Step is useful for debugging, but maybe de-emphasize?
-        # Leaving it for now as "Advanced".
-        solara.Button(
-            "Step",
-            on_click=manager.step,
-            disabled=manager.is_playing.value,
+        # Run History Section (Compact)
+        solara.Markdown("---")
+        solara.Markdown(
+            "**RUN HISTORY**",
+            style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 4px;",
         )
-
-    solara.Button(
-        label="Pause" if manager.is_playing.value else "Play",
-        on_click=lambda: manager.is_playing.set(not manager.is_playing.value),
-        color="primary",
-    )
+        with solara.Column(classes=["run-history-compact"]):
+            RunHistoryList()
 
 
 @solara.component
@@ -540,8 +787,6 @@ def Page():
 
     with solara.Sidebar():
         ConfigPanel()
-        solara.Markdown("---")
-        # RunHistoryList moved to main page
 
     solara.Title("Compute Permit Market Simulator")
 
@@ -561,12 +806,3 @@ def Page():
                 Dashboard()
             with solara.lab.Tab("Details"):
                 InspectorTab()
-
-    # Run History at the bottom
-    solara.Markdown("---")
-    with solara.v.ExpansionPanels():
-        with solara.v.ExpansionPanel():
-            with solara.v.ExpansionPanelHeader():
-                solara.Text("Previous Runs")
-            with solara.v.ExpansionPanelContent():
-                RunHistoryList()
