@@ -251,16 +251,16 @@ def _write_agents_sheet(sheet, last_step, header_format, data_format, number_for
     # Define columns to export
     cols = [
         "ID",
-        "Value",
-        "Net_Value",
+        "Revenue",
+        "Step Profit",
         "Capacity",
-        "True_Compute",
-        "Reported_Compute",
+        "Used Compute",
+        "Reported Compute",
         "Compliant",
         "Audited",
         "Caught",
         "Penalty",
-        "Wealth",
+        "Total Wealth",
     ]
     valid_cols = [c for c in cols if c in agents_df.columns]
 
@@ -313,8 +313,8 @@ def _write_graphs_sheet(sheet, run, workbook):
     if run.steps[-1].agents:
         agents_df = pd.DataFrame(run.steps[-1].agents)
         if (
-            "True_Compute" in agents_df.columns
-            and "Reported_Compute" in agents_df.columns
+            "Used Compute" in agents_df.columns
+            and "Reported Compute" in agents_df.columns
         ):
             sheet.write(25, 0, "True vs Reported Compute (Last Step)")
             scatter_fig = _create_scatter_figure(agents_df)
@@ -357,16 +357,16 @@ def _create_scatter_figure(agents_df):
         colors = "blue"
 
     ax.scatter(
-        agents_df["Reported_Compute"],
-        agents_df["True_Compute"],
+        agents_df["Reported Compute"],
+        agents_df["Used Compute"],
         c=colors,
         alpha=0.6,
         edgecolors="k",
     )
 
     max_val = max(
-        agents_df["True_Compute"].max(),
-        agents_df["Reported_Compute"].max(),
+        agents_df["Used Compute"].max(),
+        agents_df["Reported Compute"].max(),
     )
     ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honest (y=x)")
 

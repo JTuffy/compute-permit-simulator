@@ -38,16 +38,16 @@ def QuantitativeScatterPlot(agents_df):
     """Scatter plot of Reported (X) vs True (Y) compute for risk analysis.
 
     Args:
-        agents_df: pandas DataFrame containing agent snapshots with True_Compute,
-                  Reported_Compute, Compliant, and Caught columns.
+        agents_df: pandas DataFrame containing agent snapshots with Used Compute,
+                  Reported Compute, Compliant, and Caught columns.
     """
     if agents_df is None or agents_df.empty:
         solara.Markdown("No data for scatter plot.")
         return
 
     # Extract data
-    true_compute = agents_df["True_Compute"]
-    reported_compute = agents_df["Reported_Compute"]
+    true_compute = agents_df["Used Compute"]
+    reported_compute = agents_df["Reported Compute"]
 
     fig = Figure(figsize=(6, 5))
     ax = fig.subplots()
@@ -183,7 +183,7 @@ def PayoffByStrategyPlot(agents_df):
         return
 
     # Check required columns
-    required_cols = ["Compliant", "Caught", "Net_Value"]
+    required_cols = ["Compliant", "Caught", "Step Profit"]
     if not all(col in agents_df.columns for col in required_cols):
         solara.Markdown("Missing required columns for payoff plot.")
         return
@@ -198,10 +198,10 @@ def PayoffByStrategyPlot(agents_df):
     ]
 
     # Calculate average payoffs
-    avg_compliant = compliant["Net_Value"].mean() if len(compliant) > 0 else 0
-    avg_caught = cheated_caught["Net_Value"].mean() if len(cheated_caught) > 0 else 0
+    avg_compliant = compliant["Step Profit"].mean() if len(compliant) > 0 else 0
+    avg_caught = cheated_caught["Step Profit"].mean() if len(cheated_caught) > 0 else 0
     avg_uncaught = (
-        cheated_uncaught["Net_Value"].mean() if len(cheated_uncaught) > 0 else 0
+        cheated_uncaught["Step Profit"].mean() if len(cheated_uncaught) > 0 else 0
     )
 
     # Create figure

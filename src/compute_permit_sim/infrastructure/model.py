@@ -305,20 +305,24 @@ class ComputePermitModel(mesa.Model):
 
                 snapshots.append(
                     {
+                        # Group 1: Identity
                         "ID": d.lab_id,
-                        "Value": round(d.economic_value, 2),
-                        "Net_Value": round(
-                            agent.last_step_profit, 2
-                        ),  # Use actual step net value
-                        "Compliant": d.is_compliant,
-                        "Permit": d.has_permit,
-                        "True_Compute": round(true_compute, 2),
-                        "Reported_Compute": round(reported_compute, 2),
                         "Capacity": round(d.capacity, 2),
-                        "Wealth": round(agent.wealth, 2),
+                        # Group 2: Compute Action
+                        "Permit": d.has_permit,
+                        "Used Compute": round(true_compute, 2),
+                        "Reported Compute": round(reported_compute, 2),
+                        # Group 3: Compliance Status
+                        "Compliant": d.is_compliant,
                         "Audited": agent.last_audit_status.get("audited", False),
-                        "Penalty": agent.last_audit_status.get("penalty", 0.0),
                         "Caught": agent.last_audit_status.get("caught", False),
+                        # Group 4: Financials
+                        "Penalty": agent.last_audit_status.get("penalty", 0.0),
+                        "Revenue": round(d.economic_value, 2),
+                        "Step Profit": round(
+                            agent.last_step_profit, 2
+                        ),  # Net gain/loss this step
+                        "Total Wealth": round(agent.wealth, 2),
                     }
                 )
         return snapshots

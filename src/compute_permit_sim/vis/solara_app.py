@@ -692,16 +692,17 @@ def InspectorTab():
         with solara.Card("Agent Details"):
             cols = [
                 "ID",
-                "Value",
-                "Net_Value",
                 "Capacity",
-                "True_Compute",
-                "Reported_Compute",
+                "Permit",
+                "Used Compute",
+                "Reported Compute",
                 "Compliant",
                 "Audited",
                 "Caught",
                 "Penalty",
-                "Wealth",
+                "Revenue",
+                "Step Profit",
+                "Total Wealth",
             ]
             # Filter cols if they exist
             if agents_df is not None and not agents_df.empty:
