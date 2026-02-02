@@ -478,10 +478,6 @@ def Dashboard():
 
     # Wrap in analysis panel styling
     with solara.Column(classes=["analysis-panel"]):
-        # Header with mode indicator
-        mode_badge = "Historical Analysis" if not is_live else "Live Monitoring"
-        solara.Markdown(f"### {mode_badge}")
-
         # Primary Metrics Section
         with solara.Card("Key Metrics"):
             # Get current values
@@ -508,19 +504,34 @@ def Dashboard():
         if not is_live:
             with solara.Card("Run Configuration", style="background: #F5F7FA;"):
                 c = run.config
-                with solara.Columns([1, 1, 1]):
+                with solara.Columns([1, 1, 1, 1]):
                     with solara.Column():
+                        solara.Markdown(f"**Steps:** {c.steps}")
                         solara.Markdown(f"**Agents:** {c.n_agents}")
                         solara.Markdown(f"**Token Cap:** {int(c.market.token_cap)}")
                     with solara.Column():
-                        solara.Markdown(f"**Base Audit Prob:** {c.audit.base_prob:.2%}")
-                        solara.Markdown(f"**High Audit Prob:** {c.audit.high_prob:.2%}")
-                    with solara.Column():
+                        solara.Markdown(f"**Base π₀:** {c.audit.base_prob:.2%}")
+                        solara.Markdown(f"**High π₁:** {c.audit.high_prob:.2%}")
                         solara.Markdown(f"**Penalty:** ${c.audit.penalty_amount:.0f}")
-                        solara.Markdown(f"**Racing Factor:** {c.lab.racing_factor:.2f}")
+                    with solara.Column():
+                        solara.Markdown(
+                            f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
+                        )
+                        solara.Markdown(f"**FPR:** {c.audit.false_positive_rate:.2%}")
+                        solara.Markdown(f"**Racing cr:** {c.lab.racing_factor:.2f}")
+                    with solara.Column():
+                        solara.Markdown(
+                            f"**Capability Vb:** {c.lab.capability_value:.2f}"
+                        )
+                        solara.Markdown(
+                            f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
+                        )
+                        solara.Markdown(
+                            f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
+                        )
 
         # Time Series Graphs - Publication Quality
-        with solara.Card("Temporal Analysis"):
+        with solara.Card("Analysis"):
             RunGraphs(compliance_series, price_series)
 
 
@@ -535,9 +546,7 @@ def InspectorTab():
     run_id = run.id if run else "live"
     step_idx, set_step_idx = solara.use_state(0, key=run_id)
 
-    solara.Markdown(
-        "### Step Inspector" + (" (Historical)" if not is_live else " (Live)")
-    )
+    solara.Markdown("### Inspect Step")
 
     # Flatten logic
     if is_live:
@@ -581,7 +590,6 @@ def InspectorTab():
     if agents_df is not None:
         # Graph Section - Constrained to 1/3 width on top
         with solara.Card("Quantitative Risk Analysis"):
-            solara.Markdown("**True vs Reported Risk**")
             # Use 3 columns but only put graph in first one to constrain its size
             with solara.Columns([1, 2]):
                 with solara.Column():
@@ -633,18 +641,30 @@ def ConfigPanel():
                 manager.load_from_file(selected_file)
                 set_show_load(False)
 
-        # Header with Load button
+        # Header with Load and Play buttons
         with solara.Row(
             style="align-items: center; margin-bottom: 8px;", justify="space-between"
         ):
             solara.Markdown("**SCENARIO**", style="font-size: 0.9rem; opacity: 0.7;")
-            solara.Button(
-                "Load",
-                on_click=open_load_dialog,
-                icon_name="mdi-folder-open",
-                small=True,
-                text=True,
-            )
+            with solara.Row(gap="4px"):
+                solara.Button(
+                    icon_name="mdi-play"
+                    if not manager.is_playing.value
+                    else "mdi-pause",
+                    on_click=lambda: manager.is_playing.set(
+                        not manager.is_playing.value
+                    ),
+                    icon=True,
+                    small=True,
+                    color="primary",
+                )
+                solara.Button(
+                    "Load",
+                    on_click=open_load_dialog,
+                    icon_name="mdi-folder-open",
+                    small=True,
+                    text=True,
+                )
 
         with solara.v.Dialog(v_model=show_load, max_width=500):
             with solara.Card(title="Load Scenario Template"):
@@ -717,34 +737,14 @@ def ConfigPanel():
 
         # Action Buttons Section
         solara.Markdown("---")
-        with solara.Column(gap="6px"):
-            # Primary action: Play/Pause (prominent)
-            solara.Button(
-                label="⏸ Pause" if manager.is_playing.value else "▶ Play",
-                on_click=lambda: manager.is_playing.set(not manager.is_playing.value),
-                color="primary",
-                block=True,
-                style="font-weight: 600;",
-            )
-
-            # Secondary actions (smaller)
-            with solara.Row(gap="4px"):
-                solara.Button(
-                    "Reset",
-                    on_click=manager.reset_model,
-                    color="error",
-                    small=True,
-                    text=True,
-                    style="flex: 1;",
-                )
-                solara.Button(
-                    "Step",
-                    on_click=manager.step,
-                    disabled=manager.is_playing.value,
-                    small=True,
-                    text=True,
-                    style="flex: 1;",
-                )
+        # Primary action: Play/Pause (prominent)
+        solara.Button(
+            label="⏸ Pause" if manager.is_playing.value else "▶ Play",
+            on_click=lambda: manager.is_playing.set(not manager.is_playing.value),
+            color="primary",
+            block=True,
+            style="font-weight: 600;",
+        )
 
         # Run History Section (Compact)
         solara.Markdown("---")
