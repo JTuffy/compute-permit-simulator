@@ -80,7 +80,11 @@ class SimulationManager:
         self.available_scenarios.set(list_scenarios())
 
     def load_from_file(self, filename: str):
-        """Load a scenario from a file and apply it."""
+        """Load a scenario from a JSON file and apply it to the reactive state.
+
+        Args:
+            filename: Name of the scenario file (e.g., 'baseline.json').
+        """
         try:
             config = load_scenario(filename)
             self._apply_pydantic_config(config)
@@ -115,7 +119,11 @@ class SimulationManager:
         self.audit_coefficient.value = config.lab.audit_coefficient
 
     def get_current_config(self) -> ScenarioConfig:
-        """Construct a Pydantic config from current reactive state."""
+        """Construct a validated ScenarioConfig from the current UI state.
+
+        Returns:
+            A full ScenarioConfig object containing all market, audit, and lab parameters.
+        """
         return ScenarioConfig(
             name=self.selected_scenario.value,
             n_agents=self.n_agents.value,
@@ -271,7 +279,14 @@ class SimulationManager:
         # Does not imply auto-switch. We'll let the UI handle the switch back to live if desired.
 
     def save_run(self, name_prefix="run"):
-        """Persist structured run."""
+        """Persist the structured simulation run to a JSON file.
+
+        Args:
+            name_prefix: Prefix for the run ID if no current run is selected.
+
+        Returns:
+            The path to the saved run directory as a string, or None if no model exists.
+        """
         if not self.model.value:
             return None
 

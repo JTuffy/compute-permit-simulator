@@ -14,3 +14,6 @@ wheels/
 
 # Lock file
 uv.lock
+
+# IDE settings
+.vscode/
