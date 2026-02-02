@@ -11,6 +11,9 @@ import io
 
 import pandas as pd
 import xlsxwriter
+import matplotlib
+
+matplotlib.use("Agg")  # Force non-interactive backend for thread safety
 from matplotlib.figure import Figure
 
 
@@ -42,34 +45,37 @@ def export_run_to_excel(run, output_path: str | None = None) -> str:
     number_format = workbook.add_format({"border": 1, "num_format": "0.00"})
     percent_format = workbook.add_format({"border": 1, "num_format": "0.0%"})
 
-    # === Sheet 1: Configuration ===
-    config_sheet = workbook.add_worksheet("Configuration")
-    _write_config_sheet(config_sheet, run.config, header_format, data_format)
+    try:
+        # === Sheet 1: Configuration ===
+        config_sheet = workbook.add_worksheet("Configuration")
+        _write_config_sheet(config_sheet, run.config, header_format, data_format)
 
-    # === Sheet 2: Summary ===
-    summary_sheet = workbook.add_worksheet("Summary")
-    _write_summary_sheet(
-        summary_sheet,
-        run,
-        header_format,
-        section_format,
-        data_format,
-        number_format,
-        percent_format,
-    )
-
-    # === Sheet 3: Agent Details (Last Step) ===
-    if run.steps:
-        agents_sheet = workbook.add_worksheet("Agent Details")
-        _write_agents_sheet(
-            agents_sheet, run.steps[-1], header_format, data_format, number_format
+        # === Sheet 2: Summary ===
+        summary_sheet = workbook.add_worksheet("Summary")
+        _write_summary_sheet(
+            summary_sheet,
+            run,
+            header_format,
+            section_format,
+            data_format,
+            number_format,
+            percent_format,
         )
 
-    # === Sheet 4: Graphs ===
-    graphs_sheet = workbook.add_worksheet("Graphs")
-    _write_graphs_sheet(graphs_sheet, run, workbook)
+        # === Sheet 3: Agent Details (Last Step) ===
+        if run.steps:
+            agents_sheet = workbook.add_worksheet("Agent Details")
+            _write_agents_sheet(
+                agents_sheet, run.steps[-1], header_format, data_format, number_format
+            )
 
-    workbook.close()
+        # === Sheet 4: Graphs ===
+        graphs_sheet = workbook.add_worksheet("Graphs")
+        _write_graphs_sheet(graphs_sheet, run, workbook)
+
+    finally:
+        workbook.close()
+
     return output_path
 
 

@@ -1,8 +1,8 @@
 {
     "name": "Reputation Matters (Social Pressure)",
     "description": "High reputation penalty makes cheating risky even with weak formal enforcement. Labs fear reputational damage more than fines.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 2004,
     "audit": {
         "base_prob": 0.03,

@@ -275,16 +275,14 @@ def RunHistoryItem(run, is_selected):
     """Individual item in the history list."""
 
     # Label generation
-    if run.metrics:
-        comp = run.metrics.get("final_compliance", 0)
-        price = run.metrics.get("final_price", 0)
-        try:
-            display_id = run.id.split("_")[1]
-        except IndexError:
-            display_id = run.id
-        label = f"{display_id} (C:{comp:.0%} ${price:.0f})"
-    else:
-        label = f"{run.id} ({len(run.steps)})"
+    display_id = run.id
+    try:
+        display_id = run.id.split("_")[1]
+    except IndexError:
+        pass
+
+    # Request: Just the ID
+    label = display_id
 
     # Actions
     def load_config():
@@ -292,6 +290,36 @@ def RunHistoryItem(run, is_selected):
 
     def view_run():
         manager.selected_run.value = run
+
+    # Info Button (Mini-Dialog)
+    # We use v.Btn directly for better slot compatibility if needed,
+    # but simplest Solara pattern for hover menu is providing the activator slot content.
+    # We will use the v_slots argument pattern which is most robust for raw v.Menu integration in Python.
+
+    # However, Solara's v.Menu wraps the child content.
+    # Let's try the safest "Manual Hover" state pattern if v.Menu activator fails.
+    # Actually, using solara.v.Btn with slot='activator' AND passing `v_on='x.on'` is the raw way.
+    # But Solara's JSX abstraction hides `x`.
+    # Let's use `solara.v.Menu(v_slots=[{'name': 'activator', 'children': [btn]}])` logic manually?
+    # No, that's messy.
+
+    # Let's go with a Clickable Info Button (simpler interaction model) that toggles the menu.
+    # User asked for hover, but if it's broken, a working click is better.
+    # Wait, we can use `solara.lab.Menu`? No.
+
+    # Let's try `solara.v.Tooltip` with `bottom=True` containing the Rich Text?
+    # Vuetify tooltips only take text/html.
+
+    # Let's try the `solara.v.Btn` with `slot='activator'` again but verify imports.
+    # The previous error was `solara.v.Template`.
+    # The symptom "nothing happens" suggests the slot isn't being picked up or events aren't bound.
+
+    # Let's try explicit `v_on` binding if possible? No.
+
+    # REVISED STRATEGY: Use `solara.v.Menu` with a button relying on `v_model` (open state).
+    # We simulate hover using `on_mouse_enter`.
+
+    show_menu = solara.use_reactive(False)
 
     # Rich Tooltip Construction
     try:
@@ -301,15 +329,6 @@ def RunHistoryItem(run, is_selected):
         ts_str = "Unknown"
 
     c = run.config
-    tooltip_text = (
-        f"Run: {run.id}\n"
-        f"Time: {ts_str}\n"
-        f"cfg: {c.n_agents} agents, {c.steps} steps\n"
-        f"Token Cap: {c.market.token_cap}"
-    )
-
-    if run.metrics and "fraud_detected" in run.metrics:
-        tooltip_text += f"\nFraud Caught: {run.metrics['fraud_detected']}"
 
     bg_color = "#e0f2f1" if is_selected else "transparent"
 
@@ -317,17 +336,59 @@ def RunHistoryItem(run, is_selected):
         style=(f"background-color: {bg_color}; padding: 2px; align-items: center;"),
         classes=["hover-bg"],
     ):
-        # View Button (Main interaction)
-        with solara.Tooltip(tooltip_text):
-            solara.Button(
-                label,
-                on_click=view_run,
-                text=True,
-                style="text-transform: none; text-align: left; flex-grow: 1;",
-                color="primary" if is_selected else None,
+        # Info Button Area
+        # We wrap in a generic div to catch hover events if needed, or just use the button events.
+        with solara.v.Menu(
+            v_model=show_menu.value,
+            on_v_model=show_menu.set,
+            open_on_hover=True,  # Relies on activator
+            open_on_click=True,
+            close_on_content_click=False,
+            offset_x=True,
+            max_width="400px",
+        ):
+            # Activator slot attempt #3: Using v_slots explicitly
+            # Use a dummy element that we replace?
+            # Let's just put the button *inside* as current Solara/Vuetify often treats
+            # the first child as activator if no slot specified? No.
+
+            # Use `slot='activator'` on `v.Btn`
+            solara.v.Btn(
+                icon=True,
+                small=True,
+                children=[solara.v.Icon(children=["mdi-information-outline"])],
+                slot="activator",
+                # The 'on' event binding is automatic for slot='activator' in ipyvuetify
             )
 
-        # Load Config Button
+            # The Content
+            with solara.v.Card(style="padding: 12px; font-size: 0.85rem;"):
+                solara.Markdown(f"**Run {run.id}**")
+                solara.Markdown(f"_{ts_str}_")
+                solara.Markdown("---")
+                solara.Markdown(f"**Agents:** {c.n_agents} | **Steps:** {c.steps}")
+                solara.Markdown(f"**Token Cap:** {c.market.token_cap}")
+                if run.metrics and "fraud_detected" in run.metrics:
+                    solara.Markdown(
+                        f"**Fraud Caught:** {run.metrics['fraud_detected']}"
+                    )
+                solara.Markdown("---")
+                solara.Markdown("**Audit Config:**")
+                solara.Text(
+                    f"Base: {c.audit.base_prob:.2f} | High: {c.audit.high_prob:.2f}"
+                )
+                solara.Text(f"Penalty: ${c.audit.penalty_amount:.2f}")
+
+        # View Button
+        solara.Button(
+            label,
+            on_click=view_run,
+            text=True,
+            style="text-transform: none; text-align: left; flex-grow: 1;",
+            color="primary" if is_selected else None,
+        )
+
+        # Load Config
         with solara.Tooltip("Load these parameters to Config Panel"):
             solara.Button(
                 icon_name="mdi-upload",
@@ -336,16 +397,14 @@ def RunHistoryItem(run, is_selected):
                 small=True,
             )
 
-        # Save Scenario Button
+        # Save Scenario
         show_save, set_show_save = solara.use_state(False)
         save_name, set_save_name = solara.use_state(f"scenario_{run.id}")
 
         def perform_save():
-            # Add .json if missing
             fname = save_name if save_name.endswith(".json") else f"{save_name}.json"
             save_scenario(run.config, fname)
             set_show_save(False)
-            # Maybe notify user?
 
         with solara.Tooltip("Save as Scenario Template"):
             solara.Button(
@@ -355,7 +414,6 @@ def RunHistoryItem(run, is_selected):
                 small=True,
             )
 
-        # Save Dialog
         with solara.v.Dialog(v_model=show_save, max_width=500):
             with solara.Card(title="Save Scenario"):
                 solara.InputText(
@@ -367,13 +425,14 @@ def RunHistoryItem(run, is_selected):
                     )
                     solara.Button("Save", on_click=perform_save, color="primary")
 
-        # Excel Export Button
-        def export_excel():
+        # Excel Export
+        async def export_excel():
+            import asyncio
             from compute_permit_sim.vis.excel_export import export_run_to_excel
 
             try:
-                output_path = export_run_to_excel(run)
-                # TODO: Show success notification
+                # Run in thread to prevent blocking/async state invalidation
+                output_path = await asyncio.to_thread(export_run_to_excel, run)
                 print(f"Exported to: {output_path}")
             except Exception as e:
                 print(f"Export failed: {e}")

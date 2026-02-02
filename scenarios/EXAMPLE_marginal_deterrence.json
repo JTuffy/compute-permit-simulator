@@ -1,8 +1,8 @@
 {
     "name": "Marginal Deterrence (Knife-Edge)",
     "description": "Parameters tuned so deterrence is barely effective for some agents. Creates mixed compliance with visible segmentation - high-value agents cheat, low-value agents comply.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 2001,
     "audit": {
         "base_prob": 0.05,

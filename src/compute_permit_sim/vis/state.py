@@ -57,7 +57,7 @@ class SimulationManager:
         self.backcheck_prob = solara.reactive(0.0)
 
         # Sim Config
-        self.steps = solara.reactive(10)
+        self.steps = solara.reactive(5)
 
         # --- Model State ---
         self.model = solara.reactive(None)

@@ -1,8 +1,8 @@
 {
     "name": "Strict Enforcement (Audit)",
     "description": "A refined audit regime with high penalties and accurate detection signals. Designed to enforce near-total compliance.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 999,
     "audit": {
         "base_prob": 0.1,

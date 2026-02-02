@@ -1,8 +1,8 @@
 {
     "name": "Enforcement Failure (Crime Pays)",
     "description": "High racing incentives completely overwhelm audit capability. Shows what happens when enforcement is insufficient - very low compliance but caught agents still suffer.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 2002,
     "audit": {
         "base_prob": 0.02,

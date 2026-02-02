@@ -1,8 +1,8 @@
 {
     "name": "Permit Scarcity (Market Squeeze)",
     "description": "Extreme permit scarcity (only 8 for 50 agents!) drives high prices, making cheating very tempting despite strong enforcement.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 2005,
     "audit": {
         "base_prob": 0.10,

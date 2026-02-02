@@ -1,8 +1,8 @@
 {
     "name": "Baseline Scenario (Standard)",
     "description": "A balanced scenario representing typical market conditions. Moderate compliance incentives and standard audit capabilities.",
-    "n_agents": 50,
-    "steps": 100,
+    "n_agents": 20,
+    "steps": 10,
     "seed": 42,
     "audit": {
         "base_prob": 0.05,
