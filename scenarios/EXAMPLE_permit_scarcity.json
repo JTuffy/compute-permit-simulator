@@ -1,0 +1,29 @@
+{
+    "name": "Permit Scarcity (Market Squeeze)",
+    "description": "Extreme permit scarcity (only 8 for 50 agents!) drives high prices, making cheating very tempting despite strong enforcement.",
+    "n_agents": 50,
+    "steps": 100,
+    "seed": 2005,
+    "audit": {
+        "base_prob": 0.10,
+        "high_prob": 0.90,
+        "false_positive_rate": 0.08,
+        "false_negative_rate": 0.08,
+        "penalty_amount": 4.0,
+        "backcheck_prob": 0.1
+    },
+    "market": {
+        "token_cap": 8,
+        "fixed_price": null
+    },
+    "lab": {
+        "gross_value_min": 1.0,
+        "gross_value_max": 3.0,
+        "risk_profile_min": 0.7,
+        "risk_profile_max": 1.3,
+        "capability_value": 0.5,
+        "racing_factor": 1.0,
+        "reputation_sensitivity": 0.8,
+        "audit_coefficient": 1.0
+    }
+}

@@ -1,0 +1,29 @@
+{
+    "name": "Near Collapse (Tipping Point)",
+    "description": "System on the edge - small parameter changes would flip the outcome. Creates ~50/50 compliance split with nearly equal payoffs for all strategies.",
+    "n_agents": 50,
+    "steps": 100,
+    "seed": 2003,
+    "audit": {
+        "base_prob": 0.08,
+        "high_prob": 0.85,
+        "false_positive_rate": 0.10,
+        "false_negative_rate": 0.10,
+        "penalty_amount": 3.0,
+        "backcheck_prob": 0.05
+    },
+    "market": {
+        "token_cap": 20,
+        "fixed_price": null
+    },
+    "lab": {
+        "gross_value_min": 0.5,
+        "gross_value_max": 3.5,
+        "risk_profile_min": 0.5,
+        "risk_profile_max": 1.5,
+        "capability_value": 2.0,
+        "racing_factor": 2.0,
+        "reputation_sensitivity": 1.0,
+        "audit_coefficient": 1.0
+    }
+}

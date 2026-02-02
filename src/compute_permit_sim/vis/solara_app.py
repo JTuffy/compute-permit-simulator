@@ -362,6 +362,25 @@ def RunHistoryItem(run, is_selected):
                     )
                     solara.Button("Save", on_click=perform_save, color="primary")
 
+        # Excel Export Button
+        def export_excel():
+            from compute_permit_sim.vis.excel_export import export_run_to_excel
+
+            try:
+                output_path = export_run_to_excel(run)
+                # TODO: Show success notification
+                print(f"Exported to: {output_path}")
+            except Exception as e:
+                print(f"Export failed: {e}")
+
+        with solara.Tooltip("Export to Excel"):
+            solara.Button(
+                icon_name="mdi-file-excel",
+                on_click=export_excel,
+                icon=True,
+                small=True,
+            )
+
 
 @solara.component
 def RunHistoryList():
