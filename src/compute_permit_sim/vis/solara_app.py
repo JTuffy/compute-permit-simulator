@@ -202,7 +202,7 @@ def ParamView(config):
     """Read-only view of a ScenarioConfig."""
     with solara.lab.Tabs(vertical=True, align="left", dark=False):
         with solara.lab.Tab("General", style={"min-width": "auto"}):
-            with solara.Column(gap="0px", style="opacity: 0.8; font-size: 0.9em;"):
+            with solara.Column(style="opacity: 0.8; font-size: 0.9em;"):
                 solara.InputInt(label="Steps", value=config.steps, disabled=True)
                 solara.InputInt(label="N Agents", value=config.n_agents, disabled=True)
                 solara.InputInt(
@@ -212,7 +212,7 @@ def ParamView(config):
                 )
 
         with solara.lab.Tab("Audit", style={"min-width": "auto"}):
-            with solara.Column(gap="0px", style="opacity: 0.8; font-size: 0.9em;"):
+            with solara.Column(style="opacity: 0.8; font-size: 0.9em;"):
                 solara.InputFloat(
                     label="Penalty Amount",
                     value=config.audit.penalty_amount,
@@ -240,7 +240,7 @@ def ParamView(config):
                 )
 
         with solara.lab.Tab("Lab", style={"min-width": "auto"}):
-            with solara.Column(gap="0px", style="opacity: 0.8; font-size: 0.9em;"):
+            with solara.Column(style="opacity: 0.8; font-size: 0.9em;"):
                 RangeView(
                     "Gross Value Range",
                     config.lab.gross_value_min,
@@ -368,7 +368,7 @@ def RunHistoryList():
         return
 
     # Compact list with custom items
-    with solara.Column(gap="4px"):
+    with solara.Column():
         for run in manager.run_history.value:
             is_selected = (manager.selected_run.value is not None) and (
                 manager.selected_run.value.id == run.id
@@ -589,7 +589,7 @@ def InspectorTab():
     # Agent Inspection
     if agents_df is not None:
         # Graph Section - Constrained to 1/3 width on top
-        with solara.Card("Quantitative Risk Analysis"):
+        with solara.Card("Analysis"):
             # Use 3 columns but only put graph in first one to constrain its size
             with solara.Columns([1, 2]):
                 with solara.Column():
@@ -627,7 +627,7 @@ def InspectorTab():
 @solara.component
 def ConfigPanel():
     # Wrap entire panel in compact styling
-    with solara.Column(classes=["sidebar-compact"], gap="4px"):
+    with solara.Column(classes=["sidebar-compact"]):
         # Scenario Selection (New File-based)
         show_load, set_show_load = solara.use_state(False)
         selected_file, set_selected_file = solara.use_state(None)
@@ -646,7 +646,7 @@ def ConfigPanel():
             style="align-items: center; margin-bottom: 8px;", justify="space-between"
         ):
             solara.Markdown("**SCENARIO**", style="font-size: 0.9rem; opacity: 0.7;")
-            with solara.Row(gap="4px"):
+            with solara.Row():
                 solara.Button(
                     icon_name="mdi-play"
                     if not manager.is_playing.value
@@ -691,7 +691,7 @@ def ConfigPanel():
 
         # General Parameters Card
         with solara.Card("General", style="margin-bottom: 6px;"):
-            with solara.Column(gap="2px"):
+            with solara.Column():
                 solara.InputInt(label="Steps", value=manager.steps, dense=True)
                 solara.InputInt(label="N Agents", value=manager.n_agents, dense=True)
                 solara.InputFloat(
@@ -700,7 +700,7 @@ def ConfigPanel():
 
         # Audit Policy Card
         with solara.Card("Audit Policy", style="margin-bottom: 6px;"):
-            with solara.Column(gap="2px"):
+            with solara.Column():
                 solara.InputFloat(label="Penalty $", value=manager.penalty, dense=True)
                 solara.InputFloat(label="Base π₀", value=manager.base_prob, dense=True)
                 solara.InputFloat(label="High π₁", value=manager.high_prob, dense=True)
@@ -713,7 +713,7 @@ def ConfigPanel():
 
         # Lab Generation Card
         with solara.Card("Lab Generation", style="margin-bottom: 6px;"):
-            with solara.Column(gap="2px"):
+            with solara.Column():
                 RangeController(
                     "Gross Value", manager.gross_value_min, manager.gross_value_max
                 )

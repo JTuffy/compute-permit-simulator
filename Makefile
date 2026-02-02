@@ -17,7 +17,7 @@ run:
 viz: solara
 
 solara:
-	uv run solara run src/compute_permit_sim/vis/solara_app.py
+	uv run solara run src/compute_permit_sim/vis/solara_app.py --port 8766
 
 heatmap:
 	uv run python -m compute_permit_sim.vis.heatmap
