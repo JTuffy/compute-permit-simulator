@@ -21,6 +21,8 @@
         "gross_value_max": 5.0,
         "risk_profile_min": 0.5,
         "risk_profile_max": 1.0,
+        "capacity_min": 2.0,
+        "capacity_max": 5.0,
         "capability_value": 5.0,
         "racing_factor": 2.0,
         "reputation_sensitivity": 0.1,

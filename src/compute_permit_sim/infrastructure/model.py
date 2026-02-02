@@ -19,6 +19,7 @@ class MesaLab(mesa.Agent):
         model: mesa.Model,
         gross_value: float,
         risk_profile: float,
+        capacity: float = 1.0,
         capability_value: float = 0.0,
         racing_factor: float = 1.0,
         reputation_sensitivity: float = 0.0,
@@ -30,6 +31,7 @@ class MesaLab(mesa.Agent):
             unique_id,
             gross_value,
             risk_profile,
+            capacity=capacity,
             capability_value=capability_value,
             racing_factor=racing_factor,
             reputation_sensitivity=reputation_sensitivity,
@@ -107,7 +109,7 @@ class ComputePermitModel(mesa.Model):
             self.market.set_fixed_price(config.market.fixed_price)
         self.auditor = Auditor(config.audit)
 
-        # Initialize Agents
+        # Initialize Agents (IDs start at 1)
         for i in range(self.n_agents):
             gross_value = random.uniform(
                 config.lab.gross_value_min, config.lab.gross_value_max
@@ -115,12 +117,14 @@ class ComputePermitModel(mesa.Model):
             risk_profile = random.uniform(
                 config.lab.risk_profile_min, config.lab.risk_profile_max
             )
+            capacity = random.uniform(config.lab.capacity_min, config.lab.capacity_max)
             # Pass all extended parameters to the agent
             MesaLab(
-                i,
+                i + 1,  # Start IDs at 1
                 self,
                 gross_value,
                 risk_profile,
+                capacity=capacity,
                 capability_value=config.lab.capability_value,
                 racing_factor=config.lab.racing_factor,
                 reputation_sensitivity=config.lab.reputation_sensitivity,
@@ -230,6 +234,20 @@ class ComputePermitModel(mesa.Model):
                     "penalty": 0.0,
                 }
 
+        # 5. Value Realization Phase
+        # Agents who run compute (legally with permit, or illegally) get value
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                d = agent.domain_agent
+                # Agents with permits ran legally - already paid permit price
+                if d.has_permit:
+                    agent.wealth += d.gross_value  # They get the value of the run
+                # Non-compliant agents without permits ran illegally
+                elif not d.is_compliant:
+                    agent.wealth += d.gross_value  # They get the value (cheating)
+                # Compliant agents without permits didn't run - no value gained
+                # (they chose not to run because they couldn't afford permit)
+
         self.datacollector.collect(self)
 
     def get_agent_snapshots(self) -> list[dict]:
@@ -243,24 +261,32 @@ class ComputePermitModel(mesa.Model):
             if isinstance(agent, MesaLab):
                 d = agent.domain_agent
 
-                # Logic copied from previous state.py implementation
-                # Centralized here to keep UI view dumb.
+                # Determine what compute was actually used this step
+                # Agents who ran (with permit or cheating) used their capacity
+                # Compliant agents without permits didn't run
+                did_run = d.has_permit or not d.is_compliant
+                true_compute = d.capacity if did_run else 0.0
+
+                # Reported compute: compliant agents report honestly, cheaters report 0
+                if d.has_permit:
+                    reported_compute = d.capacity  # Honest reporting with permit
+                elif d.is_compliant:
+                    reported_compute = 0.0  # Didn't run, nothing to report
+                else:
+                    reported_compute = 0.0  # Cheating - underreporting
+
                 snapshots.append(
                     {
                         "ID": d.lab_id,
                         "Value": round(d.gross_value, 2),
                         "Net_Value": round(
-                            d.gross_value
-                            - (self.market.current_price if d.has_permit else 0),
-                            2,
-                        ),
+                            agent.wealth, 2
+                        ),  # Use actual accumulated wealth
                         "Compliant": d.is_compliant,
                         "Permit": d.has_permit,
-                        "True_Compute": d.gross_value,
-                        "Reported_Compute": d.gross_value
-                        if (d.has_permit or d.is_compliant)
-                        else 0.0,
-                        "Capability": d.capability_value,
+                        "True_Compute": round(true_compute, 2),
+                        "Reported_Compute": round(reported_compute, 2),
+                        "Capacity": round(d.capacity, 2),
                         "Wealth": round(agent.wealth, 2),
                         "Audited": agent.last_audit_status.get("audited", False),
                         "Penalty": agent.last_audit_status.get("penalty", 0.0),

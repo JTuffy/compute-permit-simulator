@@ -34,6 +34,8 @@ class SimulationManager:
         self.gross_value_max = solara.reactive(1.5)
         self.risk_profile_min = solara.reactive(0.8)
         self.risk_profile_max = solara.reactive(1.2)
+        self.capacity_min = solara.reactive(1.0)
+        self.capacity_max = solara.reactive(2.0)
 
         # New Quantitative Ranges
         self.capability_value = solara.reactive(0.0)
@@ -109,6 +111,8 @@ class SimulationManager:
         self.gross_value_max.value = config.lab.gross_value_max
         self.risk_profile_min.value = config.lab.risk_profile_min
         self.risk_profile_max.value = config.lab.risk_profile_max
+        self.capacity_min.value = config.lab.capacity_min
+        self.capacity_max.value = config.lab.capacity_max
         self.capability_value.value = config.lab.capability_value
         self.racing_factor.value = config.lab.racing_factor
         self.reputation_sensitivity.value = config.lab.reputation_sensitivity
@@ -134,6 +138,8 @@ class SimulationManager:
                 gross_value_max=self.gross_value_max.value,
                 risk_profile_min=self.risk_profile_min.value,
                 risk_profile_max=self.risk_profile_max.value,
+                capacity_min=self.capacity_min.value,
+                capacity_max=self.capacity_max.value,
                 capability_value=self.capability_value.value,
                 racing_factor=self.racing_factor.value,
                 reputation_sensitivity=self.reputation_sensitivity.value,
@@ -252,6 +258,8 @@ class SimulationManager:
         self.gross_value_max.value = c.lab.gross_value_max
         self.risk_profile_min.value = c.lab.risk_profile_min
         self.risk_profile_max.value = c.lab.risk_profile_max
+        self.capacity_min.value = getattr(c.lab, "capacity_min", 1.0)
+        self.capacity_max.value = getattr(c.lab, "capacity_max", 2.0)
         self.capability_value.value = getattr(c.lab, "capability_value", 0.0)
         self.racing_factor.value = getattr(c.lab, "racing_factor", 1.0)
         self.reputation_sensitivity.value = getattr(

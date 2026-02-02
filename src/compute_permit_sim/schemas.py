@@ -74,8 +74,14 @@ class LabConfig(BaseModel):
     gross_value_max: float = 1.5
     risk_profile_min: float = 0.8
     risk_profile_max: float = 1.2
+    capacity_min: float = Field(
+        1.0, ge=0, description="Min compute capacity (q_max) for agent generation"
+    )
+    capacity_max: float = Field(
+        2.0, ge=0, description="Max compute capacity (q_max) for agent generation"
+    )
     capability_value: float = Field(
-        0.0, ge=0, description="V_b: baseline value of model capabilities"
+        0.0, ge=0, description="V_b: baseline value of model capabilities from training"
     )
     racing_factor: float = Field(
         1.0, ge=0, description="c_r: urgency multiplier on capability value"

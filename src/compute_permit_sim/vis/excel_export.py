@@ -125,7 +125,8 @@ def _write_config_sheet(sheet, config, header_format, data_format):
         ("High Probability (π₁)", config.audit.high_prob),
         ("False Positive Rate", config.audit.false_positive_rate),
         ("False Negative Rate", config.audit.false_negative_rate),
-        ("Signal FPR", config.audit.signal_fpr),
+        ("Backcheck Probability", config.audit.backcheck_prob),
+        ("Whistleblower Probability", config.audit.whistleblower_prob),
     ]
     for label, value in audit_params:
         sheet.write(row, 0, label, data_format)
@@ -144,6 +145,8 @@ def _write_config_sheet(sheet, config, header_format, data_format):
         ("Gross Value Max", config.lab.gross_value_max),
         ("Risk Profile Min", config.lab.risk_profile_min),
         ("Risk Profile Max", config.lab.risk_profile_max),
+        ("Capacity Min", config.lab.capacity_min),
+        ("Capacity Max", config.lab.capacity_max),
         ("Capability Value (Vb)", config.lab.capability_value),
         ("Racing Factor (cr)", config.lab.racing_factor),
         ("Reputation Sensitivity (β)", config.lab.reputation_sensitivity),
@@ -241,7 +244,7 @@ def _write_agents_sheet(sheet, last_step, header_format, data_format, number_for
         "ID",
         "Value",
         "Net_Value",
-        "Capability",
+        "Capacity",
         "True_Compute",
         "Reported_Compute",
         "Compliant",

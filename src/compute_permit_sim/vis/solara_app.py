@@ -253,6 +253,11 @@ def ParamView(config):
                     config.lab.risk_profile_min,
                     config.lab.risk_profile_max,
                 )
+                RangeView(
+                    "Capacity Range",
+                    config.lab.capacity_min,
+                    config.lab.capacity_max,
+                )
                 solara.InputFloat(
                     label="Capability Value (V_b)",
                     value=config.lab.capability_value,
@@ -625,8 +630,7 @@ def InspectorTab():
                 "ID",
                 "Value",
                 "Net_Value",
-                "Capability",
-                # "Allowance",  # Removed from model
+                "Capacity",
                 "True_Compute",
                 "Reported_Compute",
                 "Compliant",
@@ -741,6 +745,7 @@ def ConfigPanel():
                 RangeController(
                     "Risk Profile", manager.risk_profile_min, manager.risk_profile_max
                 )
+                RangeController("Capacity", manager.capacity_min, manager.capacity_max)
                 solara.InputFloat(
                     label="Capability Vb", value=manager.capability_value, dense=True
                 )

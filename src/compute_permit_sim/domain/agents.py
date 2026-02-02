@@ -16,6 +16,7 @@ class Lab:
         gross_value: The value (v_i) the lab generates from a training run.
         risk_profile: Multiplier on perceived penalty
             (>1 = risk-averse, <1 = risk-seeking).
+        capacity: Maximum compute capacity (q_max) for this lab.
         capability_value: V_b, baseline value of model capabilities from training.
         racing_factor: c_r, urgency multiplier on capability value.
         reputation_sensitivity: R, perceived reputation cost if caught.
@@ -29,6 +30,7 @@ class Lab:
         lab_id: int,
         gross_value: float,
         risk_profile: float = 1.0,
+        capacity: float = 1.0,
         capability_value: float = 0.0,
         racing_factor: float = 1.0,
         reputation_sensitivity: float = 0.0,
@@ -40,6 +42,7 @@ class Lab:
             lab_id: Unique ID.
             gross_value: v_i, value of the training run.
             risk_profile: Multiplier for perceived penalty (default 1.0).
+            capacity: Maximum compute capacity q_max (default 1.0).
             capability_value: V_b, baseline capability value (default 0.0).
             racing_factor: c_r, urgency multiplier (default 1.0).
             reputation_sensitivity: R, reputation cost if caught (default 0.0).
@@ -48,6 +51,7 @@ class Lab:
         self.lab_id: int = lab_id
         self.gross_value: float = gross_value
         self.risk_profile: float = risk_profile
+        self.capacity: float = capacity
         self.capability_value: float = capability_value
         self.racing_factor: float = racing_factor
         self.reputation_sensitivity: float = reputation_sensitivity
