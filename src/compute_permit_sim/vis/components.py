@@ -80,3 +80,151 @@ def QuantitativeScatterPlot(agents_df):
     ax.grid(True, alpha=0.3)
 
     solara.FigureMatplotlib(fig)
+
+
+@solara.component
+def AuditTargetingPlot(agents_df):
+    """Bar chart showing audit rates by compliance status.
+
+    Helps regulators understand: Is our risk-based audit strategy
+    actually catching the right people?
+    """
+    if agents_df is None or agents_df.empty:
+        solara.Markdown("No data for audit targeting plot.")
+        return
+
+    # Check required columns
+    required_cols = ["Compliant", "Audited"]
+    if not all(col in agents_df.columns for col in required_cols):
+        solara.Markdown("Missing required columns for audit plot.")
+        return
+
+    # Calculate audit rates by compliance status
+    compliant_agents = agents_df[agents_df["Compliant"] == True]
+    noncompliant_agents = agents_df[agents_df["Compliant"] == False]
+
+    compliant_audit_rate = (
+        compliant_agents["Audited"].mean() if len(compliant_agents) > 0 else 0
+    )
+    noncompliant_audit_rate = (
+        noncompliant_agents["Audited"].mean() if len(noncompliant_agents) > 0 else 0
+    )
+
+    # Create figure
+    fig = Figure(figsize=(5, 4))
+    ax = fig.subplots()
+
+    categories = ["Compliant", "Non-Compliant"]
+    rates = [compliant_audit_rate * 100, noncompliant_audit_rate * 100]
+    colors = ["#4CAF50", "#F44336"]
+
+    bars = ax.bar(categories, rates, color=colors, alpha=0.8, edgecolor="black")
+
+    # Add value labels on bars
+    for bar, rate in zip(bars, rates):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            f"{rate:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
+
+    ax.set_ylabel("Audit Rate (%)")
+    ax.set_title("Audit Targeting Effectiveness")
+    ax.set_ylim(0, max(rates) * 1.2 if max(rates) > 0 else 10)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Add counts as annotation
+    n_compliant = len(compliant_agents)
+    n_noncompliant = len(noncompliant_agents)
+    ax.text(
+        0.02,
+        0.98,
+        f"n={n_compliant} compliant, {n_noncompliant} non-compliant",
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        alpha=0.7,
+    )
+
+    fig.tight_layout()
+    solara.FigureMatplotlib(fig)
+
+
+@solara.component
+def PayoffByStrategyPlot(agents_df):
+    """Bar chart comparing average net value by strategy outcome.
+
+    Shows regulators: Does cheating actually pay? Is the penalty high enough?
+    """
+    if agents_df is None or agents_df.empty:
+        solara.Markdown("No data for payoff plot.")
+        return
+
+    # Check required columns
+    required_cols = ["Compliant", "Caught", "Net_Value"]
+    if not all(col in agents_df.columns for col in required_cols):
+        solara.Markdown("Missing required columns for payoff plot.")
+        return
+
+    # Categorize agents
+    compliant = agents_df[agents_df["Compliant"] == True]
+    cheated_caught = agents_df[
+        (agents_df["Compliant"] == False) & (agents_df["Caught"] == True)
+    ]
+    cheated_uncaught = agents_df[
+        (agents_df["Compliant"] == False) & (agents_df["Caught"] == False)
+    ]
+
+    # Calculate average payoffs
+    avg_compliant = compliant["Net_Value"].mean() if len(compliant) > 0 else 0
+    avg_caught = cheated_caught["Net_Value"].mean() if len(cheated_caught) > 0 else 0
+    avg_uncaught = (
+        cheated_uncaught["Net_Value"].mean() if len(cheated_uncaught) > 0 else 0
+    )
+
+    # Create figure
+    fig = Figure(figsize=(5, 4))
+    ax = fig.subplots()
+
+    categories = ["Compliant", "Caught", "Uncaught"]
+    payoffs = [avg_compliant, avg_caught, avg_uncaught]
+    colors = ["#4CAF50", "#000000", "#F44336"]
+    counts = [len(compliant), len(cheated_caught), len(cheated_uncaught)]
+
+    bars = ax.bar(categories, payoffs, color=colors, alpha=0.8, edgecolor="black")
+
+    # Add value labels on bars
+    for bar, payoff, count in zip(bars, payoffs, counts):
+        y_pos = bar.get_height()
+        label_y = (
+            y_pos + 0.02 * abs(max(payoffs) - min(payoffs))
+            if y_pos >= 0
+            else y_pos - 0.05 * abs(max(payoffs) - min(payoffs))
+        )
+        va = "bottom" if y_pos >= 0 else "top"
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            label_y,
+            f"${payoff:.2f}\n(n={count})",
+            ha="center",
+            va=va,
+            fontsize=9,
+            fontweight="bold",
+        )
+
+    ax.set_ylabel("Avg Net Value ($)")
+    ax.set_title("Payoff by Strategy")
+    ax.axhline(y=0, color="gray", linestyle="-", linewidth=0.5)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Adjust y limits to show labels
+    y_min = min(0, min(payoffs) * 1.3)
+    y_max = max(payoffs) * 1.3 if max(payoffs) > 0 else 1
+    ax.set_ylim(y_min, y_max)
+
+    fig.tight_layout()
+    solara.FigureMatplotlib(fig)

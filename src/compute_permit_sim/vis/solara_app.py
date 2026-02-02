@@ -4,6 +4,8 @@ import solara.lab
 
 from compute_permit_sim.infrastructure.config_manager import save_scenario
 from compute_permit_sim.vis.components import (
+    AuditTargetingPlot,
+    PayoffByStrategyPlot,
     QuantitativeScatterPlot,
     RangeController,
     RangeView,
@@ -588,15 +590,15 @@ def InspectorTab():
 
     # Agent Inspection
     if agents_df is not None:
-        # Graph Section - Constrained to 1/3 width on top
+        # Graph Section - Three graphs in a row
         with solara.Card("Analysis"):
-            # Use 3 columns but only put graph in first one to constrain its size
-            with solara.Columns([1, 2]):
+            with solara.Columns([1, 1, 1]):
                 with solara.Column():
                     QuantitativeScatterPlot(agents_df)
                 with solara.Column():
-                    # Empty spacer
-                    pass
+                    AuditTargetingPlot(agents_df)
+                with solara.Column():
+                    PayoffByStrategyPlot(agents_df)
 
         # Agent Details Table - Full width below
         with solara.Card("Agent Details"):
