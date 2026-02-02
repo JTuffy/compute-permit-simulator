@@ -21,7 +21,7 @@ def list_scenarios() -> List[str]:
     """
     if not SCENARIO_DIR.exists():
         return []
-    return [f.name for f in SCENARIO_DIR.glob("*.json")]
+    return sorted([f.name for f in SCENARIO_DIR.glob("*.json")])
 
 
 def load_scenario(filename: str) -> ScenarioConfig:

@@ -28,8 +28,9 @@ def RangeController(label: str, min_reactive, max_reactive):
         max_reactive: Solara reactive variable for the maximum value.
     """
     solara.Markdown(f"*{label}*")
-    solara.InputFloat(label="Min", value=min_reactive)
-    solara.InputFloat(label="Max", value=max_reactive)
+    with solara.Row():
+        solara.InputFloat(label="Min", value=min_reactive, continuous_update=True)
+        solara.InputFloat(label="Max", value=max_reactive, continuous_update=True)
 
 
 @solara.component

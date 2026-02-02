@@ -336,48 +336,43 @@ def RunHistoryItem(run, is_selected):
         style=(f"background-color: {bg_color}; padding: 2px; align-items: center;"),
         classes=["hover-bg"],
     ):
-        # Info Button Area
-        # We wrap in a generic div to catch hover events if needed, or just use the button events.
-        with solara.v.Menu(
-            v_model=show_menu.value,
-            on_v_model=show_menu.set,
-            open_on_hover=True,  # Relies on activator
-            open_on_click=True,
-            close_on_content_click=False,
-            offset_x=True,
-            max_width="400px",
+        # Info Button Area - Using robust Click-to-Open Dialog
+        with solara.v.Dialog(
+            v_model=show_menu.value, on_v_model=show_menu.set, max_width=400
         ):
-            # Activator slot attempt #3: Using v_slots explicitly
-            # Use a dummy element that we replace?
-            # Let's just put the button *inside* as current Solara/Vuetify often treats
-            # the first child as activator if no slot specified? No.
-
-            # Use `slot='activator'` on `v.Btn`
-            solara.v.Btn(
-                icon=True,
-                small=True,
-                children=[solara.v.Icon(children=["mdi-information-outline"])],
-                slot="activator",
-                # The 'on' event binding is automatic for slot='activator' in ipyvuetify
-            )
-
-            # The Content
-            with solara.v.Card(style="padding: 12px; font-size: 0.85rem;"):
-                solara.Markdown(f"**Run {run.id}**")
-                solara.Markdown(f"_{ts_str}_")
-                solara.Markdown("---")
-                solara.Markdown(f"**Agents:** {c.n_agents} | **Steps:** {c.steps}")
-                solara.Markdown(f"**Token Cap:** {c.market.token_cap}")
-                if run.metrics and "fraud_detected" in run.metrics:
-                    solara.Markdown(
-                        f"**Fraud Caught:** {run.metrics['fraud_detected']}"
+            with solara.v.Card():
+                with solara.v.CardText(style="padding: 16px;"):
+                    solara.Markdown(f"**Run {run.id}**")
+                    solara.Markdown(f"_{ts_str}_")
+                    solara.Markdown("---")
+                    solara.Markdown(f"**Agents:** {c.n_agents} | **Steps:** {c.steps}")
+                    solara.Markdown(f"**Token Cap:** {c.market.token_cap}")
+                    if run.metrics and "fraud_detected" in run.metrics:
+                        solara.Markdown(
+                            f"**Fraud Caught:** {run.metrics['fraud_detected']}"
+                        )
+                    solara.Markdown("---")
+                    solara.Markdown("**Audit Config:**")
+                    solara.Text(
+                        f"Base: {c.audit.base_prob:.2f} | High: {c.audit.high_prob:.2f}"
                     )
-                solara.Markdown("---")
-                solara.Markdown("**Audit Config:**")
-                solara.Text(
-                    f"Base: {c.audit.base_prob:.2f} | High: {c.audit.high_prob:.2f}"
-                )
-                solara.Text(f"Penalty: ${c.audit.penalty_amount:.2f}")
+                    solara.Text(f"Penalty: ${c.audit.penalty_amount:.2f}")
+                with solara.v.CardActions():
+                    solara.v.Spacer()
+                    solara.v.Btn(
+                        children=["Close"],
+                        color="primary",
+                        text=True,
+                        on_click=lambda: show_menu.set(False),
+                    )
+
+        # The Activator Button (Manual Toggle)
+        solara.v.Btn(
+            icon=True,
+            small=True,
+            children=[solara.v.Icon(children=["mdi-information-outline"])],
+            on_click=lambda: show_menu.set(True),
+        )
 
         # View Button
         solara.Button(
