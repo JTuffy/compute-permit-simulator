@@ -152,6 +152,15 @@ footer { display: none !important; }
   font-family: 'Roboto Mono', monospace !important;
   font-weight: 500 !important;
 }
+
+/* Dialog fixes - prevent unwanted scrollbars */
+.v-dialog .v-card {
+  overflow: visible !important;
+}
+
+.v-dialog .v-card__text {
+  overflow: visible !important;
+}
 """
 
 # --- Components ---
@@ -160,7 +169,12 @@ footer { display: none !important; }
 @solara.component
 def SimulationController():
     """Invisible component to handle the play loop."""
-    solara.lab.use_task(manager.play_loop, dependencies=[manager.is_playing.value])
+    # Using raise_error=False to gracefully handle Python 3.13 asyncio race conditions
+    solara.lab.use_task(
+        manager.play_loop,
+        dependencies=[manager.is_playing.value],
+        raise_error=False,
+    )
     return solara.Div(style="display: none;")
 
 
@@ -319,7 +333,7 @@ def RunHistoryItem(run, is_selected):
     # REVISED STRATEGY: Use `solara.v.Menu` with a button relying on `v_model` (open state).
     # We simulate hover using `on_mouse_enter`.
 
-    show_menu = solara.use_reactive(False)
+    show_menu, set_show_menu = solara.use_state(False)
 
     # Rich Tooltip Construction
     try:
@@ -338,40 +352,130 @@ def RunHistoryItem(run, is_selected):
     ):
         # Info Button Area - Using robust Click-to-Open Dialog
         with solara.v.Dialog(
-            v_model=show_menu.value, on_v_model=show_menu.set, max_width=400
+            v_model=show_menu, on_v_model=set_show_menu, max_width=500
         ):
             with solara.v.Card():
+                # Header
+                with solara.v.CardTitle(
+                    style="background: #2196F3; color: white; padding: 12px 16px;"
+                ):
+                    solara.Text(f"Run: {run.id}")
+
                 with solara.v.CardText(style="padding: 16px;"):
-                    solara.Markdown(f"**Run {run.id}**")
-                    solara.Markdown(f"_{ts_str}_")
-                    solara.Markdown("---")
-                    solara.Markdown(f"**Agents:** {c.n_agents} | **Steps:** {c.steps}")
-                    solara.Markdown(f"**Token Cap:** {c.market.token_cap}")
-                    if run.metrics and "fraud_detected" in run.metrics:
-                        solara.Markdown(
-                            f"**Fraud Caught:** {run.metrics['fraud_detected']}"
-                        )
-                    solara.Markdown("---")
-                    solara.Markdown("**Audit Config:**")
+                    # Timestamp
                     solara.Text(
-                        f"Base: {c.audit.base_prob:.2f} | High: {c.audit.high_prob:.2f}"
-                    )
-                    solara.Text(f"Penalty: ${c.audit.penalty_amount:.2f}")
-                with solara.v.CardActions():
-                    solara.v.Spacer()
-                    solara.v.Btn(
-                        children=["Close"],
-                        color="primary",
-                        text=True,
-                        on_click=lambda: show_menu.set(False),
+                        f"Created: {ts_str}", style="opacity: 0.7; font-size: 0.85rem;"
                     )
 
-        # The Activator Button (Manual Toggle)
-        solara.v.Btn(
+                    # General Config
+                    solara.HTML(
+                        tag="h4",
+                        unsafe_innerHTML="General",
+                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
+                    )
+                    with solara.Columns([1, 1, 1]):
+                        solara.Markdown(f"**Steps:** {c.steps}")
+                        solara.Markdown(f"**Agents:** {c.n_agents}")
+                        solara.Markdown(f"**Token Cap:** {int(c.market.token_cap)}")
+
+                    # Audit Config
+                    solara.HTML(
+                        tag="h4",
+                        unsafe_innerHTML="Audit Policy",
+                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
+                    )
+                    with solara.Columns([1, 1]):
+                        with solara.Column():
+                            solara.Markdown(
+                                f"**Base Prob (π₀):** {c.audit.base_prob:.2%}"
+                            )
+                            solara.Markdown(
+                                f"**High Prob (π₁):** {c.audit.high_prob:.2%}"
+                            )
+                            solara.Markdown(
+                                f"**Backcheck:** {c.audit.backcheck_prob:.2%}"
+                            )
+                        with solara.Column():
+                            solara.Markdown(
+                                f"**Penalty:** ${c.audit.penalty_amount:.0f}"
+                            )
+                            solara.Markdown(
+                                f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
+                            )
+                            solara.Markdown(
+                                f"**FPR:** {c.audit.false_positive_rate:.2%}"
+                            )
+
+                    # Lab Config
+                    solara.HTML(
+                        tag="h4",
+                        unsafe_innerHTML="Lab Parameters",
+                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
+                    )
+                    with solara.Columns([1, 1]):
+                        with solara.Column():
+                            solara.Markdown(
+                                f"**Economic Value:** {c.lab.economic_value_min:.2f} - {c.lab.economic_value_max:.2f}"
+                            )
+                            solara.Markdown(
+                                f"**Risk Profile:** {c.lab.risk_profile_min:.2f} - {c.lab.risk_profile_max:.2f}"
+                            )
+                            solara.Markdown(
+                                f"**Capacity:** {c.lab.capacity_min:.2f} - {c.lab.capacity_max:.2f}"
+                            )
+                        with solara.Column():
+                            solara.Markdown(
+                                f"**Capability Vb:** {c.lab.capability_value:.2f}"
+                            )
+                            solara.Markdown(
+                                f"**Racing Factor cr:** {c.lab.racing_factor:.2f}"
+                            )
+                            solara.Markdown(
+                                f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
+                            )
+                            solara.Markdown(
+                                f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
+                            )
+
+                    # Metrics (if available)
+                    if run.metrics:
+                        solara.HTML(
+                            tag="h4",
+                            unsafe_innerHTML="Results",
+                            style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
+                        )
+                        with solara.Columns([1, 1]):
+                            if "final_compliance" in run.metrics:
+                                solara.Markdown(
+                                    f"**Final Compliance:** {run.metrics['final_compliance']:.1%}"
+                                )
+                            if "final_price" in run.metrics:
+                                solara.Markdown(
+                                    f"**Final Price:** ${run.metrics['final_price']:.2f}"
+                                )
+                            if "fraud_detected" in run.metrics:
+                                solara.Markdown(
+                                    f"**Fraud Detected:** {run.metrics['fraud_detected']}"
+                                )
+
+                with solara.v.CardActions():
+                    solara.v.Spacer()
+                    solara.Button(
+                        "Close",
+                        on_click=lambda: set_show_menu(False),
+                        text=True,
+                        color="primary",
+                    )
+
+        # The Activator Button - Using solara.Button for proper event handling
+        def open_info_dialog():
+            set_show_menu(True)
+
+        solara.Button(
+            icon_name="mdi-information-outline",
+            on_click=open_info_dialog,
             icon=True,
             small=True,
-            children=[solara.v.Icon(children=["mdi-information-outline"])],
-            on_click=lambda: show_menu.set(True),
         )
 
         # View Button
@@ -409,28 +513,39 @@ def RunHistoryItem(run, is_selected):
                 small=True,
             )
 
-        with solara.v.Dialog(v_model=show_save, max_width=500):
-            with solara.Card(title="Save Scenario"):
-                solara.InputText(
-                    label="Filename", value=save_name, on_value=set_save_name
-                )
-                with solara.Row(justify="end"):
+        # Save Dialog - placed after button, using v.Card for proper sizing
+        with solara.v.Dialog(
+            v_model=show_save,
+            on_v_model=set_show_save,
+            max_width=400,
+            persistent=False,
+        ):
+            with solara.v.Card(style="overflow: visible;"):
+                with solara.v.CardTitle():
+                    solara.Text("Save Scenario")
+                with solara.v.CardText(style="padding: 16px;"):
+                    solara.InputText(
+                        label="Filename", value=save_name, on_value=set_save_name
+                    )
+                with solara.v.CardActions():
+                    solara.v.Spacer()
                     solara.Button(
                         "Cancel", on_click=lambda: set_show_save(False), text=True
                     )
                     solara.Button("Save", on_click=perform_save, color="primary")
 
-        # Excel Export
-        async def export_excel():
-            import asyncio
+        # Excel Export - synchronous to avoid numpy import issues in threads
+        def export_excel():
             from compute_permit_sim.vis.excel_export import export_run_to_excel
 
             try:
-                # Run in thread to prevent blocking/async state invalidation
-                output_path = await asyncio.to_thread(export_run_to_excel, run)
+                output_path = export_run_to_excel(run)
                 print(f"Exported to: {output_path}")
             except Exception as e:
                 print(f"Export failed: {e}")
+                import traceback
+
+                traceback.print_exc()
 
         with solara.Tooltip("Export to Excel"):
             solara.Button(
@@ -532,59 +647,88 @@ def _create_time_series_figure(data, label, color, ylim=None):
 
 
 @solara.component
-def Dashboard():
-    # Helper to get data source
+def AnalysisPanel():
+    """Unified analysis panel combining metrics, timeline, graphs, and agent table.
+
+    Renders consistently regardless of live vs historical mode by using a
+    unified data access pattern at the top.
+    """
+    # --- Unified Data Access ---
     run = manager.selected_run.value
     is_live = run is None
 
-    # Extract data
-    step_count = manager.step_count.value if is_live else len(run.steps)
+    # Force dependency on step count for live updates
+    _ = manager.step_count.value
 
-    price_series = (
-        manager.price_history.value
-        if is_live
-        else [s.market.get("price", 0) for s in run.steps]
-    )
+    # Step index state for historical timeline (hoisted to ensure consistent hook calls)
+    run_id = run.id if run else "live"
+    step_idx, set_step_idx = solara.use_state(0, key=run_id)
 
-    # Calculate compliance series
-    if not is_live:
+    # --- Extract all data upfront ---
+    if is_live:
+        step_count = manager.step_count.value
+        compliance_series = manager.compliance_history.value
+        price_series = manager.price_history.value
+        agents_df = manager.agents_df.value
+        market_price = (
+            manager.model.value.market.current_price if manager.model.value else 0
+        )
+        market_supply = (
+            manager.model.value.market.max_supply if manager.model.value else 0
+        )
+        config = None  # Live mode uses sidebar config
+    else:
+        step_count = len(run.steps)
+        price_series = [s.market.get("price", 0) for s in run.steps]
+
+        # Calculate compliance series from historical data
         compliance_series = []
         for s in run.steps:
             compliant_count = sum(1 for a in s.agents if a.get("Compliant"))
             total = len(s.agents)
             compliance_series.append(compliant_count / total if total > 0 else 0)
-    else:
-        compliance_series = manager.compliance_history.value
 
-    # Wrap in analysis panel styling
+        # Get step-specific data based on slider
+        if len(run.steps) > 0:
+            idx = max(0, min(step_idx, len(run.steps) - 1))
+            total_steps = len(run.steps) - 1
+            step = run.steps[idx]
+            market_price = step.market.get("price", 0)
+            market_supply = step.market.get("supply", 0)
+            agents_df = pd.DataFrame(step.agents)
+        else:
+            idx = 0
+            total_steps = 0
+            market_price = 0
+            market_supply = 0
+            agents_df = None
+
+        config = run.config
+
+    # --- Compute derived values ---
+    current_compliance = "N/A"
+    comp_color = "primary"
+    if compliance_series:
+        comp_val = compliance_series[-1]
+        current_compliance = f"{comp_val:.1%}"
+        comp_color = "success" if comp_val >= 0.8 else "warning"
+
+    current_price = f"${price_series[-1]:.2f}" if price_series else "N/A"
+
+    # --- Render Unified Layout ---
     with solara.Column(classes=["analysis-panel"]):
-        # Primary Metrics Section
+        # SECTION 1: Key Metrics
         with solara.Card("Key Metrics"):
-            # Get current values
-            current_compliance = "N/A"
-            current_price = "N/A"
-
-            if compliance_series:
-                comp_val = compliance_series[-1]
-                current_compliance = f"{comp_val:.1%}"
-                comp_color = "success" if comp_val >= 0.8 else "warning"
-            else:
-                comp_color = "primary"
-
-            if price_series:
-                current_price = f"${price_series[-1]:.2f}"
-
-            # Display metrics in columns
             with solara.Columns([1, 1, 1]):
                 MetricCard("Steps Completed", f"{step_count}", "primary")
                 MetricCard("Compliance Rate", current_compliance, comp_color)
                 MetricCard("Market Price", current_price, "primary")
 
-        # Configuration Summary (if viewing historical run)
-        if not is_live:
+        # SECTION 2: Run Configuration (Historical Only)
+        if config is not None:
             with solara.Card("Run Configuration"):
-                c = run.config
-                with solara.Columns([1, 1, 1]):
+                c = config
+                with solara.Columns([1, 1, 1, 1]):
                     with solara.Column():
                         solara.Markdown(f"**Steps:** {c.steps}")
                         solara.Markdown(f"**Agents:** {c.n_agents}")
@@ -610,108 +754,65 @@ def Dashboard():
                             f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
                         )
 
-        # Time Series Graphs - Publication Quality
-        with solara.Card("Analysis"):
+        # SECTION 3: Time Series Graphs
+        with solara.Card("Time Series Analysis"):
             RunGraphs(compliance_series, price_series)
 
-
-@solara.component
-def InspectorTab():
-    run = manager.selected_run.value
-    _ = manager.step_count.value  # Force dependency on step count
-    is_live = run is None
-
-    # Hook must be unconditional.
-    # We use a key to reset state when the run ID changes.
-    run_id = run.id if run else "live"
-    step_idx, set_step_idx = solara.use_state(0, key=run_id)
-
-    solara.Markdown("### Simulation Timeline")
-
-    # Flatten logic
-    if is_live:
-        price = manager.model.value.market.current_price if manager.model.value else 0
-        supply = manager.model.value.market.max_supply if manager.model.value else 0
-        # n_agents (Unused)
-        agents_df = manager.agents_df.value
-    else:
-        # For history, use slider
-        if len(run.steps) > 0:
-            # Clamp
-            idx = max(0, min(step_idx, len(run.steps) - 1))
-            total = len(run.steps) - 1
-            step = run.steps[idx]
-
-            # Redesigned Simulation Timeline
-            with solara.Column(align="center", style="margin: 24px 0;"):
-                # Custom styled slider
-                solara.v.Slider(
-                    v_model=idx,
-                    on_v_model=set_step_idx,
-                    min=0,
-                    max=total,
-                    step=1,
-                    track_color="grey lighten-2",
-                    track_fill_color="primary",
-                    thumb_label="always",
-                    thumb_size=24,
-                    color="primary",
-                    style_="width: 100%; max-width: 800px;",
+        # SECTION 4: Timeline Slider (Historical Only) - grouped with step-specific content
+        if not is_live and len(run.steps) > 0:
+            with solara.Card("Step Inspector"):
+                with solara.Column(align="center"):
+                    solara.v.Slider(
+                        v_model=idx,
+                        on_v_model=set_step_idx,
+                        min=0,
+                        max=total_steps,
+                        step=1,
+                        track_color="grey lighten-2",
+                        track_fill_color="primary",
+                        thumb_label="always",
+                        thumb_size=24,
+                        color="primary",
+                        style_="width: 100%; max-width: 800px;",
+                    )
+                # Market summary for selected step
+                solara.Markdown(
+                    f"**Step {idx + 1}** — Clearing Price: ${market_price:.2f} | "
+                    f"Permits: {market_supply:.0f}"
                 )
 
-            price = step.market.get("price", 0)
-            supply = step.market.get("supply", 0)
-            # n_agents (Unused)
-            agents_df = pd.DataFrame(step.agents)
-        else:
-            price = 0
-            supply = 0
-            agents_df = None
+        # SECTION 5: Step Analysis (Agent Graphs)
+        if agents_df is not None and not agents_df.empty:
+            with solara.Card("Step Analysis"):
+                with solara.Columns([1, 1, 1]):
+                    with solara.Column():
+                        QuantitativeScatterPlot(agents_df)
+                    with solara.Column():
+                        AuditTargetingPlot(agents_df)
+                    with solara.Column():
+                        PayoffByStrategyPlot(agents_df)
 
-    # Use existing components for display
-    # Market Summary
-    # Use existing components for display
-    # Market Summary
-    with solara.Card("General"):
-        solara.Markdown(f"**Clearing Price:** {price:.2f}")
-        solara.Markdown(f"**Permits Available:** {supply:.2f} (Total Allowance)")
-
-    # Agent Inspection
-    if agents_df is not None:
-        # Graph Section - Three graphs in a row
-        with solara.Card("Analysis"):
-            with solara.Columns([1, 1, 1]):
-                with solara.Column():
-                    QuantitativeScatterPlot(agents_df)
-                with solara.Column():
-                    AuditTargetingPlot(agents_df)
-                with solara.Column():
-                    PayoffByStrategyPlot(agents_df)
-
-        # Agent Details Table - Full width below
-        with solara.Card("Agent Details"):
-            cols = [
-                "ID",
-                "Capacity",
-                "Permit",
-                "Used Compute",
-                "Reported Compute",
-                "Compliant",
-                "Audited",
-                "Caught",
-                "Penalty",
-                "Revenue",
-                "Step Profit",
-                "Total Wealth",
-            ]
-            # Filter cols if they exist
-            if agents_df is not None and not agents_df.empty:
+            # SECTION 6: Agent Details Table
+            with solara.Card("Agent Details"):
+                cols = [
+                    "ID",
+                    "Capacity",
+                    "Permit",
+                    "Used Compute",
+                    "Reported Compute",
+                    "Compliant",
+                    "Audited",
+                    "Caught",
+                    "Penalty",
+                    "Revenue",
+                    "Step Profit",
+                    "Total Wealth",
+                ]
                 valid_cols = [c for c in cols if c in agents_df.columns]
                 solara.DataFrame(agents_df[valid_cols], items_per_page=15)
-            else:
+        else:
+            with solara.Card("Agent Details"):
                 solara.Markdown("No agent data available for this step.")
-    else:
-        solara.Markdown("No agent data.")
 
 
 @solara.component
@@ -756,19 +857,28 @@ def ConfigPanel():
                     text=True,
                 )
 
-        with solara.v.Dialog(v_model=show_load, max_width=500):
-            with solara.Card(title="Load Scenario Template"):
-                if manager.available_scenarios.value:
-                    solara.Select(
-                        label="Choose File",
-                        values=manager.available_scenarios.value,
-                        value=selected_file,
-                        on_value=set_selected_file,
-                    )
-                else:
-                    solara.Markdown("_No scenarios found in scenarios/_")
-
-                with solara.Row(justify="end", style="margin-top: 10px;"):
+        # Load Dialog - using v.Card for proper sizing
+        with solara.v.Dialog(
+            v_model=show_load,
+            on_v_model=set_show_load,
+            max_width=400,
+            persistent=False,
+        ):
+            with solara.v.Card(style="overflow: visible;"):
+                with solara.v.CardTitle():
+                    solara.Text("Load Scenario Template")
+                with solara.v.CardText(style="padding: 16px;"):
+                    if manager.available_scenarios.value:
+                        solara.Select(
+                            label="Choose File",
+                            values=manager.available_scenarios.value,
+                            value=selected_file,
+                            on_value=set_selected_file,
+                        )
+                    else:
+                        solara.Markdown("_No scenarios found in scenarios/_")
+                with solara.v.CardActions():
+                    solara.v.Spacer()
                     solara.Button(
                         "Cancel", on_click=lambda: set_show_load(False), text=True
                     )
@@ -896,8 +1006,5 @@ def Page():
     elif not has_data:
         EmptyState()
     else:
-        with solara.lab.Tabs():
-            with solara.lab.Tab("Summary"):
-                Dashboard()
-            with solara.lab.Tab("Details"):
-                InspectorTab()
+        # Unified analysis view (no tabs)
+        AnalysisPanel()

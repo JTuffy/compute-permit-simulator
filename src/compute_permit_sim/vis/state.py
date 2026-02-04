@@ -203,18 +203,22 @@ class SimulationManager:
 
     async def play_loop(self):
         """Async loop for continuous play."""
-        while self.is_playing.value:
-            # Auto-stop if we exceed configured steps
-            if (
-                self.model.value
-                and self.step_count.value >= self.model.value.config.steps
-            ):
-                self.is_playing.value = False
-                self.pack_current_run()  # Auto-pack on finish
-                break
+        try:
+            while self.is_playing.value:
+                # Auto-stop if we exceed configured steps
+                if (
+                    self.model.value
+                    and self.step_count.value >= self.model.value.config.steps
+                ):
+                    self.is_playing.value = False
+                    self.pack_current_run()  # Auto-pack on finish
+                    break
 
-            self.step()
-            await asyncio.sleep(0.1)
+                self.step()
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            # Clean exit when task is cancelled (hot reload, dependency change)
+            pass
 
     def pack_current_run(self):
         """Finalize the current run and add to history."""
