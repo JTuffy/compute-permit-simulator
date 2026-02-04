@@ -1,12 +1,12 @@
 """Advanced integration tests for complex simulation scenarios."""
 
-from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import (
     AuditConfig,
     LabConfig,
     MarketConfig,
     ScenarioConfig,
 )
+from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 
 def get_base_configs():
@@ -22,8 +22,8 @@ def get_base_configs():
     )
     market = MarketConfig(token_cap=10, fixed_price=None)
     lab = LabConfig(
-        gross_value_min=1.0,
-        gross_value_max=1.0,
+        economic_value_min=1.0,
+        economic_value_max=1.0,
         risk_profile_min=1.0,
         risk_profile_max=1.0,
     )
@@ -139,7 +139,7 @@ def test_audit_capacity_constraint():
     model.step()
 
     # Verify exactly 2 agents were caught and fined
-    fined_agents = [a for a in model.agents if a.wealth < 0]
+    fined_agents = [a for a in model.agents if a.last_audit_status["penalty"] > 0]
     assert len(fined_agents) == 2
 
 
@@ -161,8 +161,8 @@ def test_audit_targeting_efficiency():
     # Since Value range is [0.8, 2.0], everyone cheats.
     lab_uniform = lab.model_copy(
         update={
-            "gross_value_min": 0.8,
-            "gross_value_max": 2.0,
+            "economic_value_min": 0.8,
+            "economic_value_max": 2.0,
             "audit_coefficient": 1.0,
         }
     )

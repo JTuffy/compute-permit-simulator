@@ -7,6 +7,10 @@ Implements the standard deterrence model:
     Ref: technical_specification.md Section 2.1 "Agents (Labs)"
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Lab:
     """Represents an AI Lab (Firm).
@@ -133,10 +137,20 @@ class Lab:
         # Effective P for this agent includes their specific audit profile
         agent_specific_prob = detection_prob * self.audit_coefficient
         expected_penalty = agent_specific_prob * b_total
+
+        logger.debug(
+            f"Lab {self.lab_id} Decision: Gain={gain:.3f}, "
+            f"Prob={agent_specific_prob:.3f}, B={b_total:.3f}, "
+            f"ExpPenalty={expected_penalty:.3f}"
+        )
+
         if expected_penalty >= gain:
             self.is_compliant = True
             return True
 
         # 6. Not deterred -> cheat
         self.is_compliant = False
+        logger.info(
+            f"Lab {self.lab_id} CHEATING: Gain ({gain:.3f}) > ExpPenalty ({expected_penalty:.3f})"
+        )
         return False

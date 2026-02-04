@@ -1,16 +1,17 @@
 """Basic tests for domain model and agent initialization."""
 
-from compute_permit_sim.domain.agents import Lab
-from compute_permit_sim.domain.enforcement import Auditor
-from compute_permit_sim.domain.market import SimpleClearingMarket
+from compute_permit_sim.core.agents import Lab
+from compute_permit_sim.core.enforcement import Auditor
+from compute_permit_sim.core.market import SimpleClearingMarket
+
 from compute_permit_sim.schemas import AuditConfig
 
 
 def test_lab_initialization():
     """Verify that a Lab agent correctly initializes with provided values and defaults."""
-    lab = Lab(lab_id=1, gross_value=1.5)
+    lab = Lab(lab_id=1, economic_value=1.5)
     assert lab.lab_id == 1
-    assert lab.gross_value == 1.5
+    assert lab.economic_value == 1.5
     assert lab.is_compliant is True
     assert lab.has_permit is False
     assert lab.get_bid() == 1.5

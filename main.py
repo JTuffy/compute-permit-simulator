@@ -1,10 +1,17 @@
 """Entry point for the Compute Permit Simulator."""
 
 import json
+import logging
 from pathlib import Path
 
-from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import ScenarioConfig
+from compute_permit_sim.services.model_wrapper import ComputePermitModel
+
+# Configure logging for CLI
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 
 def run_scenario(name: str, config_dict: dict, steps: int = 10) -> None:

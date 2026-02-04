@@ -114,12 +114,33 @@ class ScenarioConfig(BaseModel):
     seed: int | None = None
 
 
+class AgentSnapshot(BaseModel):
+    """Standardized snapshot of a single agent's state at one step."""
+
+    id: int = Field(..., description="Unique agent identifier")
+    capacity: float = Field(..., description="Max compute capacity")
+    has_permit: bool = Field(..., description="Whether the agent holds a permit")
+    used_compute: float = Field(..., description="Actual compute units consumed")
+    reported_compute: float = Field(
+        ..., description="Compute usage reported to regulator"
+    )
+    is_compliant: bool = Field(..., description="Compliance status")
+    was_audited: bool = Field(..., description="Audit status this step")
+    was_caught: bool = Field(..., description="Caught cheating this step")
+    penalty_amount: float = Field(..., description="Penalty applied this step")
+    revenue: float = Field(..., description="Gross economic value generated")
+    step_profit: float = Field(..., description="Net profit/loss this step")
+    wealth: float = Field(..., description="Cumulative wealth")
+
+    model_config = ConfigDict(frozen=True)
+
+
 class StepResult(BaseModel):
     """Snapshot of a single simulation step."""
 
-    step_id: int
+    step: int
     market: dict = Field(..., description="Market state (price, volume, supply)")
-    agents: list[dict] = Field(..., description="List of all agent states")
+    agents: list[AgentSnapshot] = Field(..., description="List of all agent states")
     audit: list[dict] = Field(
         default_factory=list, description="Audit events this step"
     )

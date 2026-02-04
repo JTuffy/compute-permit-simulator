@@ -1,8 +1,11 @@
+import logging
+
 import pandas as pd
 import solara
 import solara.lab
 
-from compute_permit_sim.infrastructure.config_manager import save_scenario
+from compute_permit_sim.services.config_manager import save_scenario
+from compute_permit_sim.services.simulation import engine
 from compute_permit_sim.vis.components import (
     AuditTargetingPlot,
     PayoffByStrategyPlot,
@@ -10,7 +13,16 @@ from compute_permit_sim.vis.components import (
     RangeController,
     RangeView,
 )
-from compute_permit_sim.vis.state import manager
+from compute_permit_sim.vis.state.active import active_sim
+from compute_permit_sim.vis.state.config import ui_config
+from compute_permit_sim.vis.state.history import session_history
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.FileHandler("simulation.log"), logging.StreamHandler()],
+)
 
 # Research Lab Design System CSS
 DENSITY_CSS = """
@@ -171,8 +183,8 @@ def SimulationController():
     """Invisible component to handle the play loop."""
     # Using raise_error=False to gracefully handle Python 3.13 asyncio race conditions
     solara.lab.use_task(
-        manager.play_loop,
-        dependencies=[manager.is_playing.value],
+        engine.play_loop,
+        dependencies=[active_sim.is_playing.value],
         raise_error=False,
     )
     return solara.Div(style="display: none;")
@@ -300,10 +312,10 @@ def RunHistoryItem(run, is_selected):
 
     # Actions
     def load_config():
-        manager.restore_config(run)
+        engine.restore_config(run)
 
     def view_run():
-        manager.selected_run.value = run
+        session_history.selected_run.value = run
 
     # Info Button (Mini-Dialog)
     # We use v.Btn directly for better slot compatibility if needed,
@@ -558,15 +570,15 @@ def RunHistoryItem(run, is_selected):
 
 @solara.component
 def RunHistoryList():
-    if not manager.run_history.value:
+    if not session_history.run_history.value:
         solara.Markdown("_No runs yet._")
         return
 
     # Compact list with custom items
     with solara.Column():
-        for run in manager.run_history.value:
-            is_selected = (manager.selected_run.value is not None) and (
-                manager.selected_run.value.id == run.id
+        for run in session_history.run_history.value:
+            is_selected = (session_history.selected_run.value is not None) and (
+                session_history.selected_run.value.id == run.id
             )
             RunHistoryItem(run, is_selected)
 
@@ -654,48 +666,61 @@ def AnalysisPanel():
     unified data access pattern at the top.
     """
     # --- Unified Data Access ---
-    run = manager.selected_run.value
+    run = session_history.selected_run.value
     is_live = run is None
 
     # Force dependency on step count for live updates
-    _ = manager.step_count.value
+    _ = active_sim.step_count.value
 
     # Step index state for historical timeline (hoisted to ensure consistent hook calls)
     run_id = run.id if run else "live"
     step_idx, set_step_idx = solara.use_state(0, key=run_id)
 
-    # --- Extract all data upfront ---
+    # --- Memoized time series (only recompute when run changes, not on slider move) ---
+    def compute_time_series():
+        if is_live:
+            return (
+                active_sim.compliance_history.value,
+                active_sim.price_history.value,
+            )
+        elif run and run.steps:
+            compliance = []
+            prices = []
+            for s in run.steps:
+                compliant_count = sum(1 for a in s.agents if a.is_compliant)
+                total = len(s.agents)
+                compliance.append(compliant_count / total if total > 0 else 0)
+                prices.append(s.market.get("price", 0))
+            return compliance, prices
+        return [], []
+
+    compliance_series, price_series = solara.use_memo(
+        compute_time_series,
+        dependencies=[run_id, active_sim.step_count.value if is_live else 0],
+    )
+
+    # --- Extract step-specific data ---
     if is_live:
-        step_count = manager.step_count.value
-        compliance_series = manager.compliance_history.value
-        price_series = manager.price_history.value
-        agents_df = manager.agents_df.value
+        step_count = active_sim.step_count.value
+        agents_df = active_sim.agents_df.value
         market_price = (
-            manager.model.value.market.current_price if manager.model.value else 0
+            active_sim.model.value.market.current_price if active_sim.model.value else 0
         )
         market_supply = (
-            manager.model.value.market.max_supply if manager.model.value else 0
+            active_sim.model.value.market.max_supply if active_sim.model.value else 0
         )
         config = None  # Live mode uses sidebar config
     else:
-        step_count = len(run.steps)
-        price_series = [s.market.get("price", 0) for s in run.steps]
+        step_count = len(run.steps) if run else 0
 
-        # Calculate compliance series from historical data
-        compliance_series = []
-        for s in run.steps:
-            compliant_count = sum(1 for a in s.agents if a.get("Compliant"))
-            total = len(s.agents)
-            compliance_series.append(compliant_count / total if total > 0 else 0)
-
-        # Get step-specific data based on slider
-        if len(run.steps) > 0:
+        # Get step-specific data based on slider (not memoized - changes with slider)
+        if run and len(run.steps) > 0:
             idx = max(0, min(step_idx, len(run.steps) - 1))
             total_steps = len(run.steps) - 1
             step = run.steps[idx]
             market_price = step.market.get("price", 0)
             market_supply = step.market.get("supply", 0)
-            agents_df = pd.DataFrame(step.agents)
+            agents_df = pd.DataFrame([a.model_dump() for a in step.agents])
         else:
             idx = 0
             total_steps = 0
@@ -703,7 +728,7 @@ def AnalysisPanel():
             market_supply = 0
             agents_df = None
 
-        config = run.config
+        config = run.config if run else None
 
     # --- Compute derived values ---
     current_compliance = "N/A"
@@ -795,18 +820,18 @@ def AnalysisPanel():
             # SECTION 6: Agent Details Table
             with solara.Card("Agent Details"):
                 cols = [
-                    "ID",
-                    "Capacity",
-                    "Permit",
-                    "Used Compute",
-                    "Reported Compute",
-                    "Compliant",
-                    "Audited",
-                    "Caught",
-                    "Penalty",
-                    "Revenue",
-                    "Step Profit",
-                    "Total Wealth",
+                    "id",
+                    "capacity",
+                    "has_permit",
+                    "used_compute",
+                    "reported_compute",
+                    "is_compliant",
+                    "was_audited",
+                    "was_caught",
+                    "penalty_amount",
+                    "revenue",
+                    "step_profit",
+                    "wealth",
                 ]
                 valid_cols = [c for c in cols if c in agents_df.columns]
                 solara.DataFrame(agents_df[valid_cols], items_per_page=15)
@@ -824,12 +849,12 @@ def ConfigPanel():
         selected_file, set_selected_file = solara.use_state(None)
 
         def open_load_dialog():
-            manager.refresh_scenarios()
+            session_history.refresh_scenarios()
             set_show_load(True)
 
         def do_load():
             if selected_file:
-                manager.load_from_file(selected_file)
+                engine.load_scenario(selected_file)
                 set_show_load(False)
 
         # Header with Load and Play buttons
@@ -840,10 +865,10 @@ def ConfigPanel():
             with solara.Row():
                 solara.Button(
                     icon_name="mdi-play"
-                    if not manager.is_playing.value
+                    if not active_sim.is_playing.value
                     else "mdi-pause",
-                    on_click=lambda: manager.is_playing.set(
-                        not manager.is_playing.value
+                    on_click=lambda: active_sim.is_playing.set(
+                        not active_sim.is_playing.value
                     ),
                     icon=True,
                     small=True,
@@ -868,10 +893,10 @@ def ConfigPanel():
                 with solara.v.CardTitle():
                     solara.Text("Load Scenario Template")
                 with solara.v.CardText(style="padding: 16px;"):
-                    if manager.available_scenarios.value:
+                    if session_history.available_scenarios.value:
                         solara.Select(
                             label="Choose File",
-                            values=manager.available_scenarios.value,
+                            values=session_history.available_scenarios.value,
                             value=selected_file,
                             on_value=set_selected_file,
                         )
@@ -892,23 +917,29 @@ def ConfigPanel():
         # General Parameters Card
         with solara.Card("General", style="margin-bottom: 6px;"):
             with solara.Column():
-                solara.InputInt(label="Steps", value=manager.steps, dense=True)
-                solara.InputInt(label="N Agents", value=manager.n_agents, dense=True)
+                solara.InputInt(label="Steps", value=ui_config.steps, dense=True)
+                solara.InputInt(label="N Agents", value=ui_config.n_agents, dense=True)
                 solara.InputFloat(
-                    label="Token Cap Q", value=manager.token_cap, dense=True
+                    label="Token Cap Q", value=ui_config.token_cap, dense=True
                 )
 
         # Audit Policy Card
         with solara.Card("Audit Policy", style="margin-bottom: 6px;"):
             with solara.Column():
-                solara.InputFloat(label="Penalty $", value=manager.penalty, dense=True)
-                solara.InputFloat(label="Base π₀", value=manager.base_prob, dense=True)
-                solara.InputFloat(label="High π₁", value=manager.high_prob, dense=True)
                 solara.InputFloat(
-                    label="Signal TPR", value=manager.signal_tpr, dense=True
+                    label="Penalty $", value=ui_config.penalty, dense=True
                 )
                 solara.InputFloat(
-                    label="Signal FPR", value=manager.signal_fpr, dense=True
+                    label="Base π₀", value=ui_config.base_prob, dense=True
+                )
+                solara.InputFloat(
+                    label="High π₁", value=ui_config.high_prob, dense=True
+                )
+                solara.InputFloat(
+                    label="Signal TPR", value=ui_config.signal_tpr, dense=True
+                )
+                solara.InputFloat(
+                    label="Signal FPR", value=ui_config.signal_fpr, dense=True
                 )
 
         # Lab Generation Card
@@ -916,34 +947,38 @@ def ConfigPanel():
             with solara.Column():
                 RangeController(
                     "Economic Value",
-                    manager.economic_value_min,
-                    manager.economic_value_max,
+                    ui_config.economic_value_min,
+                    ui_config.economic_value_max,
                 )
                 RangeController(
-                    "Risk Profile", manager.risk_profile_min, manager.risk_profile_max
+                    "Risk Profile",
+                    ui_config.risk_profile_min,
+                    ui_config.risk_profile_max,
                 )
-                RangeController("Capacity", manager.capacity_min, manager.capacity_max)
-                solara.InputFloat(
-                    label="Capability Vb", value=manager.capability_value, dense=True
+                RangeController(
+                    "Capacity", ui_config.capacity_min, ui_config.capacity_max
                 )
                 solara.InputFloat(
-                    label="Racing cr", value=manager.racing_factor, dense=True
+                    label="Capability Vb", value=ui_config.capability_value, dense=True
+                )
+                solara.InputFloat(
+                    label="Racing cr", value=ui_config.racing_factor, dense=True
                 )
                 solara.InputFloat(
                     label="Reputation β",
-                    value=manager.reputation_sensitivity,
+                    value=ui_config.reputation_sensitivity,
                     dense=True,
                 )
                 solara.InputFloat(
-                    label="Audit Coeff", value=manager.audit_coefficient, dense=True
+                    label="Audit Coeff", value=ui_config.audit_coefficient, dense=True
                 )
 
         # Action Buttons Section
         solara.Markdown("---")
         # Primary action: Play/Pause (prominent)
         solara.Button(
-            label="⏸ Pause" if manager.is_playing.value else "▶ Play",
-            on_click=lambda: manager.is_playing.set(not manager.is_playing.value),
+            label="⏸ Pause" if active_sim.is_playing.value else "▶ Play",
+            on_click=lambda: active_sim.is_playing.set(not active_sim.is_playing.value),
             color="primary",
             block=True,
             style="font-weight: 600;",
@@ -984,8 +1019,8 @@ def Page():
     solara.Style(DENSITY_CSS)
 
     # Initialize if needed
-    if manager.model.value is None:
-        manager.reset_model()
+    if active_sim.model.value is None:
+        engine.reset_model()
 
     # Mount the controller (handles the loop)
     SimulationController()
@@ -996,10 +1031,10 @@ def Page():
     solara.Title("Compute Permit Market Simulator")
 
     # --- Right Pane State Machine ---
-    has_data = (manager.step_count.value > 0) or (
-        manager.selected_run.value is not None
+    has_data = (active_sim.step_count.value > 0) or (
+        session_history.selected_run.value is not None
     )
-    is_playing = manager.is_playing.value
+    is_playing = active_sim.is_playing.value
 
     if is_playing:
         LoadingState()

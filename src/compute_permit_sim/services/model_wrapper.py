@@ -4,11 +4,15 @@ import random
 
 import mesa
 
-from ..domain.agents import Lab
-from ..domain.enforcement import Auditor
-from ..domain.market import SimpleClearingMarket
+from compute_permit_sim.services.data_collect import (
+    compute_compliance_rate,
+    compute_current_price,
+)
+
+from ..core.agents import Lab
+from ..core.enforcement import Auditor
+from ..core.market import SimpleClearingMarket
 from ..schemas import AuditConfig, LabConfig, MarketConfig, ScenarioConfig
-from .data_collect import compute_compliance_rate, compute_current_price
 
 
 class MesaLab(mesa.Agent):
@@ -306,23 +310,23 @@ class ComputePermitModel(mesa.Model):
                 snapshots.append(
                     {
                         # Group 1: Identity
-                        "ID": d.lab_id,
-                        "Capacity": round(d.capacity, 2),
+                        "id": d.lab_id,
+                        "capacity": round(d.capacity, 2),
                         # Group 2: Compute Action
-                        "Permit": d.has_permit,
-                        "Used Compute": round(true_compute, 2),
-                        "Reported Compute": round(reported_compute, 2),
+                        "has_permit": d.has_permit,
+                        "used_compute": round(true_compute, 2),
+                        "reported_compute": round(reported_compute, 2),
                         # Group 3: Compliance Status
-                        "Compliant": d.is_compliant,
-                        "Audited": agent.last_audit_status.get("audited", False),
-                        "Caught": agent.last_audit_status.get("caught", False),
+                        "is_compliant": d.is_compliant,
+                        "was_audited": agent.last_audit_status.get("audited", False),
+                        "was_caught": agent.last_audit_status.get("caught", False),
                         # Group 4: Financials
-                        "Penalty": agent.last_audit_status.get("penalty", 0.0),
-                        "Revenue": round(d.economic_value, 2),
-                        "Step Profit": round(
+                        "penalty_amount": agent.last_audit_status.get("penalty", 0.0),
+                        "revenue": round(d.economic_value, 2),
+                        "step_profit": round(
                             agent.last_step_profit, 2
                         ),  # Net gain/loss this step
-                        "Total Wealth": round(agent.wealth, 2),
+                        "wealth": round(agent.wealth, 2),
                     }
                 )
         return snapshots

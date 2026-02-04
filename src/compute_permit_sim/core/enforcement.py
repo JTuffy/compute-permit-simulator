@@ -13,7 +13,7 @@ Effective detection probability (tech spec section 3):
 
 import random
 
-from ..schemas import AuditConfig
+from compute_permit_sim.schemas import AuditConfig
 
 
 class Auditor:

@@ -9,9 +9,9 @@ Exports run data to Excel with multiple sheets:
 
 import io
 
+import matplotlib
 import pandas as pd
 import xlsxwriter
-import matplotlib
 
 matplotlib.use("Agg")  # Force non-interactive backend for thread safety
 from matplotlib.figure import Figure

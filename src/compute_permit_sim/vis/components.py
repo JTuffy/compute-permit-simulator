@@ -46,8 +46,8 @@ def QuantitativeScatterPlot(agents_df):
         return
 
     # Extract data
-    true_compute = agents_df["Used Compute"]
-    reported_compute = agents_df["Reported Compute"]
+    true_compute = agents_df["used_compute"]
+    reported_compute = agents_df["reported_compute"]
 
     fig = Figure(figsize=(6, 5))
     ax = fig.subplots()
@@ -60,13 +60,15 @@ def QuantitativeScatterPlot(agents_df):
     # We need access to status columns.
     # agents_df is a DataFrame.
     # Check if we have the columns
-    has_status = "Compliant" in agents_df.columns and "Caught" in agents_df.columns
+    has_status = (
+        "is_compliant" in agents_df.columns and "was_caught" in agents_df.columns
+    )
 
     if has_status:
         for _, row in agents_df.iterrows():
-            if row["Caught"]:
+            if row["was_caught"]:
                 colors.append("black")  # Caught
-            elif not row["Compliant"]:
+            elif not row["is_compliant"]:
                 colors.append("red")  # Cheating successfully
             else:
                 colors.append("green")  # Compliant
@@ -112,20 +114,20 @@ def AuditTargetingPlot(agents_df):
         return
 
     # Check required columns
-    required_cols = ["Compliant", "Audited"]
+    required_cols = ["is_compliant", "was_audited"]
     if not all(col in agents_df.columns for col in required_cols):
         solara.Markdown("Missing required columns for audit plot.")
         return
 
     # Calculate audit rates by compliance status
-    compliant_agents = agents_df[agents_df["Compliant"] == True]
-    noncompliant_agents = agents_df[agents_df["Compliant"] == False]
+    compliant_agents = agents_df[agents_df["is_compliant"]]
+    noncompliant_agents = agents_df[~agents_df["is_compliant"]]
 
     compliant_audit_rate = (
-        compliant_agents["Audited"].mean() if len(compliant_agents) > 0 else 0
+        compliant_agents["was_audited"].mean() if len(compliant_agents) > 0 else 0
     )
     noncompliant_audit_rate = (
-        noncompliant_agents["Audited"].mean() if len(noncompliant_agents) > 0 else 0
+        noncompliant_agents["was_audited"].mean() if len(noncompliant_agents) > 0 else 0
     )
 
     # Create figure
@@ -183,25 +185,21 @@ def PayoffByStrategyPlot(agents_df):
         return
 
     # Check required columns
-    required_cols = ["Compliant", "Caught", "Step Profit"]
+    required_cols = ["is_compliant", "was_caught", "step_profit"]
     if not all(col in agents_df.columns for col in required_cols):
         solara.Markdown("Missing required columns for payoff plot.")
         return
 
     # Categorize agents
-    compliant = agents_df[agents_df["Compliant"] == True]
-    cheated_caught = agents_df[
-        (agents_df["Compliant"] == False) & (agents_df["Caught"] == True)
-    ]
+    compliant = agents_df[agents_df["is_compliant"]]
+    cheated_caught = agents_df[~agents_df["is_compliant"] & agents_df["was_caught"]]
     cheated_uncaught = agents_df[
-        (agents_df["Compliant"] == False) & (agents_df["Caught"] == False)
-    ]
-
-    # Calculate average payoffs
-    avg_compliant = compliant["Step Profit"].mean() if len(compliant) > 0 else 0
-    avg_caught = cheated_caught["Step Profit"].mean() if len(cheated_caught) > 0 else 0
+        ~agents_df["is_compliant"] & ~agents_df["was_caught"]
+    ]  # Calculate average payoffs
+    avg_compliant = compliant["step_profit"].mean() if len(compliant) > 0 else 0
+    avg_caught = cheated_caught["step_profit"].mean() if len(cheated_caught) > 0 else 0
     avg_uncaught = (
-        cheated_uncaught["Step Profit"].mean() if len(cheated_uncaught) > 0 else 0
+        cheated_uncaught["step_profit"].mean() if len(cheated_uncaught) > 0 else 0
     )
 
     # Create figure

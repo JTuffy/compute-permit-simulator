@@ -1,6 +1,6 @@
 """Verify scenario manager functionality."""
 
-from compute_permit_sim.infrastructure.config_manager import (
+from compute_permit_sim.services.config_manager import (
     SCENARIO_DIR,
     list_scenarios,
     load_scenario,
