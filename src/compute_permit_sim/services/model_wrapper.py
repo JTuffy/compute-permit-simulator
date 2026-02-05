@@ -9,6 +9,14 @@ from compute_permit_sim.services.data_collect import (
     compute_current_price,
 )
 
+from compute_permit_sim.core.constants import (
+    DEFAULT_AUDIT_BASE_PROB,
+    DEFAULT_AUDIT_FALSE_NEG_RATE,
+    DEFAULT_AUDIT_FALSE_POS_RATE,
+    DEFAULT_AUDIT_HIGH_PROB,
+    DEFAULT_AUDIT_PENALTY_AMOUNT,
+    DEFAULT_MARKET_TOKEN_CAP,
+)
 from ..core.agents import Lab
 from ..core.enforcement import Auditor
 from ..core.market import SimpleClearingMarket
@@ -97,13 +105,13 @@ class ComputePermitModel(mesa.Model):
             config = ScenarioConfig(
                 name="Default",
                 audit=AuditConfig(
-                    base_prob=0.1,
-                    high_prob=0.1,
-                    false_positive_rate=0.0,
-                    false_negative_rate=0.0,
-                    penalty_amount=1.0,
+                    base_prob=DEFAULT_AUDIT_BASE_PROB,
+                    high_prob=DEFAULT_AUDIT_HIGH_PROB,
+                    false_positive_rate=DEFAULT_AUDIT_FALSE_POS_RATE,
+                    false_negative_rate=DEFAULT_AUDIT_FALSE_NEG_RATE,
+                    penalty_amount=DEFAULT_AUDIT_PENALTY_AMOUNT,
                 ),
-                market=MarketConfig(token_cap=10),
+                market=MarketConfig(token_cap=DEFAULT_MARKET_TOKEN_CAP),
                 lab=LabConfig(),
             )
 
@@ -323,6 +331,8 @@ class ComputePermitModel(mesa.Model):
                         # Group 4: Financials
                         "penalty_amount": agent.last_audit_status.get("penalty", 0.0),
                         "revenue": round(d.economic_value, 2),
+                        "economic_value": round(d.economic_value, 2),
+                        "risk_profile": round(d.risk_profile, 2),
                         "step_profit": round(
                             agent.last_step_profit, 2
                         ),  # Net gain/loss this step

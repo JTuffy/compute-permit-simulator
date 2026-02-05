@@ -1,179 +1,49 @@
 import logging
+from pathlib import Path
 
 import pandas as pd
 import solara
 import solara.lab
 
+from compute_permit_sim.core.constants import CHART_COLOR_MAP
+
 from compute_permit_sim.services.config_manager import save_scenario
 from compute_permit_sim.services.simulation import engine
 from compute_permit_sim.vis.components import (
     AuditTargetingPlot,
+    LabDecisionPlot,
     PayoffByStrategyPlot,
     QuantitativeScatterPlot,
     RangeController,
     RangeView,
+    WealthDivergencePlot,
 )
 from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
 from compute_permit_sim.vis.state.history import session_history
 
 # --- Logging Configuration ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.FileHandler("simulation.log"), logging.StreamHandler()],
+# Force configuration of the library logger to ensure we capture output
+logger = logging.getLogger("compute_permit_sim")
+logger.setLevel(logging.INFO)
+# Clear existing handlers to avoid duplicates
+if logger.handlers:
+    logger.handlers.clear()
+
+file_handler = logging.FileHandler("outputs/simulation.log")
+file_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 )
 
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
+
 # Research Lab Design System CSS
-DENSITY_CSS = """
-/* Hide Solara watermark */
-footer { display: none !important; }
-
-/* Color Palette - Research Lab Theme */
-:root {
-  --lab-primary: #2196F3;
-  --lab-success: #4CAF50;
-  --lab-warning: #FF9800;
-  --lab-error: #F44336;
-  --lab-input-bg: #F5F7FA;
-  --lab-output-bg: #FFFFFF;
-  --lab-metric-bg: #E3F2FD;
-  --lab-spacing-tight: 4px;
-  --lab-spacing-normal: 8px;
-  --lab-spacing-loose: 16px;
-}
-
-/* Left Panel: Compact Control Panel Style */
-.sidebar-compact .v-card { 
-  margin-bottom: 8px !important; 
-  background: var(--lab-input-bg) !important;
-  border-radius: 4px !important;
-}
-
-.sidebar-compact .v-input { 
-  margin-bottom: 2px !important; 
-  font-size: 0.85rem !important;
-}
-
-.sidebar-compact .v-card__text { 
-  padding: 6px 10px !important; 
-}
-
-.sidebar-compact .v-card__title { 
-  font-size: 0.75rem !important; 
-  text-transform: uppercase !important; 
-  letter-spacing: 0.5px !important; 
-  opacity: 0.7 !important;
-  padding: 6px 10px !important;
-  font-weight: 600 !important;
-}
-
-.sidebar-compact .v-label {
-  font-size: 0.85rem !important;
-}
-
-/* Compact tab styling */
-.sidebar-compact .v-tab {
-  font-size: 0.8rem !important;
-  min-width: 60px !important;
-  padding: 0 8px !important;
-}
-
-/* Right Panel: Spacious Analytical Readout */
-.analysis-panel { 
-  padding: 24px !important; 
-}
-
-.analysis-panel .v-card {
-  margin-bottom: 20px !important;
-}
-
-.analysis-panel .v-card__title {
-  font-size: 1.1rem !important;
-  padding: 12px 16px !important;
-  font-weight: 600 !important;
-}
-
-.analysis-panel .v-card__text {
-  padding: 16px !important;
-}
-
-/* Metric Cards */
-.metric-card { 
-  padding: 8px 12px !important; 
-  background: var(--lab-metric-bg) !important;
-  border-left: 3px solid var(--lab-primary) !important;
-  border-radius: 4px !important;
-  margin-bottom: 8px !important;
-}
-
-.metric-card.success { 
-  border-left-color: var(--lab-success) !important; 
-  background: #E8F5E9 !important;
-}
-
-.metric-card.warning { 
-  border-left-color: var(--lab-warning) !important; 
-  background: #FFF3E0 !important;
-}
-
-.metric-value { 
-  font-size: 1.4rem !important; 
-  font-family: 'Roboto Mono', monospace !important; 
-  font-weight: 700 !important;
-  line-height: 1.2 !important;
-  margin-bottom: 2px !important;
-}
-
-.metric-label { 
-  font-size: 0.65rem !important; 
-  text-transform: uppercase !important; 
-  letter-spacing: 0.5px !important; 
-  opacity: 0.6 !important;
-  font-weight: 600 !important;
-}
-
-/* Compact Run History */
-.run-history-compact {
-  max-height: 250px !important;
-  overflow-y: auto !important;
-  padding: 4px !important;
-}
-
-.run-history-compact .v-btn {
-  font-size: 0.75rem !important;
-  padding: 2px 6px !important;
-}
-
-/* General density improvements */
-.v-application .v-input--dense .v-input__control {
-  min-height: 32px !important;
-}
-
-.solara-markdown p { 
-  margin-bottom: 4px !important; 
-}
-
-/* Button hierarchy */
-.v-btn.v-btn--text {
-  text-transform: none !important;
-}
-
-/* Numeric display */
-.numeric-display {
-  font-family: 'Roboto Mono', monospace !important;
-  font-weight: 500 !important;
-}
-
-/* Dialog fixes - prevent unwanted scrollbars */
-.v-dialog .v-card {
-  overflow: visible !important;
-}
-
-.v-dialog .v-card__text {
-  overflow: visible !important;
-}
-"""
+# Research Lab Design System CSS - Moved to assets/style.css
 
 # --- Components ---
 
@@ -192,24 +62,27 @@ def SimulationController():
 
 @solara.component
 def MetricCard(label: str, value: str, color_variant: str = "primary"):
-    """Display a primary metric with visual hierarchy.
+    """Display a primary metric with visual hierarchy."""
+    # Custom compact styling via CSS classes or inline style
+    style = "padding: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: white;"
+    border = (
+        "4px solid #1976D2"
+        if color_variant == "primary"
+        else "4px solid #4CAF50"
+        if color_variant == "success"
+        else "4px solid #FF9800"
+    )
 
-    Args:
-        label: Metric label (e.g., "Final Compliance")
-        value: Formatted value (e.g., "87.5%")
-        color_variant: "primary", "success", or "warning"
-    """
-    classes = ["metric-card"]
-    if color_variant != "primary":
-        classes.append(color_variant)
-
-    with solara.Card(classes=classes):
+    with solara.Column(style=f"{style} border-left: {border}; margin: 4px;"):
         solara.HTML(
             tag="div",
-            unsafe_innerHTML=f"""
-                <div class="metric-label">{label}</div>
-                <div class="metric-value">{value}</div>
-            """,
+            style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px;",
+            unsafe_innerHTML=label,
+        )
+        solara.HTML(
+            tag="div",
+            style="font-size: 1.8rem; font-weight: 500;",
+            unsafe_innerHTML=value,
         )
 
 
@@ -584,9 +457,9 @@ def RunHistoryList():
 
 
 @solara.component
-def RunGraphs(compliance_series, price_series):
+def RunGraphs(compliance_series, price_series, wealth_series):
     """Reusable component for displaying run metrics graphs."""
-    with solara.Columns([1, 1]):
+    with solara.Columns([1, 1, 1]):
         with solara.Column():
             if compliance_series:
                 fig = _create_time_series_figure(
@@ -602,6 +475,12 @@ def RunGraphs(compliance_series, price_series):
                 solara.FigureMatplotlib(fig)
             else:
                 solara.Markdown("No Data")
+
+        with solara.Column():
+            if wealth_series and wealth_series[0]:
+                WealthDivergencePlot(*wealth_series)
+            else:
+                solara.Markdown("No Wealth Data")
 
 
 def _create_time_series_figure(data, label, color, ylim=None):
@@ -619,12 +498,7 @@ def _create_time_series_figure(data, label, color, ylim=None):
     from matplotlib.figure import Figure
 
     # Color mapping for research lab aesthetic
-    color_map = {
-        "green": "#4CAF50",
-        "blue": "#2196F3",
-        "red": "#F44336",
-        "orange": "#FF9800",
-    }
+    color_map = CHART_COLOR_MAP
     plot_color = color_map.get(color, color)
 
     # Larger figure for better readability
@@ -682,19 +556,33 @@ def AnalysisPanel():
             return (
                 active_sim.compliance_history.value,
                 active_sim.price_history.value,
+                (
+                    active_sim.wealth_history_compliant.value,
+                    active_sim.wealth_history_non_compliant.value,
+                ),
             )
         elif run and run.steps:
             compliance = []
             prices = []
+            w_comp = []
+            w_non = []
             for s in run.steps:
+                # Compliance & Price
                 compliant_count = sum(1 for a in s.agents if a.is_compliant)
                 total = len(s.agents)
                 compliance.append(compliant_count / total if total > 0 else 0)
                 prices.append(s.market.get("price", 0))
-            return compliance, prices
-        return [], []
 
-    compliance_series, price_series = solara.use_memo(
+                # Wealth
+                w_comp.append(
+                    sum(a.wealth for a in s.agents if a.is_compliant)
+                )  # AgentSnapshot has wealth
+                w_non.append(sum(a.wealth for a in s.agents if not a.is_compliant))
+
+            return compliance, prices, (w_comp, w_non)
+        return [], [], ([], [])
+
+    compliance_series, price_series, wealth_series = solara.use_memo(
         compute_time_series,
         dependencies=[run_id, active_sim.step_count.value if is_live else 0],
     )
@@ -709,7 +597,35 @@ def AnalysisPanel():
         market_supply = (
             active_sim.model.value.market.max_supply if active_sim.model.value else 0
         )
-        config = None  # Live mode uses sidebar config
+
+        # Determine config for display
+        # We need to construct a display-friendly object that mirrors the structure of SimulationConfig
+        from types import SimpleNamespace
+
+        # Helpers for nested structure
+        market_c = SimpleNamespace(token_cap=ui_config.token_cap.value)
+        audit_c = SimpleNamespace(
+            base_prob=ui_config.base_prob.value,
+            high_prob=ui_config.high_prob.value,
+            penalty_amount=ui_config.penalty.value,
+            false_negative_rate=1.0 - ui_config.signal_tpr.value,
+            false_positive_rate=ui_config.signal_fpr.value,
+        )
+        lab_c = SimpleNamespace(
+            racing_factor=ui_config.racing_factor.value,
+            capability_value=ui_config.capability_value.value,
+            reputation_sensitivity=ui_config.reputation_sensitivity.value,
+            audit_coefficient=ui_config.audit_coefficient.value,
+        )
+
+        config = SimpleNamespace(
+            steps=ui_config.steps.value,
+            n_agents=ui_config.n_agents.value,
+            market=market_c,
+            audit=audit_c,
+            lab=lab_c,
+        )
+
     else:
         step_count = len(run.steps) if run else 0
 
@@ -750,38 +666,62 @@ def AnalysisPanel():
                 MetricCard("Market Price", current_price, "primary")
 
         # SECTION 2: Run Configuration (Historical Only)
+        # SECTION 2: Run Configuration (Historical Only)
         if config is not None:
-            with solara.Card("Run Configuration"):
-                c = config
-                with solara.Columns([1, 1, 1, 1]):
-                    with solara.Column():
-                        solara.Markdown(f"**Steps:** {c.steps}")
-                        solara.Markdown(f"**Agents:** {c.n_agents}")
-                        solara.Markdown(f"**Token Cap:** {int(c.market.token_cap)}")
-                    with solara.Column():
-                        solara.Markdown(f"**Base π₀:** {c.audit.base_prob:.2%}")
-                        solara.Markdown(f"**High π₁:** {c.audit.high_prob:.2%}")
-                        solara.Markdown(f"**Penalty:** ${c.audit.penalty_amount:.0f}")
-                    with solara.Column():
-                        solara.Markdown(
-                            f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
-                        )
-                        solara.Markdown(f"**FPR:** {c.audit.false_positive_rate:.2%}")
-                        solara.Markdown(f"**Racing cr:** {c.lab.racing_factor:.2f}")
-                    with solara.Column():
-                        solara.Markdown(
-                            f"**Capability Vb:** {c.lab.capability_value:.2f}"
-                        )
-                        solara.Markdown(
-                            f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
-                        )
-                        solara.Markdown(
-                            f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
-                        )
+            with solara.Card():
+                with solara.Details("Run Configuration", expand=False):
+                    c = config
+                    with solara.lab.Tabs():
+                        with solara.lab.Tab("General"):
+                            with solara.Columns([1, 1]):
+                                with solara.Column():
+                                    solara.Markdown(f"**Steps:** {c.steps}")
+                                    solara.Markdown(f"**Agents:** {c.n_agents}")
+                                with solara.Column():
+                                    solara.Markdown(
+                                        f"**Token Cap:** {int(c.market.token_cap)}"
+                                    )
+
+                        with solara.lab.Tab("Audit Policy"):
+                            with solara.Columns([1, 1]):
+                                with solara.Column():
+                                    solara.Markdown(
+                                        f"**Base π₀:** {c.audit.base_prob:.2%}"
+                                    )
+                                    solara.Markdown(
+                                        f"**High π₁:** {c.audit.high_prob:.2%}"
+                                    )
+                                    solara.Markdown(
+                                        f"**Penalty:** ${c.audit.penalty_amount:.0f}"
+                                    )
+                                with solara.Column():
+                                    solara.Markdown(
+                                        f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
+                                    )
+                                    solara.Markdown(
+                                        f"**FPR:** {c.audit.false_positive_rate:.2%}"
+                                    )
+
+                        with solara.lab.Tab("Lab Dynamics"):
+                            with solara.Columns([1, 1]):
+                                with solara.Column():
+                                    solara.Markdown(
+                                        f"**Racing cr:** {c.lab.racing_factor:.2f}"
+                                    )
+                                    solara.Markdown(
+                                        f"**Capability Vb:** {c.lab.capability_value:.2f}"
+                                    )
+                                with solara.Column():
+                                    solara.Markdown(
+                                        f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
+                                    )
+                                    solara.Markdown(
+                                        f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
+                                    )
 
         # SECTION 3: Time Series Graphs
         with solara.Card("Time Series Analysis"):
-            RunGraphs(compliance_series, price_series)
+            RunGraphs(compliance_series, price_series, wealth_series)
 
         # SECTION 4: Timeline Slider (Historical Only) - grouped with step-specific content
         if not is_live and len(run.steps) > 0:
@@ -807,15 +747,41 @@ def AnalysisPanel():
                 )
 
         # SECTION 5: Step Analysis (Agent Graphs)
+        # SECTION 5: Step Analysis (Agent Graphs)
         if agents_df is not None and not agents_df.empty:
             with solara.Card("Step Analysis"):
                 with solara.Columns([1, 1, 1]):
                     with solara.Column():
-                        QuantitativeScatterPlot(agents_df)
+                        # Determine efficient detection p and penalty
+                        if is_live:
+                            # Live mode: use reactive UI config
+                            p_eff = ui_config.high_prob.value
+                            penalty = ui_config.penalty.value
+                        elif config:
+                            # History mode: use stored config
+                            p_eff = config.audit.high_prob
+                            penalty = config.audit.penalty_amount
+                        else:
+                            p_eff = 0
+                            penalty = 0
+
+                        if p_eff > 0:
+                            LabDecisionPlot(agents_df, p_eff, penalty)
+                        else:
+                            solara.Markdown("Deterrence Frontier (No Config)")
                     with solara.Column():
                         AuditTargetingPlot(agents_df)
                     with solara.Column():
                         PayoffByStrategyPlot(agents_df)
+
+                # Optional secondary row - Enforce 3-column grid consistency
+                with solara.Columns([1, 1, 1]):
+                    with solara.Column():
+                        QuantitativeScatterPlot(agents_df)
+                    with solara.Column():
+                        pass  # Empty placeholder for alignment
+                    with solara.Column():
+                        pass  # Empty placeholder for alignment
 
             # SECTION 6: Agent Details Table
             with solara.Card("Agent Details"):
@@ -1016,7 +982,7 @@ def LoadingState():
 @solara.component
 def Page():
     # Inject CSS
-    solara.Style(DENSITY_CSS)
+    solara.Style(Path(__file__).parent / "assets" / "style.css")
 
     # Initialize if needed
     if active_sim.model.value is None:

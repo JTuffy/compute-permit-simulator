@@ -1,0 +1,149 @@
+/* Hide Solara watermark */
+footer {
+    display: none !important;
+}
+
+/* Color Palette - Research Lab Theme */
+:root {
+    --lab-primary: #2196F3;
+    --lab-success: #4CAF50;
+    --lab-warning: #FF9800;
+    --lab-error: #F44336;
+    --lab-input-bg: #F5F7FA;
+    --lab-output-bg: #FFFFFF;
+    --lab-metric-bg: #E3F2FD;
+    --lab-spacing-tight: 4px;
+    --lab-spacing-normal: 8px;
+    --lab-spacing-loose: 16px;
+}
+
+/* Left Panel: Compact Control Panel Style */
+.sidebar-compact .v-card {
+    margin-bottom: 8px !important;
+    background: var(--lab-input-bg) !important;
+    border-radius: 4px !important;
+}
+
+.sidebar-compact .v-input {
+    margin-bottom: 2px !important;
+    font-size: 0.85rem !important;
+}
+
+.sidebar-compact .v-card__text {
+    padding: 6px 10px !important;
+}
+
+.sidebar-compact .v-card__title {
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    opacity: 0.7 !important;
+    padding: 6px 10px !important;
+    font-weight: 600 !important;
+}
+
+.sidebar-compact .v-label {
+    font-size: 0.85rem !important;
+}
+
+/* Compact tab styling */
+.sidebar-compact .v-tab {
+    font-size: 0.8rem !important;
+    min-width: 60px !important;
+    padding: 0 8px !important;
+}
+
+/* Right Panel: Spacious Analytical Readout */
+.analysis-panel {
+    padding: 24px !important;
+}
+
+.analysis-panel .v-card {
+    margin-bottom: 20px !important;
+}
+
+.analysis-panel .v-card__title {
+    font-size: 1.1rem !important;
+    padding: 12px 16px !important;
+    font-weight: 600 !important;
+}
+
+.analysis-panel .v-card__text {
+    padding: 16px !important;
+}
+
+/* Metric Cards */
+.metric-card {
+    padding: 8px 12px !important;
+    background: var(--lab-metric-bg) !important;
+    border-left: 3px solid var(--lab-primary) !important;
+    border-radius: 4px !important;
+    margin-bottom: 8px !important;
+}
+
+.metric-card.success {
+    border-left-color: var(--lab-success) !important;
+    background: #E8F5E9 !important;
+}
+
+.metric-card.warning {
+    border-left-color: var(--lab-warning) !important;
+    background: #FFF3E0 !important;
+}
+
+.metric-value {
+    font-size: 1.4rem !important;
+    font-family: 'Roboto Mono', monospace !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+    margin-bottom: 2px !important;
+}
+
+.metric-label {
+    font-size: 0.65rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    opacity: 0.6 !important;
+    font-weight: 600 !important;
+}
+
+/* Compact Run History */
+.run-history-compact {
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    padding: 4px !important;
+}
+
+.run-history-compact .v-btn {
+    font-size: 0.75rem !important;
+    padding: 2px 6px !important;
+}
+
+/* General density improvements */
+.v-application .v-input--dense .v-input__control {
+    min-height: 32px !important;
+}
+
+.solara-markdown p {
+    margin-bottom: 4px !important;
+}
+
+/* Button hierarchy */
+.v-btn.v-btn--text {
+    text-transform: none !important;
+}
+
+/* Numeric display */
+.numeric-display {
+    font-family: 'Roboto Mono', monospace !important;
+    font-weight: 500 !important;
+}
+
+/* Dialog fixes - prevent unwanted scrollbars */
+.v-dialog .v-card {
+    overflow: visible !important;
+}
+
+.v-dialog .v-card__text {
+    overflow: visible !important;
+}

@@ -104,6 +104,20 @@ class SimulationEngine:
             model.market.current_price
         ]
 
+        # Update wealth history (Total wealth by group)
+        compliant_wealth = sum(
+            a.get("wealth", 0) for a in agents if a.get("is_compliant", False)
+        )
+        non_compliant_wealth = sum(
+            a.get("wealth", 0) for a in agents if not a.get("is_compliant", False)
+        )
+        self.active.wealth_history_compliant.value = (
+            self.active.wealth_history_compliant.value + [compliant_wealth]
+        )
+        self.active.wealth_history_non_compliant.value = (
+            self.active.wealth_history_non_compliant.value + [non_compliant_wealth]
+        )
+
         logger.info(
             f"Step {step_num} complete. Price: {model.market.current_price:.2f}, Compliance: {compliance:.2%}"
         )
@@ -138,18 +152,20 @@ class SimulationEngine:
                 if config and self.active.step_count.value >= config.steps:
                     logger.info("Step limit reached in play loop")
                     self.pack_current_run()
+                    # Safe to update state here as we are not cancelling
+                    self.active.is_playing.set(False)
                     break
 
                 self.step()
                 await asyncio.sleep(0.05)
 
         except asyncio.CancelledError:
-            logger.info("Play loop cancelled")
-            pass
+            # DO NOT update reactive state here.
+            # Just acknowledge and exit.
+            logger.debug("Play loop task cancelled gracefully.")
+            raise
         except Exception as e:
             logger.error(f"Error in play loop: {e}", exc_info=True)
-            self.active.is_playing.set(False)
-        finally:
             self.active.is_playing.set(False)
 
     def pack_current_run(self) -> None:
@@ -177,6 +193,12 @@ class SimulationEngine:
             update={"seed": self.active.actual_seed.value}
         )
 
+        # Calculate Regulator Metrics
+        total_audits = sum(len(step.audit) for step in self.active.current_run_steps)
+        # Use simple constant cost for now, or read from config if added later.
+        audit_cost_per_unit = getattr(model.config.audit, "cost", 1.0)
+        total_enforcement_cost = total_audits * audit_cost_per_unit
+
         run = SimulationRun(
             id=f"run_{timestamp}",
             config=final_config,
@@ -184,6 +206,8 @@ class SimulationEngine:
             metrics={
                 "final_compliance": final_compliance,
                 "final_price": model.market.current_price,
+                "total_enforcement_cost": total_enforcement_cost,
+                "deterrence_success_rate": final_compliance,  # Using compliance as proxy
             },
         )
 

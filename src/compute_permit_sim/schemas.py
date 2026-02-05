@@ -3,6 +3,29 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+from compute_permit_sim.core.constants import (
+    DEFAULT_AUDIT_BACKCHECK_PROB,
+    DEFAULT_AUDIT_BASE_PROB,
+    DEFAULT_AUDIT_FALSE_NEG_RATE,
+    DEFAULT_AUDIT_FALSE_POS_RATE,
+    DEFAULT_AUDIT_HIGH_PROB,
+    DEFAULT_AUDIT_PENALTY_AMOUNT,
+    DEFAULT_AUDIT_WHISTLEBLOWER_PROB,
+    DEFAULT_LAB_AUDIT_COEFFICIENT,
+    DEFAULT_LAB_CAPABILITY_VALUE,
+    DEFAULT_LAB_CAPACITY_MAX,
+    DEFAULT_LAB_CAPACITY_MIN,
+    DEFAULT_LAB_ECON_VALUE_MAX,
+    DEFAULT_LAB_ECON_VALUE_MIN,
+    DEFAULT_LAB_RACING_FACTOR,
+    DEFAULT_LAB_REPUTATION_SENSITIVITY,
+    DEFAULT_LAB_RISK_PROFILE_MAX,
+    DEFAULT_LAB_RISK_PROFILE_MIN,
+    DEFAULT_SCENARIO_N_AGENTS,
+    DEFAULT_SCENARIO_STEPS,
+)
+
+
 class AuditConfig(BaseModel):
     """Configuration for audit policies (The Auditor).
 
@@ -16,25 +39,39 @@ class AuditConfig(BaseModel):
     """
 
     base_prob: float = Field(
-        ..., ge=0, le=1, description="Base audit probability (pi_0)"
+        DEFAULT_AUDIT_BASE_PROB, ge=0, le=1, description="Base audit probability (pi_0)"
     )
     high_prob: float = Field(
-        ..., ge=0, le=1, description="High suspicion audit probability (pi_1)"
+        DEFAULT_AUDIT_HIGH_PROB,
+        ge=0,
+        le=1,
+        description="High suspicion audit probability (pi_1)",
     )
     false_positive_rate: float = Field(
-        ..., ge=0, le=1, description="P(signal=1 | compliant) — alpha"
+        DEFAULT_AUDIT_FALSE_POS_RATE,
+        ge=0,
+        le=1,
+        description="P(signal=1 | compliant) — alpha",
     )
     false_negative_rate: float = Field(
-        ..., ge=0, le=1, description="P(signal=0 | non-compliant) — 1 - beta"
+        DEFAULT_AUDIT_FALSE_NEG_RATE,
+        ge=0,
+        le=1,
+        description="P(signal=0 | non-compliant) — 1 - beta",
     )
     penalty_amount: float = Field(
-        ..., ge=0, description="Effective penalty amount (P = fine phi)"
+        DEFAULT_AUDIT_PENALTY_AMOUNT,
+        ge=0,
+        description="Effective penalty amount (P = fine phi)",
     )
     backcheck_prob: float = Field(
-        0.0, ge=0, le=1, description="Backcheck probability (p_b)"
+        DEFAULT_AUDIT_BACKCHECK_PROB,
+        ge=0,
+        le=1,
+        description="Backcheck probability (p_b)",
     )
     whistleblower_prob: float = Field(
-        0.0,
+        DEFAULT_AUDIT_WHISTLEBLOWER_PROB,
         ge=0,
         le=1,
         description="Probability of detection by whistleblower (p_w)",
@@ -72,27 +109,39 @@ class LabConfig(BaseModel):
     for these can be added by converting to min/max ranges later.
     """
 
-    economic_value_min: float = 0.5
-    economic_value_max: float = 1.5
-    risk_profile_min: float = 0.8
-    risk_profile_max: float = 1.2
+    economic_value_min: float = DEFAULT_LAB_ECON_VALUE_MIN
+    economic_value_max: float = DEFAULT_LAB_ECON_VALUE_MAX
+    risk_profile_min: float = DEFAULT_LAB_RISK_PROFILE_MIN
+    risk_profile_max: float = DEFAULT_LAB_RISK_PROFILE_MAX
     capacity_min: float = Field(
-        1.0, ge=0, description="Min compute capacity (q_max) for agent generation"
+        DEFAULT_LAB_CAPACITY_MIN,
+        ge=0,
+        description="Min compute capacity (q_max) for agent generation",
     )
     capacity_max: float = Field(
-        2.0, ge=0, description="Max compute capacity (q_max) for agent generation"
+        DEFAULT_LAB_CAPACITY_MAX,
+        ge=0,
+        description="Max compute capacity (q_max) for agent generation",
     )
     capability_value: float = Field(
-        0.0, ge=0, description="V_b: baseline value of model capabilities from training"
+        DEFAULT_LAB_CAPABILITY_VALUE,
+        ge=0,
+        description="V_b: baseline value of model capabilities from training",
     )
     racing_factor: float = Field(
-        1.0, ge=0, description="c_r: urgency multiplier on capability value"
+        DEFAULT_LAB_RACING_FACTOR,
+        ge=0,
+        description="c_r: urgency multiplier on capability value",
     )
     reputation_sensitivity: float = Field(
-        0.0, ge=0, description="R: perceived reputation cost if caught"
+        DEFAULT_LAB_REPUTATION_SENSITIVITY,
+        ge=0,
+        description="R: perceived reputation cost if caught",
     )
     audit_coefficient: float = Field(
-        1.0, ge=0, description="c(i): firm-specific audit rate scaling"
+        DEFAULT_LAB_AUDIT_COEFFICIENT,
+        ge=0,
+        description="c(i): firm-specific audit rate scaling",
     )
 
     model_config = ConfigDict(frozen=True)
@@ -103,8 +152,8 @@ class ScenarioConfig(BaseModel):
 
     name: str = "Scenario"
     description: str = ""
-    n_agents: int = Field(5, gt=0)
-    steps: int = Field(10, gt=0)
+    n_agents: int = Field(DEFAULT_SCENARIO_N_AGENTS, gt=0)
+    steps: int = Field(DEFAULT_SCENARIO_STEPS, gt=0)
 
     # Sub-configs
     audit: AuditConfig
@@ -129,6 +178,8 @@ class AgentSnapshot(BaseModel):
     was_caught: bool = Field(..., description="Caught cheating this step")
     penalty_amount: float = Field(..., description="Penalty applied this step")
     revenue: float = Field(..., description="Gross economic value generated")
+    economic_value: float = Field(..., description="Agent's base economic value (v_i)")
+    risk_profile: float = Field(..., description="Agent's risk profile")
     step_profit: float = Field(..., description="Net profit/loss this step")
     wealth: float = Field(..., description="Cumulative wealth")
 

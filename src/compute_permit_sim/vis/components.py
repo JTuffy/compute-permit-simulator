@@ -244,3 +244,123 @@ def PayoffByStrategyPlot(agents_df):
 
     fig.tight_layout()
     solara.FigureMatplotlib(fig)
+
+
+@solara.component
+def LabDecisionPlot(agents_df, audit_prob: float, penalty: float):
+    """Scatter plot of Economic Value vs Risk Profile with Deterrence Frontier.
+
+    Theoretical Frontier: p * B = g
+    (penalty * detection_prob * risk_profile) = economic_value
+
+    Rearranging for y=risk_profile:
+    risk_profile = economic_value / (penalty * detection_prob)
+
+    Args:
+        agents_df: DataFrame containing agent state.
+        audit_prob: Current effective detection probability.
+        penalty: Current penalty amount.
+    """
+    import numpy as np
+    from compute_permit_sim.core.constants import CHART_COLOR_MAP
+
+    if agents_df is None or agents_df.empty:
+        solara.Markdown("No Agent Data")
+        return
+
+    # Check required columns
+    required_cols = ["economic_value", "risk_profile", "is_compliant"]
+    if not all(col in agents_df.columns for col in required_cols):
+        solara.Markdown(
+            "Missing data for decision plot (need economic_value/risk_profile)."
+        )
+        return
+
+    # Create Figure
+    fig = Figure(figsize=(6, 5), dpi=100)
+    ax = fig.subplots()
+
+    # Extract data
+    x = agents_df["economic_value"]
+    y = agents_df["risk_profile"]
+
+    colors = agents_df["is_compliant"].map(
+        {True: CHART_COLOR_MAP["green"], False: CHART_COLOR_MAP["red"]}
+    )
+
+    ax.scatter(x, y, c=colors, alpha=0.7, edgecolors="w", s=80)
+
+    # Deterrence Line
+    # y = x / (penalty * audit_prob)
+    if penalty > 0 and audit_prob > 0:
+        x_line = np.linspace(x.min(), x.max(), 100)
+        y_line = x_line / (penalty * audit_prob)
+        ax.plot(x_line, y_line, color="gray", linestyle="--", label="Indifference Line")
+
+    ax.set_xlabel("Economic Value (Incentive)")
+    ax.set_ylabel("Risk Profile (Sensitivity)")
+    ax.set_title("Deterrence Frontier")
+    ax.grid(True, alpha=0.3)
+
+    # Styling
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend()
+
+    solara.FigureMatplotlib(fig)
+
+
+@solara.component
+def WealthDivergencePlot(
+    compliant_history: list[float], non_compliant_history: list[float]
+):
+    """Line chart showing Total Wealth of Compliant vs Non-Compliant agents over time.
+
+    Also tracks the "Criminal Premium" (Wealth Gap).
+    """
+    import numpy as np
+    from compute_permit_sim.core.constants import CHART_COLOR_MAP
+    from matplotlib.figure import Figure
+
+    # Guard against empty data
+    if not compliant_history and not non_compliant_history:
+        solara.Markdown("No Wealth Data")
+        return
+
+    # Create figure
+    fig = Figure(figsize=(8, 4), dpi=100)
+    ax = fig.subplots()
+
+    steps = list(range(1, len(compliant_history) + 1))
+
+    # Plot lines
+    ax.plot(
+        steps,
+        compliant_history,
+        label="Compliant Total Wealth",
+        color=CHART_COLOR_MAP["green"],
+        linewidth=2.5,
+        alpha=0.9,
+    )
+    ax.plot(
+        steps,
+        non_compliant_history,
+        label="Non-Compliant Total Wealth",
+        color=CHART_COLOR_MAP["red"],
+        linewidth=2.5,
+        alpha=0.9,
+    )
+
+    # Styling
+    ax.set_xlabel("Step", fontsize=10)
+    ax.set_ylabel("Total Wealth ($)", fontsize=10)
+    ax.set_title("Wealth Divergence: Does Crime Pay?")
+    ax.legend(loc="upper left")
+    ax.grid(True, alpha=0.25, linestyle="--")
+
+    # Cleaner spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    fig.tight_layout()
+    solara.FigureMatplotlib(fig)
