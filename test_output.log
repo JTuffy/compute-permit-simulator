@@ -1,0 +1,7 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0 -- C:\source\aisc-cm-simulator\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\source\aisc-cm-simulator
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collecting ... 

@@ -3,13 +3,15 @@
 from compute_permit_sim.core.agents import Lab
 from compute_permit_sim.core.enforcement import Auditor
 from compute_permit_sim.core.market import SimpleClearingMarket
-
-from compute_permit_sim.schemas import AuditConfig
+from compute_permit_sim.schemas import AuditConfig, LabConfig
 
 
 def test_lab_initialization():
     """Verify that a Lab agent correctly initializes with provided values and defaults."""
-    lab = Lab(lab_id=1, economic_value=1.5)
+    lab_config = LabConfig()
+    lab = Lab(
+        lab_id=1, config=lab_config, economic_value=1.5, risk_profile=1.0, capacity=2.0
+    )
     assert lab.lab_id == 1
     assert lab.economic_value == 1.5
     assert lab.is_compliant is True

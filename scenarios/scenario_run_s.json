@@ -1,0 +1,34 @@
+{
+  "name": "Marginal Deterrence (Knife-Edge)",
+  "description": "",
+  "n_agents": 20,
+  "steps": 10,
+  "audit": {
+    "base_prob": 0.05,
+    "high_prob": 0.7,
+    "false_positive_rate": 0.12,
+    "false_negative_rate": 0.15000000000000002,
+    "penalty_amount": 2.0,
+    "backcheck_prob": 0.0,
+    "whistleblower_prob": 0.0,
+    "cost": 1.0,
+    "max_audits_per_step": null
+  },
+  "market": {
+    "token_cap": 15.0,
+    "fixed_price": null
+  },
+  "lab": {
+    "economic_value_min": 1.0,
+    "economic_value_max": 4.0,
+    "risk_profile_min": 0.6,
+    "risk_profile_max": 1.4,
+    "capacity_min": 1.0,
+    "capacity_max": 4.0,
+    "capability_value": 1.0,
+    "racing_factor": 1.5,
+    "reputation_sensitivity": 0.5,
+    "audit_coefficient": 1.0
+  },
+  "seed": 2001
+}

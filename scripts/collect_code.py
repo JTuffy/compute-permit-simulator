@@ -9,8 +9,8 @@ Output:
 """
 
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Root directory of the project
 ROOT = Path(__file__).parent.parent

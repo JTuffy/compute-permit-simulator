@@ -15,6 +15,7 @@ DEFAULT_AUDIT_FALSE_NEG_RATE = 0.0  # 1 - beta
 DEFAULT_AUDIT_PENALTY_AMOUNT = 1.0  # phi (fixed amount for MVP)
 DEFAULT_AUDIT_BACKCHECK_PROB = 0.0  # p_b
 DEFAULT_AUDIT_WHISTLEBLOWER_PROB = 0.0  # p_w
+DEFAULT_AUDIT_COST = 1.0  # Cost per audit for regulator
 
 # --- Market Defaults ---
 DEFAULT_MARKET_TOKEN_CAP = 20.0
@@ -35,6 +36,27 @@ DEFAULT_LAB_AUDIT_COEFFICIENT = 1.0  # c(i)
 # --- Scenario Defaults ---
 DEFAULT_SCENARIO_N_AGENTS = 50
 DEFAULT_SCENARIO_STEPS = 10
+
+
+# --- Dataframe Column Names (Strong Typing) ---
+class ColumnNames:
+    """Strongly typed column names for AgentSnapshot DataFrames."""
+
+    ID = "id"
+    CAPACITY = "capacity"
+    HAS_PERMIT = "has_permit"
+    USED_COMPUTE = "used_compute"
+    REPORTED_COMPUTE = "reported_compute"
+    IS_COMPLIANT = "is_compliant"
+    WAS_AUDITED = "was_audited"
+    WAS_CAUGHT = "was_caught"
+    PENALTY_AMOUNT = "penalty_amount"
+    REVENUE = "revenue"
+    ECONOMIC_VALUE = "economic_value"
+    RISK_PROFILE = "risk_profile"
+    STEP_PROFIT = "step_profit"
+    WEALTH = "wealth"
+
 
 # --- UI / Visualization / CSS Colors ---
 # Research Lab Theme

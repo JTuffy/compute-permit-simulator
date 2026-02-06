@@ -1,91 +1,76 @@
 # Compute Permit Market Simulator
 
-A simulation of an AI Compute Permit Market, modeling the interactions between **AI Labs** (Firms) and a **Auditor** (Regulator) in an environment with audit mechanisms and penalties.
+> **A Multi-Agent Simulation of AI Compute Regulation, Compliance, and Deterrence.**
 
-## Overview
+This project models the strategic interaction between **AI Labs** (seeking to maximize profit by training models) and an **Auditor** (seeking to enforce compute permit limits). It serves as a computational playground to explore the conditions under which regulation succeeds or fails.
 
-This project simulates a market for "compute permits" where:
-1.  **Labs** decide whether to comply (buy permits) or defect (train without permits) based on their value, costs, and the expected penalty of being caught.
-2.  **Market** determines the clearing price for permits based on aggregate demand.
-3.  **Auditor** monitors for signals of non-compliance and launches targeted audits ($pi_1$) or random audits ($pi_0$) to enforce the cap.
+[![Pipeline](https://gitlab.com/aisc-cm-simulator/badges/main/pipeline.svg)](https://gitlab.com/aisc-cm-simulator/pipelines)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The simulation explores the **Deterrence Model**: under what conditions (Penalty $P$, Detection Probability $p$) do rational agents choose compliance?
+## 🚀 Quick Start
 
-## Installation
+The simulator provides an interactive web dashboard for real-time experimentation.
 
-This project uses `uv` for dependency management.
+### Prerequisites
 
-1.  **Install `uv`** (if not already installed):
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
+- Python 3.13+
+- [uv](https://astral.sh/uv) (recommended for dependency management)
 
-2.  **Sync Dependencies**:
-    ```bash
-    uv sync
-    ```
+### Installation
 
-## Usage
+```bash
+# 1. Install uv (if needed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-### Interactive Dashboard (Solara)
-Launch the web-based interactive dashboard to adjust parameters ($P$, $p$, $Q$, $N$) in real-time, load scenarios, and visualize Compliance/Price trends:
+# 2. Clone and Sync
+git clone https://gitlab.com/your-org/aisc-cm-simulator.git
+cd aisc-cm-simulator
+uv sync
+```
+
+## 🎮 Usage
+
+### Interactive Dashboard
+Launch the visualization dashboard to explore the model interactively.
 
 ```bash
 uv run solara run app.py
 ```
 
-**Features:**
--   **Live Simulation**: Play/Pause, Step-by-step execution.
--   **Scenario Management**: Load predefined scenarios (Baseline, High Risk, Strict Audit) or save your own experiments.
--   **Quantitative Risk Analysis**: Scatter plots of True vs. Reported compute.
--   **Agent Inspection**: Detailed view of each agent's state, wealth, and audit status.
+**Key Features:**
+- **Scenario Control**: Adjust penalty ($P$), detection prob ($p$), and audit capacity ($N$) on the fly.
+- **Real-time Analysis**: Watch compliance rates and market prices evolve.
+- **Agent Inspector**: Drill down into individual lab behaviors and audit history.
 
-### Command Line Simulation
-Run the standard scenarios defined in `scenarios/` via CLI:
+### CLI Simulation
+Run headless simulations for bulk data collection.
 
 ```bash
 uv run main.py
 ```
 
-### Deterrence Heatmap
-Generate a static heatmap showing Compliance Rate across a grid of Penalty vs. Detection Probability:
+---
 
-```bash
-uv run src/compute_permit_sim/vis/heatmap.py
-```
-*Output saved to `deterrence_heatmap.png`.*
+## 🛠️ Development
 
-## Project Structure
+We use `uv` for all development tasks to ensure reproducibility.
 
-```text
-src/compute_permit_sim/
-├── domain/                    # core business logic
-│   ├── agents.py              # Lab compliance logic (decision rule)
-│   ├── market.py              # Permit market clearing mechanism
-│   └── enforcement.py         # Auditor audit & signal logic
-├── infrastructure/            # simulation framework
-│   ├── model.py               # Mesa model & step scheduler
-│   ├── config_manager.py      # Scenario I/O and Validation
-│   └── data_collect.py        # Metrics collection
-├── vis/                       # visualization
-│   ├── solara_app.py          # Interactive dashboard logic
-│   ├── state.py               # Reactive state management
-│   └── heatmap.py             # Static diagrams
-└── schemas.py                 # Pydantic configuration models
-```
+| Task | Command |
+|------|---------|
+| **Run Tests** | `uv run pytest` |
+| **Lint** | `uv run ruff check .` |
+| **Format** | `uv run ruff format .` |
+| **Type Check** | `uv run mypy .` |
 
-## Development
+### CI/CD Pipeline
+This project includes a GitLab CI/CD pipeline that:
+1.  **Tests**: Runs `pytest` on every commit.
+2.  **Deploys**: Builds the Solara app (WASM) to GitLab Pages on merge to `main`.
 
-We enforce strict code quality using `ruff`.
+---
 
--   **Lint**: `uv run ruff check .`
--   **Format**: `uv run ruff format .`
+## 📚 Documentation
 
-### Key Concepts
+For deep technical details on the architecture, decision logic, and mesa model structure, see:
+👉 [**Technical Documentation**](TECHNICAL_DOCUMENTATION.md)
 
--   **Decision Rule**: Labs run without a permit if $v_i - c > E[Penalty]$.
--   **Expected Penalty**: $P \times p_{eff}$, where effective detection depends on the Auditor's signal quality ($\alpha, \beta$) and audit strategy.
--   **Scenarios**:
-    1.  **Baseline**: Standard balanced parameters.
-    2.  **High Risk**: High racing incentives, harder to deter.
-    3.  **Strict Audit**: High penalties and accurate signals.

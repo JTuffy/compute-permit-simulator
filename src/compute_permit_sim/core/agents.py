@@ -8,6 +8,10 @@ Implements the standard deterrence model:
 """
 
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..schemas import LabConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,37 +36,31 @@ class Lab:
     def __init__(
         self,
         lab_id: int,
+        config: "LabConfig",
         economic_value: float,
-        risk_profile: float = 1.0,
-        capacity: float = 1.0,
-        capability_value: float = 0.0,
-        racing_factor: float = 1.0,
-        reputation_sensitivity: float = 0.0,
-        audit_coefficient: float = 1.0,
+        risk_profile: float,
+        capacity: float,
     ) -> None:
         """Initialize the Lab.
 
         Args:
-            lab_id: Unique integer identifier for this AI Lab.
-            economic_value: Base economic value (v_i) generated from a training run.
-            risk_profile: Multiplier for perceived penalty (>1: risk-averse, <1: risk-seeking).
-            capacity: Maximum compute capacity (q_max) for this lab.
-            capability_value: Internal model capability value (V_b) gained from training.
-            racing_factor: Urgency multiplier (c_r) scaling the capability gain.
-            reputation_sensitivity: Perceived cost of reputation loss (R) if caught violating.
-            audit_coefficient: Firm-specific audit probability scaling factor c(i).
-
-        Returns:
-            None
+            lab_id: Unique integer identifier.
+            config: Static configuration shared across labs.
+            economic_value: Generated economic value (v_i).
+            risk_profile: Generated risk profile.
+            capacity: Generated capacity (q_max).
         """
         self.lab_id: int = lab_id
         self.economic_value: float = economic_value
         self.risk_profile: float = risk_profile
         self.capacity: float = capacity
-        self.capability_value: float = capability_value
-        self.racing_factor: float = racing_factor
-        self.reputation_sensitivity: float = reputation_sensitivity
-        self.audit_coefficient: float = audit_coefficient
+
+        # Static params from config
+        self.capability_value: float = config.capability_value
+        self.racing_factor: float = config.racing_factor
+        self.reputation_sensitivity: float = config.reputation_sensitivity
+        self.audit_coefficient: float = config.audit_coefficient
+
         self.is_compliant: bool = True
         self.has_permit: bool = False
 

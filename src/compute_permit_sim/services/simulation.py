@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 from compute_permit_sim.schemas import (
+    MarketSnapshot,
     SimulationRun,
     StepResult,
 )
@@ -54,10 +55,18 @@ class SimulationEngine:
         logger.info("Resetting simulation model")
         scenario_config = self.config.to_scenario_config()
 
+        # Dynamic Seeding: If no seed provided in config, generate one now.
+        if scenario_config.seed is None:
+            import random
+
+            generated_seed = random.randint(1000, 999999)
+            scenario_config.seed = generated_seed
+            logger.info(f"Auto-generated run seed: {generated_seed}")
+
         model = ComputePermitModel(scenario_config)
         self.active.model.value = model
 
-        # Capture actua seed used by Mesa (for reproducibility)
+        # Capture actual seed used by Mesa (for reproducibility)
         # Mesa 3.x stores it in self._seed
         actual_seed = getattr(model, "_seed", None)
         self.active.actual_seed.value = actual_seed
@@ -87,16 +96,12 @@ class SimulationEngine:
         self.active.step_count.value = step_num
 
         # Get agent data
-        agents = model.get_agent_snapshots()  # Returns list[dict] with snake_case keys
-        self.active.agents_df.value = pd.DataFrame(agents)
+        agents = model.get_agent_snapshots()  # Returns list[AgentSnapshot]
+        self.active.agents_df.value = pd.DataFrame([a.model_dump() for a in agents])
 
         # Update time series
-        # Ensure we access the correct key "is_compliant"
-        compliance = (
-            sum(a.get("is_compliant", False) for a in agents) / len(agents)
-            if agents
-            else 0
-        )
+        # Access Pydantic model attributes directly
+        compliance = sum(a.is_compliant for a in agents) / len(agents) if agents else 0
         self.active.compliance_history.value = self.active.compliance_history.value + [
             compliance
         ]
@@ -105,12 +110,8 @@ class SimulationEngine:
         ]
 
         # Update wealth history (Total wealth by group)
-        compliant_wealth = sum(
-            a.get("wealth", 0) for a in agents if a.get("is_compliant", False)
-        )
-        non_compliant_wealth = sum(
-            a.get("wealth", 0) for a in agents if not a.get("is_compliant", False)
-        )
+        compliant_wealth = sum(a.wealth for a in agents if a.is_compliant)
+        non_compliant_wealth = sum(a.wealth for a in agents if not a.is_compliant)
         self.active.wealth_history_compliant.value = (
             self.active.wealth_history_compliant.value + [compliant_wealth]
         )
@@ -125,10 +126,10 @@ class SimulationEngine:
         # Store step result using Pydantic schema
         step_res = StepResult(
             step=self.active.step_count.value,
-            market={
-                "price": model.market.current_price,
-                "supply": model.market.max_supply,
-            },
+            market=MarketSnapshot(
+                price=model.market.current_price,
+                supply=model.market.max_supply,
+            ),
             agents=agents,  # StepResult agents is list[AgentSnapshot]
             audit=[],
         )
@@ -180,9 +181,7 @@ class SimulationEngine:
         # Calculate final metrics
         agents = model.get_agent_snapshots()
         final_compliance = (
-            sum(a.get("is_compliant", False) for a in agents) / len(agents)
-            if agents
-            else 0
+            sum(a.is_compliant for a in agents) / len(agents) if agents else 0
         )
 
         # Ensure config has the ACTUAL seed used
@@ -196,22 +195,66 @@ class SimulationEngine:
         # Calculate Regulator Metrics
         total_audits = sum(len(step.audit) for step in self.active.current_run_steps)
         # Use simple constant cost for now, or read from config if added later.
-        audit_cost_per_unit = getattr(model.config.audit, "cost", 1.0)
+        audit_cost_per_unit = model.config.audit.cost
         total_enforcement_cost = total_audits * audit_cost_per_unit
+
+        import hashlib
+        import json
+
+        # We need to recreate the exact dict structure used in solara_app.py
+        c = final_config
+        # Use strongly typed UrlConfig
+        from compute_permit_sim.schemas import UrlConfig
+
+        run_state = UrlConfig(
+            n_agents=c.n_agents,
+            steps=c.steps,
+            token_cap=c.market.token_cap,
+            seed=c.seed,
+            penalty=c.audit.penalty_amount,
+            base_prob=c.audit.base_prob,
+            high_prob=c.audit.high_prob,
+            signal_fpr=c.audit.false_positive_rate,
+            signal_tpr=1.0 - c.audit.false_negative_rate,
+            backcheck_prob=c.audit.backcheck_prob,
+            audit_cost=c.audit.cost,
+            ev_min=c.lab.economic_value_min,
+            ev_max=c.lab.economic_value_max,
+            risk_min=c.lab.risk_profile_min,
+            risk_max=c.lab.risk_profile_max,
+            cap_min=c.lab.capacity_min,
+            cap_max=c.lab.capacity_max,
+            vb=c.lab.capability_value,
+            cr=c.lab.racing_factor,
+            rep=c.lab.reputation_sensitivity,
+            audit_coeff=c.lab.audit_coefficient,
+        ).model_dump(exclude_none=True)
+
+        # Compute SHA-256 Hash
+        json_bytes = json.dumps(run_state, sort_keys=True).encode("utf-8")
+        full_hash = hashlib.sha256(json_bytes).hexdigest()
+        short_hash = full_hash[:8]
+
+        # Use simpler timestamp for display ID, but store sim_id as short hash
+        from compute_permit_sim.schemas import RunMetrics
 
         run = SimulationRun(
             id=f"run_{timestamp}",
+            sim_id=short_hash,
             config=final_config,
             steps=self.active.current_run_steps.copy(),
-            metrics={
-                "final_compliance": final_compliance,
-                "final_price": model.market.current_price,
-                "total_enforcement_cost": total_enforcement_cost,
-                "deterrence_success_rate": final_compliance,  # Using compliance as proxy
-            },
+            metrics=RunMetrics(
+                final_compliance=final_compliance,
+                final_price=model.market.current_price,
+                total_enforcement_cost=total_enforcement_cost,
+                deterrence_success_rate=final_compliance,
+            ),
         )
 
         self.history.add_run(run)
+
+        # Auto-select to show results immediately (reveals slider)
+        self.history.select_run(run)
 
     def load_scenario(self, filename: str) -> None:
         """Load a scenario from a JSON file."""

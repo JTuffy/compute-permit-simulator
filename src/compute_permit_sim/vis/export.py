@@ -8,13 +8,13 @@ Exports run data to Excel with multiple sheets:
 """
 
 import io
+import os
 
-import matplotlib
 import pandas as pd
 import xlsxwriter
 
-matplotlib.use("Agg")  # Force non-interactive backend for thread safety
-from matplotlib.figure import Figure
+from compute_permit_sim.core.constants import ColumnNames
+from compute_permit_sim.vis.plotting import plot_scatter, plot_time_series
 
 
 def export_run_to_excel(run, output_path: str | None = None) -> str:
@@ -29,10 +29,10 @@ def export_run_to_excel(run, output_path: str | None = None) -> str:
         Path to the created Excel file.
     """
     if output_path is None:
-        import os
-
         os.makedirs("outputs", exist_ok=True)
-        output_path = f"outputs/simulation_run_{run.id}.xlsx"
+        # Use simpler Config ID if available, otherwise timestamp
+        fname = run.sim_id if run.sim_id else run.id
+        output_path = f"outputs/simulation_run_{fname}.xlsx"
 
     # Create workbook with xlsxwriter for image embedding support
     workbook = xlsxwriter.Workbook(output_path)
@@ -188,7 +188,9 @@ def _write_summary_sheet(
     row += 1
 
     sheet.write(row, 0, "Run ID", data_format)
-    sheet.write(row, 1, run.id, data_format)
+    # Prefer nicer Config ID
+    display_id = run.sim_id if run.sim_id else run.id
+    sheet.write(row, 1, display_id, data_format)
     row += 1
 
     sheet.write(row, 0, "Total Steps", data_format)
@@ -206,12 +208,12 @@ def _write_summary_sheet(
         metrics = [
             (
                 "Final Compliance",
-                run.metrics.get("final_compliance", 0),
+                run.metrics.final_compliance,
                 percent_format,
             ),
-            ("Final Price ($)", run.metrics.get("final_price", 0), number_format),
-            ("Fraud Detected", run.metrics.get("fraud_detected", 0), data_format),
-            ("Fraud Undetected", run.metrics.get("fraud_undetected", 0), data_format),
+            ("Final Price ($)", run.metrics.final_price, number_format),
+            ("Total Cost", run.metrics.total_enforcement_cost, number_format),
+            ("Deterrence Rate", run.metrics.deterrence_success_rate, percent_format),
         ]
         for label, value, fmt in metrics:
             sheet.write(row, 0, label, data_format)
@@ -228,10 +230,11 @@ def _write_summary_sheet(
 
     for i, step in enumerate(run.steps):
         # Calculate compliance for this step
-        compliant_count = sum(1 for a in step.agents if a.get("Compliant"))
+        # FIX: Access Pydantic model attribute directly
+        compliant_count = sum(1 for a in step.agents if a.is_compliant)
         total = len(step.agents)
         compliance = compliant_count / total if total > 0 else 0
-        price = step.market.get("price", 0)
+        price = step.market.price
 
         sheet.write(row, 0, f"Step {i}", data_format)
         sheet.write(row, 1, compliance, percent_format)
@@ -245,31 +248,39 @@ def _write_agents_sheet(sheet, last_step, header_format, data_format, number_for
         sheet.write(0, 0, "No agent data available")
         return
 
-    # Convert to DataFrame
-    agents_df = pd.DataFrame(last_step.agents)
+    # Convert to DataFrame properly from Pydantic models
+    agents_df = pd.DataFrame([a.model_dump() for a in last_step.agents])
 
-    # Define columns to export
+    # Define columns to export (using correct snake_case Pydantic field names)
     cols = [
-        "ID",
-        "Revenue",
-        "Step Profit",
-        "Capacity",
-        "Used Compute",
-        "Reported Compute",
-        "Compliant",
-        "Audited",
-        "Caught",
-        "Penalty",
-        "Total Wealth",
+        (ColumnNames.ID, "ID"),
+        (ColumnNames.REVENUE, "Revenue"),
+        (ColumnNames.STEP_PROFIT, "Step Profit"),
+        (ColumnNames.CAPACITY, "Capacity"),
+        (ColumnNames.USED_COMPUTE, "Used Compute"),
+        (ColumnNames.REPORTED_COMPUTE, "Reported Compute"),
+        (ColumnNames.IS_COMPLIANT, "Compliant"),
+        (ColumnNames.WAS_AUDITED, "Audited"),
+        (ColumnNames.WAS_CAUGHT, "Caught"),
+        (ColumnNames.PENALTY_AMOUNT, "Penalty"),
+        (ColumnNames.WEALTH, "Total Wealth"),
     ]
-    valid_cols = [c for c in cols if c in agents_df.columns]
+
+    valid_cols = []
+    headers = []
+
+    # Check which columns exist
+    for field, header in cols:
+        if field in agents_df.columns:
+            valid_cols.append(field)
+            headers.append(header)
 
     # Write headers
-    for col_idx, col_name in enumerate(valid_cols):
-        sheet.write(0, col_idx, col_name, header_format)
+    for col_idx, header in enumerate(headers):
+        sheet.write(0, col_idx, header, header_format)
 
     # Set column widths
-    for col_idx in range(len(valid_cols)):
+    for col_idx in range(len(headers)):
         sheet.set_column(col_idx, col_idx, 15)
 
     # Write data
@@ -292,92 +303,55 @@ def _write_graphs_sheet(sheet, run, workbook):
     price_series = []
 
     for step in run.steps:
-        compliant_count = sum(1 for a in step.agents if a.get("Compliant"))
+        # FIX: Pydantic attribute access
+        compliant_count = sum(1 for a in step.agents if a.is_compliant)
         total = len(step.agents)
         compliance_series.append(compliant_count / total if total > 0 else 0)
-        price_series.append(step.market.get("price", 0))
+        price_series.append(step.market.price)
 
     # Create and embed compliance graph
     sheet.write(0, 0, "Compliance Over Time")
-    comp_fig = _create_time_series_figure(compliance_series, "Compliance", "#4CAF50")
+    comp_fig = plot_time_series(compliance_series, "Compliance", "green")
     comp_img = _fig_to_bytes(comp_fig)
     sheet.insert_image(1, 0, "compliance.png", {"image_data": comp_img})
 
     # Create and embed price graph (offset to the right)
     sheet.write(0, 8, "Price Over Time")
-    price_fig = _create_time_series_figure(price_series, "Price ($)", "#2196F3")
+    price_fig = plot_time_series(price_series, "Price ($)", "blue")
     price_img = _fig_to_bytes(price_fig)
     sheet.insert_image(1, 8, "price.png", {"image_data": price_img})
 
     # If we have agents in last step, create scatter plot
     if run.steps[-1].agents:
-        agents_df = pd.DataFrame(run.steps[-1].agents)
+        agents_df = pd.DataFrame([a.model_dump() for a in run.steps[-1].agents])
+        # Check for numeric columns (snake_case)
         if (
-            "Used Compute" in agents_df.columns
-            and "Reported Compute" in agents_df.columns
+            ColumnNames.USED_COMPUTE in agents_df.columns
+            and ColumnNames.REPORTED_COMPUTE in agents_df.columns
         ):
             sheet.write(25, 0, "True vs Reported Compute (Last Step)")
-            scatter_fig = _create_scatter_figure(agents_df)
+
+            scatter_fig, ax = plot_scatter(
+                agents_df,
+                ColumnNames.REPORTED_COMPUTE,
+                ColumnNames.USED_COMPUTE,
+                "True vs Reported Compute",
+                "Reported Compute",
+                "True Compute",
+                color_logic="compliance",
+            )
+
+            # Add y=x line locally
+            max_val = max(
+                agents_df[ColumnNames.USED_COMPUTE].max(),
+                agents_df[ColumnNames.REPORTED_COMPUTE].max(),
+            )
+            ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honest (y=x)")
+            ax.legend()
+            scatter_fig.tight_layout()
+
             scatter_img = _fig_to_bytes(scatter_fig)
             sheet.insert_image(26, 0, "scatter.png", {"image_data": scatter_img})
-
-
-def _create_time_series_figure(data, label, color):
-    """Create a simple time series figure for embedding."""
-    fig = Figure(figsize=(5, 3), dpi=100)
-    ax = fig.subplots()
-
-    ax.plot(data, color=color, linewidth=2)
-    ax.set_xlabel("Step")
-    ax.set_ylabel(label)
-    ax.set_title(f"{label} Over Time")
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-
-    return fig
-
-
-def _create_scatter_figure(agents_df):
-    """Create scatter plot of true vs reported compute."""
-    fig = Figure(figsize=(5, 4), dpi=100)
-    ax = fig.subplots()
-
-    # Color by compliance status
-    colors = []
-    has_status = "Compliant" in agents_df.columns and "Caught" in agents_df.columns
-    if has_status:
-        for _, row in agents_df.iterrows():
-            if row.get("Caught"):
-                colors.append("black")
-            elif not row.get("Compliant"):
-                colors.append("red")
-            else:
-                colors.append("green")
-    else:
-        colors = "blue"
-
-    ax.scatter(
-        agents_df["Reported Compute"],
-        agents_df["Used Compute"],
-        c=colors,
-        alpha=0.6,
-        edgecolors="k",
-    )
-
-    max_val = max(
-        agents_df["Used Compute"].max(),
-        agents_df["Reported Compute"].max(),
-    )
-    ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honest (y=x)")
-
-    ax.set_xlabel("Reported Compute")
-    ax.set_ylabel("True Compute")
-    ax.set_title("True vs Reported Compute")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-
-    return fig
 
 
 def _fig_to_bytes(fig) -> io.BytesIO:

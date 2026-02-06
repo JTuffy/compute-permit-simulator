@@ -4,10 +4,12 @@ import random
 
 import mesa
 
-from compute_permit_sim.services.data_collect import (
-    compute_compliance_rate,
-    compute_current_price,
-)
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+from typing import TYPE_CHECKING
 
 from compute_permit_sim.core.constants import (
     DEFAULT_AUDIT_BASE_PROB,
@@ -17,10 +19,18 @@ from compute_permit_sim.core.constants import (
     DEFAULT_AUDIT_PENALTY_AMOUNT,
     DEFAULT_MARKET_TOKEN_CAP,
 )
+from compute_permit_sim.services.data_collect import (
+    compute_compliance_rate,
+    compute_current_price,
+)
+
 from ..core.agents import Lab
 from ..core.enforcement import Auditor
 from ..core.market import SimpleClearingMarket
 from ..schemas import AuditConfig, LabConfig, MarketConfig, ScenarioConfig
+
+if TYPE_CHECKING:
+    from ..schemas import AgentSnapshot
 
 
 class MesaLab(mesa.Agent):
@@ -37,37 +47,29 @@ class MesaLab(mesa.Agent):
         self,
         unique_id: int,
         model: mesa.Model,
+        config: "LabConfig",
         economic_value: float,
         risk_profile: float,
-        capacity: float = 1.0,
-        capability_value: float = 0.0,
-        racing_factor: float = 1.0,
-        reputation_sensitivity: float = 0.0,
-        audit_coefficient: float = 1.0,
+        capacity: float,
     ) -> None:
         """Initialize a Mesa-managed Lab agent.
 
         Args:
-            unique_id: Unique identifier for the agent.
-            model: The Mesa model instance this agent belongs to.
+            unique_id: Unique identifier.
+            model: The Mesa model instance.
+            config: Shared lab configuration.
             economic_value: Baseline value (v_i) of training compute.
-            risk_profile: Multiplier for perceived penalty (deterrence sensitivity).
-            capability_value: Baseline model capability value (V_b).
-            racing_factor: Multiplier for urgency-driven capability gain (c_r).
-            reputation_sensitivity: Perceived cost of being caught (R).
-            audit_coefficient: Firm-specific audit probability multiplier (c_i).
+            risk_profile: Deterrence sensitivity.
+            capacity: Max compute capacity.
         """
         super().__init__(model)
         self.unique_id = unique_id
         self.domain_agent = Lab(
             unique_id,
+            config,
             economic_value,
             risk_profile,
-            capacity=capacity,
-            capability_value=capability_value,
-            racing_factor=racing_factor,
-            reputation_sensitivity=reputation_sensitivity,
-            audit_coefficient=audit_coefficient,
+            capacity,
         )
         self.wealth: float = 0.0
         self.last_step_profit: float = 0.0
@@ -133,7 +135,26 @@ class ComputePermitModel(mesa.Model):
         super().__init__(seed=config.seed)
         self.config = config
         self.n_agents = config.n_agents
-        # Mesa 3.x handles agent management via self.agents automatically
+
+        # --- SEEDING FOR DETERMINISM ---
+        # User wants "Seed as Identity". We must seed global RNGs to ensure
+        # components using 'random' (like Auditor) or 'numpy' are deterministic.
+
+        # Mesa has already set self._seed (either from config.seed or auto-generated)
+        current_seed = getattr(self, "_seed", config.seed)
+
+        # If Mesa didn't set _seed (older versions?), fallback to config or random
+        if current_seed is None:
+            current_seed = random.randint(0, 1000000)
+            self._seed = current_seed
+
+        # Apply to GLOBAL generic RNGs
+        random.seed(current_seed)
+
+        # Use top-level numpy if available
+        if np is not None:
+            np.random.seed(current_seed)
+
         self.running = True
 
         # Initialize Market and Auditor
@@ -144,24 +165,23 @@ class ComputePermitModel(mesa.Model):
 
         # Initialize Agents (IDs start at 1)
         for i in range(self.n_agents):
-            economic_value = random.uniform(
+            economic_value = self.random.uniform(
                 config.lab.economic_value_min, config.lab.economic_value_max
             )
-            risk_profile = random.uniform(
+            risk_profile = self.random.uniform(
                 config.lab.risk_profile_min, config.lab.risk_profile_max
             )
-            capacity = random.uniform(config.lab.capacity_min, config.lab.capacity_max)
+            capacity = self.random.uniform(
+                config.lab.capacity_min, config.lab.capacity_max
+            )
             # Pass all extended parameters to the agent
             MesaLab(
                 i + 1,  # Start IDs at 1
                 self,
-                economic_value,
-                risk_profile,
+                config=config.lab,
+                economic_value=economic_value,
+                risk_profile=risk_profile,
                 capacity=capacity,
-                capability_value=config.lab.capability_value,
-                racing_factor=config.lab.racing_factor,
-                reputation_sensitivity=config.lab.reputation_sensitivity,
-                audit_coefficient=config.lab.audit_coefficient,
             )
             # Agent is automatically added to self.agents in Mesa 3.x
 
@@ -242,7 +262,7 @@ class ComputePermitModel(mesa.Model):
         if self.config.audit.max_audits_per_step is not None:
             if len(potential_audits) > self.config.audit.max_audits_per_step:
                 # Randomly select subset to audit (limited resources)
-                actual_audits = random.sample(
+                actual_audits = self.random.sample(
                     potential_audits, self.config.audit.max_audits_per_step
                 )
             else:
@@ -290,53 +310,47 @@ class ComputePermitModel(mesa.Model):
 
         self.datacollector.collect(self)
 
-    def get_agent_snapshots(self) -> list[dict]:
+    def get_agent_snapshots(self) -> list["AgentSnapshot"]:
         """Capture standard view of agent state for UI/Data collection.
 
         Returns:
-            List of dictionaries containing agent metrics.
+            List of AgentSnapshot objects containing agent metrics.
         """
+        from ..schemas import AgentSnapshot
+
         snapshots = []
         for agent in self.agents:
             if isinstance(agent, MesaLab):
                 d = agent.domain_agent
 
                 # Determine what compute was actually used this step
-                # Agents who ran (with permit or cheating) used their capacity
-                # Compliant agents without permits didn't run
                 did_run = d.has_permit or not d.is_compliant
                 true_compute = d.capacity if did_run else 0.0
 
-                # Reported compute: compliant agents report honestly, cheaters report 0
+                # Reported compute logic
                 if d.has_permit:
-                    reported_compute = d.capacity  # Honest reporting with permit
+                    reported_compute = d.capacity
                 elif d.is_compliant:
-                    reported_compute = 0.0  # Didn't run, nothing to report
+                    reported_compute = 0.0
                 else:
-                    reported_compute = 0.0  # Cheating - underreporting
+                    reported_compute = 0.0
 
                 snapshots.append(
-                    {
-                        # Group 1: Identity
-                        "id": d.lab_id,
-                        "capacity": round(d.capacity, 2),
-                        # Group 2: Compute Action
-                        "has_permit": d.has_permit,
-                        "used_compute": round(true_compute, 2),
-                        "reported_compute": round(reported_compute, 2),
-                        # Group 3: Compliance Status
-                        "is_compliant": d.is_compliant,
-                        "was_audited": agent.last_audit_status.get("audited", False),
-                        "was_caught": agent.last_audit_status.get("caught", False),
-                        # Group 4: Financials
-                        "penalty_amount": agent.last_audit_status.get("penalty", 0.0),
-                        "revenue": round(d.economic_value, 2),
-                        "economic_value": round(d.economic_value, 2),
-                        "risk_profile": round(d.risk_profile, 2),
-                        "step_profit": round(
-                            agent.last_step_profit, 2
-                        ),  # Net gain/loss this step
-                        "wealth": round(agent.wealth, 2),
-                    }
+                    AgentSnapshot(
+                        id=d.lab_id,
+                        capacity=round(d.capacity, 2),
+                        has_permit=d.has_permit,
+                        used_compute=round(true_compute, 2),
+                        reported_compute=round(reported_compute, 2),
+                        is_compliant=d.is_compliant,
+                        was_audited=agent.last_audit_status["audited"],
+                        was_caught=agent.last_audit_status["caught"],
+                        penalty_amount=agent.last_audit_status["penalty"],
+                        revenue=round(d.economic_value, 2),
+                        economic_value=round(d.economic_value, 2),
+                        risk_profile=round(d.risk_profile, 2),
+                        step_profit=round(agent.last_step_profit, 2),
+                        wealth=round(agent.wealth, 2),
+                    )
                 )
         return snapshots
