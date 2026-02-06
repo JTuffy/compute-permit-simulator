@@ -14,6 +14,7 @@ import pandas as pd
 import xlsxwriter
 
 from compute_permit_sim.core.constants import ColumnNames
+from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import plot_scatter, plot_time_series
 
 
@@ -230,10 +231,7 @@ def _write_summary_sheet(
 
     for i, step in enumerate(run.steps):
         # Calculate compliance for this step
-        # FIX: Access Pydantic model attribute directly
-        compliant_count = sum(1 for a in step.agents if a.is_compliant)
-        total = len(step.agents)
-        compliance = compliant_count / total if total > 0 else 0
+        compliance = calculate_compliance(step.agents)
         price = step.market.price
 
         sheet.write(row, 0, f"Step {i}", data_format)
@@ -303,10 +301,7 @@ def _write_graphs_sheet(sheet, run, workbook):
     price_series = []
 
     for step in run.steps:
-        # FIX: Pydantic attribute access
-        compliant_count = sum(1 for a in step.agents if a.is_compliant)
-        total = len(step.agents)
-        compliance_series.append(compliant_count / total if total > 0 else 0)
+        compliance_series.append(calculate_compliance(step.agents))
         price_series.append(step.market.price)
 
     # Create and embed compliance graph

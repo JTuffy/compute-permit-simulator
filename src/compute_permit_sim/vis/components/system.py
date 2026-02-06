@@ -2,7 +2,7 @@ import solara
 import solara.lab
 
 from compute_permit_sim.schemas import UrlConfig
-from compute_permit_sim.services.simulation import engine
+from compute_permit_sim.services import engine
 from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
 
@@ -13,7 +13,7 @@ def SimulationController():
     # Using raise_error=False to gracefully handle Python 3.13 asyncio race conditions
     solara.lab.use_task(
         engine.play_loop,
-        dependencies=[active_sim.is_playing.value],
+        dependencies=[active_sim.state.value.is_playing],
         raise_error=False,
     )
     return solara.Div(style="display: none;")

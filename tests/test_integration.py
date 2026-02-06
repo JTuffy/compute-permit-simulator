@@ -7,7 +7,7 @@ from compute_permit_sim.schemas import (
 from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 
-def test_simulation_integration():
+def test_simulation_integration() -> None:
     """Run a minimal simulation for a few steps to check for crashes and basic logic."""
     audit_config = AuditConfig(
         base_prob=0.1,
@@ -42,7 +42,7 @@ def test_simulation_integration():
     assert "Price" in df.columns
 
 
-def test_fixed_price_integration():
+def test_fixed_price_integration() -> None:
     """Run a simulation with fixed price market."""
     audit_config = AuditConfig(
         base_prob=0.1,

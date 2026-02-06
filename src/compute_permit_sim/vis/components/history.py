@@ -3,7 +3,7 @@ import solara.lab
 
 from compute_permit_sim.schemas import SimulationRun
 from compute_permit_sim.services.config_manager import save_scenario
-from compute_permit_sim.services.simulation import engine
+from compute_permit_sim.services import engine
 from compute_permit_sim.vis.state.history import session_history
 
 

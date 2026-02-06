@@ -5,8 +5,8 @@ import solara
 from matplotlib.figure import Figure
 
 from compute_permit_sim.core.constants import CHART_COLOR_MAP, ColumnNames
-from compute_permit_sim.vis.components.charts.base import validate_dataframe
 from compute_permit_sim.vis.plotting import plot_scatter
+from compute_permit_sim.vis.components.charts.base import validate_dataframe
 
 
 @solara.component

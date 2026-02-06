@@ -3,7 +3,6 @@
 import solara
 
 from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.services.config_manager import list_scenarios
 
 
 class SessionHistory:
@@ -19,6 +18,9 @@ class SessionHistory:
         self.selected_run = solara.reactive(None)  # SimulationRun | None
 
         # --- Available Scenarios ---
+        # --- Available Scenarios ---
+        from compute_permit_sim.services.config_manager import list_scenarios
+
         self.available_scenarios = solara.reactive(list_scenarios())
 
     def add_run(self, run: SimulationRun) -> None:
@@ -35,6 +37,9 @@ class SessionHistory:
 
     def refresh_scenarios(self) -> None:
         """Refresh the list of available scenario files."""
+        """Refresh the list of available scenario files."""
+        from compute_permit_sim.services.config_manager import list_scenarios
+
         self.available_scenarios.value = list_scenarios()
 
 

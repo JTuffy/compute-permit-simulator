@@ -2,8 +2,8 @@ import solara
 import solara.lab
 
 from compute_permit_sim.schemas import ScenarioConfig
-from compute_permit_sim.services.simulation import engine
 from compute_permit_sim.vis.components import RangeController, RangeView
+from compute_permit_sim.vis.components.dialogs import LoadScenarioDialog
 from compute_permit_sim.vis.components.history import RunHistoryList
 from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
@@ -92,16 +92,12 @@ def ConfigPanel():
     with solara.Column(classes=["sidebar-compact"]):
         # Scenario Selection (New File-based)
         show_load, set_show_load = solara.use_state(False)
-        selected_file, set_selected_file = solara.use_state(None)
 
         def open_load_dialog():
             session_history.refresh_scenarios()
             set_show_load(True)
 
-        def do_load():
-            if selected_file:
-                engine.load_scenario(selected_file)
-                set_show_load(False)
+        LoadScenarioDialog(show_load, set_show_load)
 
         # Header with Load and Play buttons
         with solara.Row(
@@ -111,10 +107,10 @@ def ConfigPanel():
             with solara.Row():
                 solara.Button(
                     icon_name="mdi-play"
-                    if not active_sim.is_playing.value
+                    if not active_sim.state.value.is_playing
                     else "mdi-pause",
-                    on_click=lambda: active_sim.is_playing.set(
-                        not active_sim.is_playing.value
+                    on_click=lambda: active_sim.update(
+                        is_playing=not active_sim.state.value.is_playing
                     ),
                     icon=True,
                     small=True,
@@ -129,36 +125,6 @@ def ConfigPanel():
                 )
 
         # Load Dialog - using v.Card for proper sizing
-        with solara.v.Dialog(
-            v_model=show_load,
-            on_v_model=set_show_load,
-            max_width=400,
-            persistent=False,
-        ):
-            with solara.v.Card(style="overflow: visible;"):
-                with solara.v.CardTitle():
-                    solara.Text("Load Scenario Template")
-                with solara.v.CardText(style="padding: 16px;"):
-                    if session_history.available_scenarios.value:
-                        solara.Select(
-                            label="Choose File",
-                            values=session_history.available_scenarios.value,
-                            value=selected_file,
-                            on_value=set_selected_file,
-                        )
-                    else:
-                        solara.Markdown("_No scenarios found in scenarios/_")
-                with solara.v.CardActions():
-                    solara.v.Spacer()
-                    solara.Button(
-                        "Cancel", on_click=lambda: set_show_load(False), text=True
-                    )
-                    solara.Button(
-                        "Load",
-                        on_click=do_load,
-                        color="primary",
-                        disabled=(not selected_file),
-                    )
 
         # General Parameters Card
         with solara.Card("General", style="margin-bottom: 6px;"):
@@ -239,8 +205,10 @@ def ConfigPanel():
                     dense=True,
                 )
         solara.Button(
-            label="⏸ Pause" if active_sim.is_playing.value else "▶ Play",
-            on_click=lambda: active_sim.is_playing.set(not active_sim.is_playing.value),
+            label="⏸ Pause" if active_sim.state.value.is_playing else "▶ Play",
+            on_click=lambda: active_sim.update(
+                is_playing=not active_sim.state.value.is_playing
+            ),
             color="primary",
             block=True,
             style="font-weight: 600;",

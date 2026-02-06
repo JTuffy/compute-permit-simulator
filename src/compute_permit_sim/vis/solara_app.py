@@ -27,3 +27,5 @@ logger.addHandler(stream_handler)
 # The Page component is the root of the app
 # Solara will automatically render this when running `solara run solara_app.py`
 from compute_permit_sim.vis.layout.main import Page
+
+__all__ = ["Page"]

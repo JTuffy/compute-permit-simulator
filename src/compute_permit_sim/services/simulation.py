@@ -17,11 +17,19 @@ from compute_permit_sim.schemas import (
     SimulationRun,
     StepResult,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from compute_permit_sim.vis.state.active import ActiveSimulation
+    from compute_permit_sim.vis.state.config import UIConfig
+    from compute_permit_sim.vis.state.history import SessionHistory
+
 from compute_permit_sim.services.config_manager import load_scenario
+from compute_permit_sim.services.metrics import (
+    calculate_compliance,
+    calculate_wealth_stats,
+)
 from compute_permit_sim.services.model_wrapper import ComputePermitModel
-from compute_permit_sim.vis.state.active import ActiveSimulation, active_sim
-from compute_permit_sim.vis.state.config import UIConfig, ui_config
-from compute_permit_sim.vis.state.history import SessionHistory, session_history
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +43,9 @@ class SimulationEngine:
 
     def __init__(
         self,
-        config: UIConfig,
-        active: ActiveSimulation,
-        history: SessionHistory,
+        config: "UIConfig",
+        active: "ActiveSimulation",
+        history: "SessionHistory",
     ) -> None:
         """Initialize the engine with state dependencies.
 
@@ -64,97 +72,103 @@ class SimulationEngine:
             logger.info(f"Auto-generated run seed: {generated_seed}")
 
         model = ComputePermitModel(scenario_config)
-        self.active.model.value = model
 
         # Capture actual seed used by Mesa (for reproducibility)
         # Mesa 3.x stores it in self._seed
         actual_seed = getattr(model, "_seed", None)
-        self.active.actual_seed.value = actual_seed
         logger.info(f"Model initialized with seed: {actual_seed}")
 
-        self.active.step_count.value = 0
-        self.active.compliance_history.value = []
-        self.active.price_history.value = []
-        self.active.agents_df.value = None
-        self.active.is_playing.value = False
-        self.active.current_run_steps = []
+        # Update unified state in ONE transaction
+        self.active.update(
+            model=model,
+            actual_seed=actual_seed,
+            step_count=0,
+            compliance_history=[],
+            price_history=[],
+            agents_df=None,
+            is_playing=False,
+            current_run_steps=[],
+        )
 
         # Clear selection to show live
         self.history.selected_run.value = None
 
     def step(self) -> None:
         """Advance the simulation one step."""
-        model = self.active.model.value
+        model = self.active.state.value.model
         if not model:
             logger.warning("Attempted to step without a model")
             return
 
-        step_num = self.active.step_count.value + 1
+        # Advance step count
+        step_num = self.active.state.value.step_count + 1
         logger.debug(f"Starting step {step_num}")
 
         model.step()
-        self.active.step_count.value = step_num
 
         # Get agent data
         agents = model.get_agent_snapshots()  # Returns list[AgentSnapshot]
-        self.active.agents_df.value = pd.DataFrame([a.model_dump() for a in agents])
+        agents_df = pd.DataFrame([a.model_dump() for a in agents])
 
         # Update time series
-        # Access Pydantic model attributes directly
-        compliance = sum(a.is_compliant for a in agents) / len(agents) if agents else 0
-        self.active.compliance_history.value = self.active.compliance_history.value + [
-            compliance
-        ]
-        self.active.price_history.value = self.active.price_history.value + [
-            model.market.current_price
-        ]
+        # Update time series
+        state = self.active.state.value
+        compliance = calculate_compliance(agents)
+        new_compliance = state.compliance_history + [compliance]
+        new_price = state.price_history + [model.market.current_price]
 
-        # Update wealth history (Total wealth by group)
-        compliant_wealth = sum(a.wealth for a in agents if a.is_compliant)
-        non_compliant_wealth = sum(a.wealth for a in agents if not a.is_compliant)
-        self.active.wealth_history_compliant.value = (
-            self.active.wealth_history_compliant.value + [compliant_wealth]
-        )
-        self.active.wealth_history_non_compliant.value = (
-            self.active.wealth_history_non_compliant.value + [non_compliant_wealth]
-        )
+        # Update wealth history
+        compliant_wealth, non_compliant_wealth = calculate_wealth_stats(agents)
+        new_wealth_c = state.wealth_history_compliant + [compliant_wealth]
+        new_wealth_nc = state.wealth_history_non_compliant + [non_compliant_wealth]
 
         logger.info(
             f"Step {step_num} complete. Price: {model.market.current_price:.2f}, Compliance: {compliance:.2%}"
         )
 
-        # Store step result using Pydantic schema
+        # Store step result
         step_res = StepResult(
-            step=self.active.step_count.value,
+            step=step_num,
             market=MarketSnapshot(
                 price=model.market.current_price,
                 supply=model.market.max_supply,
             ),
-            agents=agents,  # StepResult agents is list[AgentSnapshot]
+            agents=agents,
             audit=[],
         )
-        self.active.current_run_steps.append(step_res)
+        new_run_steps = state.current_run_steps + [step_res]
+
+        # Update unified state
+        self.active.update(
+            step_count=step_num,
+            agents_df=agents_df,
+            compliance_history=new_compliance,
+            price_history=new_price,
+            wealth_history_compliant=new_wealth_c,
+            wealth_history_non_compliant=new_wealth_nc,
+            current_run_steps=new_run_steps,
+        )
 
     async def play_loop(self) -> None:
         """Async loop for continuous play.
 
         Uses defensive pattern for Python 3.13 compatibility.
         """
-        if not self.active.is_playing.value:
+        if not self.active.state.value.is_playing:
             return
 
         logger.info("Starting play loop")
         try:
-            while self.active.is_playing.value:
-                model = self.active.model.value
+            while self.active.state.value.is_playing:
+                model = self.active.state.value.model
                 config = model.config if model else None
 
                 # Check step limit
-                if config and self.active.step_count.value >= config.steps:
+                if config and self.active.state.value.step_count >= config.steps:
                     logger.info("Step limit reached in play loop")
                     self.pack_current_run()
                     # Safe to update state here as we are not cancelling
-                    self.active.is_playing.set(False)
+                    self.active.update(is_playing=False)
                     break
 
                 self.step()
@@ -167,11 +181,11 @@ class SimulationEngine:
             raise
         except Exception as e:
             logger.error(f"Error in play loop: {e}", exc_info=True)
-            self.active.is_playing.set(False)
+            self.active.update(is_playing=False)
 
     def pack_current_run(self) -> None:
         """Finalize the current run and add to history."""
-        model = self.active.model.value
+        model = self.active.state.value.model
         if not model:
             return
 
@@ -179,21 +193,22 @@ class SimulationEngine:
         logger.info(f"Packing run {timestamp}")
 
         # Calculate final metrics
+        # Calculate final metrics
         agents = model.get_agent_snapshots()
-        final_compliance = (
-            sum(a.is_compliant for a in agents) / len(agents) if agents else 0
-        )
+        final_compliance = calculate_compliance(agents)
 
         # Ensure config has the ACTUAL seed used
         final_config = self.config.to_scenario_config()
         # Force the captured seed into the config record so it can be restored
         # We need to perform a copy/update since model is frozen
         final_config = final_config.model_copy(
-            update={"seed": self.active.actual_seed.value}
+            update={"seed": self.active.state.value.actual_seed}
         )
 
         # Calculate Regulator Metrics
-        total_audits = sum(len(step.audit) for step in self.active.current_run_steps)
+        total_audits = sum(
+            len(step.audit) for step in self.active.state.value.current_run_steps
+        )
         # Use simple constant cost for now, or read from config if added later.
         audit_cost_per_unit = model.config.audit.cost
         total_enforcement_cost = total_audits * audit_cost_per_unit
@@ -242,7 +257,7 @@ class SimulationEngine:
             id=f"run_{timestamp}",
             sim_id=short_hash,
             config=final_config,
-            steps=self.active.current_run_steps.copy(),
+            steps=self.active.state.value.current_run_steps.copy(),
             metrics=RunMetrics(
                 final_compliance=final_compliance,
                 final_price=model.market.current_price,
@@ -305,7 +320,7 @@ class SimulationEngine:
 
     def save_run(self, name_prefix="run") -> str | None:
         """Persist the structured simulation run to a JSON file."""
-        model = self.active.model.value
+        model = self.active.state.value.model
         if not model:
             return None
 
@@ -316,13 +331,13 @@ class SimulationEngine:
             # Ensure config has seed
             final_config = self.config.to_scenario_config()
             final_config = final_config.model_copy(
-                update={"seed": self.active.actual_seed.value}
+                update={"seed": self.active.state.value.actual_seed}
             )
 
             run_to_save = SimulationRun(
                 id=f"{timestamp}_current",
                 config=final_config,
-                steps=self.active.current_run_steps,
+                steps=self.active.state.value.current_run_steps,
                 metrics={},
             )
 
@@ -335,7 +350,3 @@ class SimulationEngine:
 
         logger.info(f"Saved run to {filepath}")
         return str(run_dir)
-
-
-# Singleton instance with default state modules injected
-engine = SimulationEngine(ui_config, active_sim, session_history)

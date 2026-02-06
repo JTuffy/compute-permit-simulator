@@ -2,7 +2,7 @@ from pathlib import Path
 
 import solara
 
-from compute_permit_sim.services.simulation import engine
+from compute_permit_sim.services import engine
 from compute_permit_sim.vis.components.system import SimulationController, UrlManager
 from compute_permit_sim.vis.panels.analysis import AnalysisPanel
 from compute_permit_sim.vis.panels.config import ConfigPanel
@@ -41,7 +41,7 @@ def Page():
     UrlManager()
 
     # Initialize if needed
-    if active_sim.model.value is None:
+    if active_sim.state.value.model is None:
         engine.reset_model()
 
     # Mount the controller (handles the loop)
@@ -53,10 +53,10 @@ def Page():
     solara.Title("Compute Permit Market Simulator")
 
     # --- Right Pane State Machine ---
-    has_data = (active_sim.step_count.value > 0) or (
+    has_data = (active_sim.state.value.step_count > 0) or (
         session_history.selected_run.value is not None
     )
-    is_playing = active_sim.is_playing.value
+    is_playing = active_sim.state.value.is_playing
 
     if is_playing:
         LoadingState()
