@@ -1,13 +1,13 @@
-from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import (
     AuditConfig,
     LabConfig,
     MarketConfig,
     ScenarioConfig,
 )
+from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 
-def test_simulation_integration():
+def test_simulation_integration() -> None:
     """Run a minimal simulation for a few steps to check for crashes and basic logic."""
     audit_config = AuditConfig(
         base_prob=0.1,
@@ -42,7 +42,7 @@ def test_simulation_integration():
     assert "Price" in df.columns
 
 
-def test_fixed_price_integration():
+def test_fixed_price_integration() -> None:
     """Run a simulation with fixed price market."""
     audit_config = AuditConfig(
         base_prob=0.1,
@@ -80,7 +80,7 @@ def test_fixed_price_integration():
     for agent in model.agents:
         if hasattr(agent, "domain_agent"):  # Skip scheduler/other entities if any
             da = agent.domain_agent
-            if da.gross_value >= 1.0:
+            if da.economic_value >= 1.0:
                 assert da.has_permit is True
             else:
                 assert da.has_permit is False

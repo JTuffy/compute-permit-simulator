@@ -1,10 +1,10 @@
-from compute_permit_sim.infrastructure.model import ComputePermitModel
 from compute_permit_sim.schemas import (
     AuditConfig,
     LabConfig,
     MarketConfig,
     ScenarioConfig,
 )
+from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 
 def get_base_configs():
@@ -18,8 +18,8 @@ def get_base_configs():
     )
     market = MarketConfig(token_cap=10, fixed_price=0.5)
     lab = LabConfig(
-        gross_value_min=1.0,
-        gross_value_max=1.0,
+        economic_value_min=1.0,
+        economic_value_max=1.0,
         risk_profile_min=1.0,
         risk_profile_max=1.0,
     )
@@ -134,8 +134,8 @@ def test_high_racing_factor_zero_compliance():
     market.set_fixed_price(2.0)  # Price > Value (1.0)
     lab = lab.model_copy(
         update={
-            "gross_value_min": 1.0,
-            "gross_value_max": 1.0,
+            "economic_value_min": 1.0,
+            "economic_value_max": 1.0,
             "capability_value": 1.0,
             "racing_factor": 1000.0,  # Huge gain from cheating
         }

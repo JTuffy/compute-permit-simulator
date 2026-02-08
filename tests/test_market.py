@@ -1,4 +1,4 @@
-from compute_permit_sim.domain.market import SimpleClearingMarket
+from compute_permit_sim.core.market import SimpleClearingMarket
 
 
 def test_market_clearing_scarce():

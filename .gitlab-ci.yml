@@ -1,0 +1,33 @@
+image: python:3.13
+
+variables:
+  UV_CACHE_DIR: .uv_cache
+
+cache:
+  paths:
+    - .uv_cache
+
+stages:
+  - test
+  - deploy
+
+before_script:
+  - pip install uv
+  - uv venv
+  - source .venv/bin/activate
+  - uv sync
+
+test:
+  stage: test
+  script:
+    - uv run pytest
+
+pages:
+  stage: deploy
+  script:
+    - uv run solara export build app.py --output public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
