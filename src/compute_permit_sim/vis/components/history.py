@@ -2,8 +2,8 @@ import solara
 import solara.lab
 
 from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.services.config_manager import save_scenario
 from compute_permit_sim.services import engine
+from compute_permit_sim.services.config_manager import save_scenario
 from compute_permit_sim.vis.state.history import session_history
 
 
@@ -229,7 +229,7 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
 
         # Excel Export
         def export_excel():
-            from compute_permit_sim.vis.export import export_run_to_excel
+            from compute_permit_sim.services.export import export_run_to_excel
 
             try:
                 output_path = export_run_to_excel(run)

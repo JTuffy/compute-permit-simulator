@@ -142,7 +142,13 @@ def UrlManager():
         ui_config.audit_coefficient.value,
     ]
 
-    def write_url():
+    async def write_url():
+        # Debounce: Wait for 300ms of inactivity before updating URL
+        # This prevents 20+ updates when loading a scenario
+        import asyncio
+
+        await asyncio.sleep(0.3)
+
         import base64
         import json
 
@@ -180,6 +186,19 @@ def UrlManager():
         if router.search != new_search:
             router.push(new_search)
 
-    solara.use_effect(write_url, deps)
+    solara.lab.use_task(write_url, dependencies=deps)
 
+    return solara.Div(style="display: none;")
+
+
+@solara.component
+def KeyboardListener():
+    """Global keyboard shortcut listener.
+
+    Since global window events are hard in Solara, we attach key listeners to the
+    main UI container in layout/main.py. This component is effectively a placeholder
+    for logic if we were using ipyevents.
+
+    For now, we will handle keys in the root Page container by setting it to focusable.
+    """
     return solara.Div(style="display: none;")

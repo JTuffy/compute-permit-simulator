@@ -9,6 +9,7 @@ import asyncio
 import logging
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -17,7 +18,6 @@ from compute_permit_sim.schemas import (
     SimulationRun,
     StepResult,
 )
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from compute_permit_sim.vis.state.active import ActiveSimulation
@@ -63,13 +63,8 @@ class SimulationEngine:
         logger.info("Resetting simulation model")
         scenario_config = self.config.to_scenario_config()
 
-        # Dynamic Seeding: If no seed provided in config, generate one now.
-        if scenario_config.seed is None:
-            import random
-
-            generated_seed = random.randint(1000, 999999)
-            scenario_config.seed = generated_seed
-            logger.info(f"Auto-generated run seed: {generated_seed}")
+        # Dynamic Seeding: If no seed provided in config, Model will handle it.
+        # We capture usage below.
 
         model = ComputePermitModel(scenario_config)
 

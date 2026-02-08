@@ -3,7 +3,10 @@ from pathlib import Path
 import solara
 
 from compute_permit_sim.services import engine
-from compute_permit_sim.vis.components.system import SimulationController, UrlManager
+from compute_permit_sim.vis.components.system import (
+    SimulationController,
+    UrlManager,
+)
 from compute_permit_sim.vis.panels.analysis import AnalysisPanel
 from compute_permit_sim.vis.panels.config import ConfigPanel
 from compute_permit_sim.vis.state.active import active_sim
@@ -50,18 +53,19 @@ def Page():
     with solara.Sidebar():
         ConfigPanel()
 
-    solara.Title("Compute Permit Market Simulator")
+    with solara.Column(style="height: 100vh; outline: none;"):
+        solara.Title("Compute Permit Market Simulator")
 
-    # --- Right Pane State Machine ---
-    has_data = (active_sim.state.value.step_count > 0) or (
-        session_history.selected_run.value is not None
-    )
-    is_playing = active_sim.state.value.is_playing
+        # --- Right Pane State Machine ---
+        has_data = (active_sim.state.value.step_count > 0) or (
+            session_history.selected_run.value is not None
+        )
+        is_playing = active_sim.state.value.is_playing
 
-    if is_playing:
-        LoadingState()
-    elif not has_data:
-        EmptyState()
-    else:
-        # Unified analysis view (no tabs)
-        AnalysisPanel()
+        if is_playing:
+            LoadingState()
+        elif not has_data:
+            EmptyState()
+        else:
+            # Unified analysis view (no tabs)
+            AnalysisPanel()

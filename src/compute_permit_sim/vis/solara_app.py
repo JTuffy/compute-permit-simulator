@@ -4,6 +4,8 @@ Logic is now distributed across `vis/panels`, `vis/components`, and `vis/layout`
 
 import logging
 
+from compute_permit_sim.vis.layout.main import Page
+
 # --- Logging Configuration ---
 # Force configuration of the library logger to ensure we capture output
 logger = logging.getLogger("compute_permit_sim")
@@ -26,6 +28,5 @@ logger.addHandler(stream_handler)
 
 # The Page component is the root of the app
 # Solara will automatically render this when running `solara run solara_app.py`
-from compute_permit_sim.vis.layout.main import Page
 
 __all__ = ["Page"]

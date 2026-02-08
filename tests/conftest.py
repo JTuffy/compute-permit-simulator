@@ -12,9 +12,9 @@ from compute_permit_sim.schemas import (
 )
 from compute_permit_sim.schemas.data import AgentSnapshot
 from compute_permit_sim.services.model_wrapper import ComputePermitModel
+
 from .factories import (
     create_agent_snapshot,
-    create_market_snapshot,
     create_scenario_config,
 )
 

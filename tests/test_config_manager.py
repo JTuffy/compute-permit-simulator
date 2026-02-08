@@ -1,11 +1,9 @@
 import json
-import shutil
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from compute_permit_sim.schemas import ScenarioConfig
 
 # Import the module to patch, not just the function
 import compute_permit_sim.services.config_manager as config_manager_module
