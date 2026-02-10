@@ -60,7 +60,7 @@ def AnalysisSummary(
                                 solara.Markdown(f"**Base π₀:** {c.audit.base_prob:.2%}")
                                 solara.Markdown(f"**High π₁:** {c.audit.high_prob:.2%}")
                                 solara.Markdown(
-                                    f"**Penalty:** ${c.audit.penalty_amount:.0f}"
+                                    f"**Penalty:** ${c.audit.penalty_amount:.0f}M"
                                 )
                             with solara.Column():
                                 solara.Markdown(

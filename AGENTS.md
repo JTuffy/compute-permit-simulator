@@ -1,6 +1,14 @@
 # Developer Guidelines & Agent Rules
 
-This document outlines the architectural patterns, best practices, and rules for developing the Compute Permit Simulator. All AI agents and developers must adhere to these guidelines to ensure maintainability, performance, and stability.
+Guidelines for the Compute Permit Simulator. For detailed architecture diagrams, see `documents/TECHNICAL_DOCUMENTATION.md`.
+
+## Commands
+
+```bash
+pytest                           # Verify all tests pass
+pytest tests/test_file.py -v     # Single file test
+solara run vis/app.py            # Start UI
+```
 
 ## 1. Architecture Overview
 
@@ -31,7 +39,17 @@ This document outlines the architectural patterns, best practices, and rules for
   - Use `ScenarioConfig` as the canonical definition.
   - `vis.state.config.UIConfig` should map reactive fields *directly* to/from `ScenarioConfig`.
 - **Performance**:
-  - **Debounce Effects**: Heavy side-effects (like URL updates or I/O) triggered by reactive variables must be debounced using `solara.lab.use_task` and `asyncio.sleep()`.
+  - **Debounce Effects**: Heavy side-effects triggered by reactive variables must be debounced:
+    ```python
+    # Wrong - fires every keystroke
+    solara.use_effect(lambda: save_to_disk(), [value])
+
+    # Correct - debounced
+    async def debounced_save():
+        await asyncio.sleep(0.3)
+        save_to_disk()
+    solara.lab.use_task(debounced_save, dependencies=[value])
+    ```
   - **Batch Updates**: When updating multiple reactive variables (e.g., loading a scenario), be aware of cascade effects.
 
 ### Testing
@@ -45,8 +63,30 @@ This document outlines the architectural patterns, best practices, and rules for
 3. **Update Logic**: Then implement the logic in `services/`.
 4. **Verify**: Run `pytest` to ensure no regressions.
 
-## 4. Common Pitfalls to Avoid
+## 4. Boundaries
 
-- **Duplicate definitions**: Do not create `UIAuditConfig` if `AuditConfig` exists. Use the existing schema.
-- **Synchronous blocking**: Do not run heavy computation in `solara.use_effect` without `use_task`.
-- **Stale Imports**: When moving classes, grep the entire codebase for old import paths.
+### ✅ Always
+- Modify `schemas/config.py` first when adding parameters
+- Use factories from `tests/factories.py` for test data
+- Use `solara.lab.use_task` with `asyncio.sleep()` for heavy side-effects
+- Run `pytest` after changes
+
+### ⚠️ Ask First
+- Adding new dependencies
+- Modifying config file formats
+- Deleting files or removing functionality
+- Changes to `services/engine_instance.py`
+
+### 🚫 Never
+- Import `vis` from `services` (circular imports)
+- Duplicate Pydantic models (e.g., creating `UIAuditConfig` when `AuditConfig` exists)
+- Run heavy computation in `solara.use_effect` without `use_task`
+- Commit secrets or credentials
+
+## 5. Refactoring Triggers
+
+Refactor when:
+- Schema has >5 optional fields with interdependencies → extract sub-schema
+- Component file >200 lines → split into subcomponents
+- Same pattern appears 3+ times → extract helper
+- Test requires >3 mocks → simplify dependencies

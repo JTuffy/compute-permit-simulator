@@ -60,7 +60,7 @@ We use `uv` for all development tasks to ensure reproducibility.
 | **Run Tests** | `uv run pytest` |
 | **Lint** | `uv run ruff check .` |
 | **Format** | `uv run ruff format .` |
-| **Type Check** | `uv run mypy .` |
+
 
 ### CI/CD Pipeline
 This project includes a GitLab CI/CD pipeline that:

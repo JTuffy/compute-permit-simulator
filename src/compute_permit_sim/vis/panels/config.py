@@ -154,7 +154,7 @@ def ConfigPanel():
         with solara.Card("Audit Policy", style="margin-bottom: 6px;"):
             with solara.Column():
                 solara.InputFloat(
-                    label="Penalty $", value=ui_config.penalty, dense=True
+                    label="Penalty (M$)", value=ui_config.penalty, dense=True
                 )
                 solara.InputFloat(
                     label="Base π₀", value=ui_config.base_prob, dense=True

@@ -1,6 +1,6 @@
 {
     "name": "High Stakes Racing (Risk)",
-    "description": "Labs have high racing incentives and capability values. Enforcement is standard but potentially insufficient to deter high-value cheating.",
+    "description": "Labs have high racing incentives and capability values (~2026 frontier). Enforcement is standard but potentially insufficient to deter high-value cheating. Values in M$ (millions USD).",
     "n_agents": 20,
     "steps": 10,
     "seed": 101,
@@ -9,7 +9,7 @@
         "high_prob": 0.8,
         "false_positive_rate": 0.15,
         "false_negative_rate": 0.2,
-        "penalty_amount": 1.5,
+        "penalty_amount": 150.0,
         "backcheck_prob": 0.0
     },
     "market": {
@@ -17,15 +17,15 @@
         "fixed_price": null
     },
     "lab": {
-        "economic_value_min": 2.0,
-        "economic_value_max": 5.0,
+        "economic_value_min": 200.0,
+        "economic_value_max": 500.0,
         "risk_profile_min": 0.5,
         "risk_profile_max": 1.0,
         "capacity_min": 2.0,
         "capacity_max": 5.0,
-        "capability_value": 5.0,
+        "capability_value": 500.0,
         "racing_factor": 2.0,
-        "reputation_sensitivity": 0.1,
+        "reputation_sensitivity": 10.0,
         "audit_coefficient": 1.0
     }
 }

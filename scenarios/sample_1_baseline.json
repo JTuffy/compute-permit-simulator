@@ -1,6 +1,6 @@
 {
     "name": "Baseline Scenario (Standard)",
-    "description": "A balanced scenario representing typical market conditions. Moderate compliance incentives and standard audit capabilities.",
+    "description": "A balanced scenario representing typical market conditions (~2025). Moderate compliance incentives and standard audit capabilities. Values in M$ (millions USD).",
     "n_agents": 20,
     "steps": 10,
     "seed": 42,
@@ -9,7 +9,7 @@
         "high_prob": 0.9,
         "false_positive_rate": 0.1,
         "false_negative_rate": 0.1,
-        "penalty_amount": 2.0,
+        "penalty_amount": 200.0,
         "backcheck_prob": 0.0
     },
     "market": {
@@ -17,15 +17,15 @@
         "fixed_price": null
     },
     "lab": {
-        "economic_value_min": 0.5,
-        "economic_value_max": 2.5,
+        "economic_value_min": 50.0,
+        "economic_value_max": 250.0,
         "risk_profile_min": 0.8,
         "risk_profile_max": 1.2,
         "capacity_min": 1.0,
         "capacity_max": 3.0,
         "capability_value": 0.0,
         "racing_factor": 1.0,
-        "reputation_sensitivity": 0.5,
+        "reputation_sensitivity": 50.0,
         "audit_coefficient": 1.0
     }
 }

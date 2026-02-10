@@ -1,15 +1,8 @@
 """Mesa model integration for the Compute Permit Simulator."""
 
-import random
+from typing import TYPE_CHECKING
 
 import mesa
-
-try:
-    import numpy as np
-except ImportError:
-    np = None
-
-from typing import TYPE_CHECKING
 
 from compute_permit_sim.core.constants import (
     DEFAULT_AUDIT_BASE_PROB,
@@ -51,6 +44,8 @@ class MesaLab(mesa.Agent):
         economic_value: float,
         risk_profile: float,
         capacity: float,
+        firm_revenue: float = 0.0,
+        planned_training_flops: float = 0.0,
     ) -> None:
         """Initialize a Mesa-managed Lab agent.
 
@@ -61,6 +56,8 @@ class MesaLab(mesa.Agent):
             economic_value: Baseline value (v_i) of training compute.
             risk_profile: Deterrence sensitivity.
             capacity: Max compute capacity.
+            firm_revenue: Annual revenue/turnover (M$) for penalty calculation.
+            planned_training_flops: Planned training run size (FLOP).
         """
         super().__init__(model)
         self.unique_id = unique_id
@@ -70,11 +67,18 @@ class MesaLab(mesa.Agent):
             economic_value,
             risk_profile,
             capacity,
+            firm_revenue=firm_revenue,
+            planned_training_flops=planned_training_flops,
         )
         self.wealth: float = 0.0
         self.last_step_profit: float = 0.0
         # Tracking for visualization
-        self.last_audit_status = {"audited": False, "caught": False, "penalty": 0.0}
+        self.last_audit_status = {
+            "audited": False,
+            "caught": False,
+            "penalty": 0.0,
+            "collateral_seized": False,
+        }
 
     def step(self) -> None:
         """Execute one step of the agent.
@@ -135,33 +139,14 @@ class ComputePermitModel(mesa.Model):
         super().__init__(seed=config.seed)
         self.config = config
         self.n_agents = config.n_agents
-
-        # --- SEEDING FOR DETERMINISM ---
-        # User wants "Seed as Identity". We must seed global RNGs to ensure
-        # components using 'random' (like Auditor) or 'numpy' are deterministic.
-
-        # Mesa has already set self._seed (either from config.seed or auto-generated)
-        current_seed = getattr(self, "_seed", config.seed)
-
-        # If Mesa didn't set _seed (older versions?), fallback to config or random
-        if current_seed is None:
-            current_seed = random.randint(0, 1000000)
-            self._seed = current_seed
-
-        # Apply to GLOBAL generic RNGs
-        random.seed(current_seed)
-
-        # Use top-level numpy if available
-        if np is not None:
-            np.random.seed(current_seed)
-
         self.running = True
 
         # Initialize Market and Auditor
+        # Pass self.random (Mesa's seeded RNG) to Auditor for reproducibility
         self.market = SimpleClearingMarket(token_cap=config.market.token_cap)
         if config.market.fixed_price is not None:
             self.market.set_fixed_price(config.market.fixed_price)
-        self.auditor = Auditor(config.audit)
+        self.auditor = Auditor(config.audit, rng=self.random)
 
         # Initialize Agents (IDs start at 1)
         for i in range(self.n_agents):
@@ -174,6 +159,12 @@ class ComputePermitModel(mesa.Model):
             capacity = self.random.uniform(
                 config.lab.capacity_min, config.lab.capacity_max
             )
+            firm_revenue = self.random.uniform(
+                config.lab.firm_revenue_min, config.lab.firm_revenue_max
+            )
+            planned_training_flops = self.random.uniform(
+                config.lab.training_flops_min, config.lab.training_flops_max
+            )
             # Pass all extended parameters to the agent
             MesaLab(
                 i + 1,  # Start IDs at 1
@@ -182,6 +173,8 @@ class ComputePermitModel(mesa.Model):
                 economic_value=economic_value,
                 risk_profile=risk_profile,
                 capacity=capacity,
+                firm_revenue=firm_revenue,
+                planned_training_flops=planned_training_flops,
             )
             # Agent is automatically added to self.agents in Mesa 3.x
 
@@ -199,6 +192,16 @@ class ComputePermitModel(mesa.Model):
         for agent in self.agents:
             if isinstance(agent, MesaLab):
                 agent.last_step_profit = 0.0
+
+        # 0. Collateral Phase — labs post refundable collateral
+        # Ref: Christoph (2026) §2.6 step 2: "Participants post collateral K"
+        collateral_k = self.config.collateral_amount
+        if collateral_k > 0:
+            for agent in self.agents:
+                if isinstance(agent, MesaLab):
+                    agent.domain_agent.collateral_posted = collateral_k
+                    agent.wealth -= collateral_k
+                    agent.last_step_profit -= collateral_k
 
         # 1. Trading Phase
         # Collect bids (valuations) from all agents
@@ -224,25 +227,38 @@ class ComputePermitModel(mesa.Model):
                     agent.domain_agent.has_permit = False
 
         # 2. Choice Phase (Run / Compliance)
-        # TPR = 1 - FNR (beta)
-        tpr = 1.0 - self.config.audit.false_negative_rate
-        p_s = (
-            tpr * self.config.audit.high_prob
-            + (1.0 - tpr) * self.config.audit.base_prob
-        )
-        detection_prob_audit = p_s + (1.0 - p_s) * self.config.audit.backcheck_prob
-
-        # Combine with whistleblower prob: p_eff = 1 - (1-p_audit)(1-p_wb)
-        p_wb = self.config.audit.whistleblower_prob
-        detection_prob = 1.0 - (1.0 - detection_prob_audit) * (1.0 - p_wb)
-
+        # Compute detection probability for deterrence calculation
+        # Labs estimate their detection risk based on expected signal strength
+        flop_threshold = self.config.flop_threshold
         for agent in self.agents:
             if isinstance(agent, MesaLab):
-                agent.domain_agent.decide_compliance(
+                d = agent.domain_agent
+                # Estimate signal strength if they were to cheat
+                # (used for deterrence calculation)
+                hypothetical_usage = d.planned_training_flops
+                expected_signal = self.auditor.compute_signal_strength(
+                    used_compute=hypothetical_usage,
+                    flop_threshold=flop_threshold,
+                    is_compliant=False,  # hypothetical cheating scenario
+                )
+                # Compute effective detection probability
+                # Uses current_audit_coefficient (may be escalated via dynamic factors)
+                detection_prob_audit = self.auditor.compute_effective_detection(
+                    audit_coefficient=d.current_audit_coefficient,
+                    signal_strength=expected_signal,
+                )
+                # Combine with whistleblower prob: p_eff = 1 - (1-p_audit)(1-p_wb)
+                p_wb = self.config.audit.whistleblower_prob
+                detection_prob = 1.0 - (1.0 - detection_prob_audit) * (1.0 - p_wb)
+
+                # Compute firm-specific penalty for deterrence calculation
+                firm_penalty = self.auditor.compute_penalty_amount(
+                    firm_value=d.firm_revenue
+                )
+                d.decide_compliance(
                     market_price=clearing_price,
-                    penalty=self.config.audit.penalty_amount,
+                    penalty=firm_penalty,
                     detection_prob=detection_prob,
-                    # cost ignored for MVP or folded into net value
                 )
 
         # 3. Signal Phase & 4. Enforcement Phase
@@ -250,10 +266,22 @@ class ComputePermitModel(mesa.Model):
 
         for agent in self.agents:
             if isinstance(agent, MesaLab):
-                is_compliant = agent.domain_agent.is_compliant
-                signal = self.auditor.generate_signal(is_compliant)
-                # Check if auditor WANTS to audit (based on signal policy)
-                should_audit = self.auditor.decide_audit(signal)
+                d = agent.domain_agent
+                is_compliant = d.is_compliant
+
+                # Determine actual compute used this step
+                did_run = d.has_permit or not is_compliant
+                used_compute = d.planned_training_flops if did_run else 0.0
+
+                # Generate signal based on usage relative to threshold
+                signal_strength = self.auditor.generate_signal(
+                    used_compute=used_compute,
+                    flop_threshold=flop_threshold,
+                    is_compliant=is_compliant,
+                )
+
+                # Decide whether to audit based on signal strength
+                should_audit = self.auditor.decide_audit(signal_strength)
 
                 if should_audit:
                     potential_audits.append(agent)
@@ -270,18 +298,47 @@ class ComputePermitModel(mesa.Model):
         else:
             actual_audits = potential_audits
 
-        # Execute Audits
+        # Execute Audits - use FPR/FNR to determine if violation is found
         for agent in actual_audits:
-            is_compliant = agent.domain_agent.is_compliant
-            # Reset audit status
-            agent.last_audit_status = {"audited": True, "caught": False, "penalty": 0.0}
-            # Enforce
-            if not is_compliant and not agent.domain_agent.has_permit:
-                # Caught cheating!
-                agent.wealth -= self.config.audit.penalty_amount
-                agent.last_step_profit -= self.config.audit.penalty_amount
+            d = agent.domain_agent
+            is_compliant = d.is_compliant
+            has_permit = d.has_permit
+
+            # Audit status: audited but outcome depends on FPR/FNR
+            agent.last_audit_status = {
+                "audited": True,
+                "caught": False,
+                "penalty": 0.0,
+                "collateral_seized": False,
+            }
+
+            # Determine if audit finds a violation
+            # For firms with permits, they're effectively "compliant" for audit purposes
+            effective_compliant = is_compliant or has_permit
+            violation_found = self.auditor.audit_finds_violation(effective_compliant)
+
+            if violation_found and not has_permit:
+                # Caught! (true positive for non-compliant, or false positive for compliant)
+                # Pass firm_revenue for flexible penalty: max(fixed, pct × revenue), capped
+                penalty = self.auditor.apply_penalty(
+                    violation_found=True, firm_value=d.firm_revenue
+                )
+                agent.wealth -= penalty
+                agent.last_step_profit -= penalty
                 agent.last_audit_status["caught"] = True
-                agent.last_audit_status["penalty"] = self.config.audit.penalty_amount
+                agent.last_audit_status["penalty"] = penalty
+
+                # Seize collateral on verified violation
+                # Ref: Christoph (2026) §2.6 step 8: "collateral seized"
+                if d.collateral_posted > 0:
+                    agent.last_audit_status["collateral_seized"] = True
+                    # Collateral already deducted in phase 0; don't refund it
+                    d.collateral_posted = 0.0
+
+                # Dynamic factors: escalate reputation and audit coefficient
+                d.on_audit_failure(
+                    audit_escalation=self.config.audit.audit_escalation,
+                )
 
         # Reset audit status for non-audited agents
         for agent in self.agents:
@@ -290,7 +347,20 @@ class ComputePermitModel(mesa.Model):
                     "audited": False,
                     "caught": False,
                     "penalty": 0.0,
+                    "collateral_seized": False,
                 }
+
+        # Refund collateral for agents not caught
+        # Ref: Christoph (2026) §2.6 step 9: "Non-violators receive collateral refunds"
+        if collateral_k > 0:
+            for agent in self.agents:
+                if isinstance(agent, MesaLab):
+                    d = agent.domain_agent
+                    if d.collateral_posted > 0:
+                        # Not seized — refund
+                        agent.wealth += d.collateral_posted
+                        agent.last_step_profit += d.collateral_posted
+                        d.collateral_posted = 0.0
 
         # 5. Value Realization Phase
         # Agents who run compute (legally with permit, or illegally) get value
@@ -307,6 +377,25 @@ class ComputePermitModel(mesa.Model):
                     agent.last_step_profit += d.economic_value
                 # Compliant agents without permits didn't run - no value gained
                 # (they chose not to run because they couldn't afford permit)
+
+        # 6. Dynamic Factor Updates (end-of-step)
+        # Decay audit coefficients toward base for all labs
+        audit_decay = self.config.audit.audit_decay_rate
+        for agent in self.agents:
+            if isinstance(agent, MesaLab):
+                agent.domain_agent.decay_audit_coefficient(audit_decay)
+
+        # Update racing factors based on relative capability position
+        capabilities = [
+            a.domain_agent.cumulative_capability
+            for a in self.agents
+            if isinstance(a, MesaLab)
+        ]
+        if capabilities:
+            mean_cap = sum(capabilities) / len(capabilities)
+            for agent in self.agents:
+                if isinstance(agent, MesaLab):
+                    agent.domain_agent.update_racing_factor(mean_cap)
 
         self.datacollector.collect(self)
 
