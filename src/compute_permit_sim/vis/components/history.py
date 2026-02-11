@@ -96,7 +96,7 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
                             )
                         with solara.Column():
                             solara.Markdown(
-                                f"**Penalty:** ${c.audit.penalty_amount:.0f}"
+                                f"**Penalty:** ${c.audit.penalty_amount:.0f}M"
                             )
                             solara.Markdown(
                                 f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
@@ -104,7 +104,7 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
                             solara.Markdown(
                                 f"**FPR:** {c.audit.false_positive_rate:.2%}"
                             )
-                            solara.Markdown(f"**Cost:** ${c.audit.cost:.2f}")
+                            solara.Markdown(f"**Cost:** ${c.audit.cost:.2f}M")
 
                     # Lab Config
                     solara.HTML(

@@ -6,21 +6,35 @@ from compute_permit_sim.core.constants import (
     DEFAULT_AUDIT_BACKCHECK_PROB,
     DEFAULT_AUDIT_BASE_PROB,
     DEFAULT_AUDIT_COST,
+    DEFAULT_AUDIT_DECAY_RATE,
+    DEFAULT_AUDIT_ESCALATION,
     DEFAULT_AUDIT_FALSE_NEG_RATE,
     DEFAULT_AUDIT_FALSE_POS_RATE,
     DEFAULT_AUDIT_HIGH_PROB,
     DEFAULT_AUDIT_PENALTY_AMOUNT,
+    DEFAULT_AUDIT_PENALTY_CEILING,
+    DEFAULT_AUDIT_PENALTY_FIXED,
+    DEFAULT_AUDIT_PENALTY_PERCENTAGE,
     DEFAULT_AUDIT_WHISTLEBLOWER_PROB,
+    DEFAULT_CAPABILITY_SCALE,
+    DEFAULT_COLLATERAL_AMOUNT,
+    DEFAULT_FLOP_THRESHOLD,
     DEFAULT_LAB_AUDIT_COEFFICIENT,
     DEFAULT_LAB_CAPABILITY_VALUE,
     DEFAULT_LAB_CAPACITY_MAX,
     DEFAULT_LAB_CAPACITY_MIN,
     DEFAULT_LAB_ECON_VALUE_MAX,
     DEFAULT_LAB_ECON_VALUE_MIN,
+    DEFAULT_LAB_FIRM_REVENUE_MAX,
+    DEFAULT_LAB_FIRM_REVENUE_MIN,
     DEFAULT_LAB_RACING_FACTOR,
     DEFAULT_LAB_REPUTATION_SENSITIVITY,
     DEFAULT_LAB_RISK_PROFILE_MAX,
     DEFAULT_LAB_RISK_PROFILE_MIN,
+    DEFAULT_LAB_TRAINING_FLOPS_MAX,
+    DEFAULT_LAB_TRAINING_FLOPS_MIN,
+    DEFAULT_RACING_GAP_SENSITIVITY,
+    DEFAULT_REPUTATION_ESCALATION_FACTOR,
     DEFAULT_SCENARIO_N_AGENTS,
     DEFAULT_SCENARIO_STEPS,
 )
@@ -56,13 +70,17 @@ class UrlConfig(BaseModel):
 class AuditConfig(BaseModel):
     """Configuration for audit policies (The Auditor).
 
-    Signal model: The auditor observes a noisy binary signal s_i for each firm.
-        P(s=1 | compliant)     = false_positive_rate  (alpha)
-        P(s=0 | non-compliant) = false_negative_rate  (1 - beta)
+    Audit model has two stages:
+    1. AUDIT OCCURRENCE: Whether an audit is initiated
+       - base_prob (pi_0): baseline audit probability for all firms
+       - high_prob (pi_1): elevated audit probability given suspicious signal
+       - Signal strength for non-compliant firms scales with compute excess
+
+    2. AUDIT OUTCOME: Whether an audit catches a violator (if one exists)
+       - false_positive_rate (alpha): P(false alarm | compliant firm audited)
+       - false_negative_rate (beta): P(miss | non-compliant firm audited)
 
     Detection: p_eff = p_s + (1 - p_s) * backcheck_prob
-        where p_s = (1 - false_negative_rate) * high_prob
-                   + false_negative_rate * base_prob
     """
 
     base_prob: float = Field(
@@ -78,18 +96,34 @@ class AuditConfig(BaseModel):
         DEFAULT_AUDIT_FALSE_POS_RATE,
         ge=0,
         le=1,
-        description="P(signal=1 | compliant) — alpha",
+        description="P(false alarm | compliant firm audited) — alpha",
     )
     false_negative_rate: float = Field(
         DEFAULT_AUDIT_FALSE_NEG_RATE,
         ge=0,
         le=1,
-        description="P(signal=0 | non-compliant) — 1 - beta",
+        description="P(miss | non-compliant firm audited) — beta",
     )
     penalty_amount: float = Field(
         DEFAULT_AUDIT_PENALTY_AMOUNT,
         ge=0,
-        description="Effective penalty amount (P = fine phi)",
+        description="Legacy flat penalty amount (used when penalty_fixed is not set)",
+    )
+    penalty_fixed: float = Field(
+        DEFAULT_AUDIT_PENALTY_FIXED,
+        ge=0,
+        description="Fixed penalty floor (M$) — like EU AI Act €35M",
+    )
+    penalty_percentage: float = Field(
+        DEFAULT_AUDIT_PENALTY_PERCENTAGE,
+        ge=0,
+        le=1.0,
+        description="Percentage of firm value — like EU AI Act 7% turnover",
+    )
+    penalty_ceiling: float | None = Field(
+        DEFAULT_AUDIT_PENALTY_CEILING,
+        ge=0,
+        description="Optional cap on total penalty (M$) — None means no cap",
     )
     backcheck_prob: float = Field(
         DEFAULT_AUDIT_BACKCHECK_PROB,
@@ -112,6 +146,18 @@ class AuditConfig(BaseModel):
         None,
         ge=0,
         description="Max number of audits allowed per step (budget constraint)",
+    )
+    # Audit rate escalation (active when dynamic_factors=True)
+    audit_escalation: float = Field(
+        DEFAULT_AUDIT_ESCALATION,
+        ge=0,
+        description="Added to audit_coefficient on failed audit",
+    )
+    audit_decay_rate: float = Field(
+        DEFAULT_AUDIT_DECAY_RATE,
+        ge=0,
+        le=1,
+        description="Per-step decay factor for escalated audit coefficient",
     )
 
     model_config = ConfigDict(frozen=True)
@@ -175,6 +221,42 @@ class LabConfig(BaseModel):
         ge=0,
         description="c(i): firm-specific audit rate scaling",
     )
+    firm_revenue_min: float = Field(
+        DEFAULT_LAB_FIRM_REVENUE_MIN,
+        ge=0,
+        description="Min annual revenue/turnover (M$) for penalty calculation",
+    )
+    firm_revenue_max: float = Field(
+        DEFAULT_LAB_FIRM_REVENUE_MAX,
+        ge=0,
+        description="Max annual revenue/turnover (M$) for penalty calculation",
+    )
+    training_flops_min: float = Field(
+        DEFAULT_LAB_TRAINING_FLOPS_MIN,
+        ge=0,
+        description="Min planned training run size (FLOP)",
+    )
+    training_flops_max: float = Field(
+        DEFAULT_LAB_TRAINING_FLOPS_MAX,
+        ge=0,
+        description="Max planned training run size (FLOP)",
+    )
+    # Dynamic factor params (active when dynamic_factors=True on ScenarioConfig)
+    reputation_escalation_factor: float = Field(
+        DEFAULT_REPUTATION_ESCALATION_FACTOR,
+        ge=0,
+        description="Reputation increase per failed audit (0.5 = +50%)",
+    )
+    racing_gap_sensitivity: float = Field(
+        DEFAULT_RACING_GAP_SENSITIVITY,
+        ge=0,
+        description="How much capability gap affects racing factor",
+    )
+    capability_scale: float = Field(
+        DEFAULT_CAPABILITY_SCALE,
+        gt=0,
+        description="Normalization factor for capability gap",
+    )
 
     model_config = ConfigDict(frozen=True)
 
@@ -186,6 +268,24 @@ class ScenarioConfig(BaseModel):
     description: str = ""
     n_agents: int = Field(DEFAULT_SCENARIO_N_AGENTS, gt=0)
     steps: int = Field(DEFAULT_SCENARIO_STEPS, gt=0)
+
+    # Regulatory threshold: training runs require permits when
+    # planned_training_flops > flop_threshold.
+    # Signal strength for enforcement scales with excess above this value.
+    flop_threshold: float = Field(
+        DEFAULT_FLOP_THRESHOLD,
+        ge=0,
+        description="FLOP threshold for permit requirement (e.g. 1e25)",
+    )
+
+    # Collateral: refundable deposit posted before market participation.
+    # Seized on verified violation; returned otherwise. 0 = no collateral.
+    # Ref: Christoph (2026) §2.5 — collateral K relaxes limited liability.
+    collateral_amount: float = Field(
+        DEFAULT_COLLATERAL_AMOUNT,
+        ge=0,
+        description="Required collateral per lab (M$). 0 = disabled.",
+    )
 
     # Sub-configs
     audit: AuditConfig

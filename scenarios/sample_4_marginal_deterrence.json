@@ -1,6 +1,6 @@
 {
     "name": "Marginal Deterrence (Knife-Edge)",
-    "description": "Parameters tuned so deterrence is barely effective for some agents. Creates mixed compliance with visible segmentation - high-value agents cheat, low-value agents comply.",
+    "description": "Parameters tuned so deterrence is barely effective for some agents. Creates mixed compliance with visible segmentation - high-value agents cheat, low-value agents comply. Values in M$ (millions USD).",
     "n_agents": 20,
     "steps": 10,
     "seed": 2001,
@@ -9,7 +9,7 @@
         "high_prob": 0.70,
         "false_positive_rate": 0.12,
         "false_negative_rate": 0.15,
-        "penalty_amount": 2.0,
+        "penalty_amount": 200.0,
         "backcheck_prob": 0.0
     },
     "market": {
@@ -17,15 +17,15 @@
         "fixed_price": null
     },
     "lab": {
-        "economic_value_min": 1.0,
-        "economic_value_max": 4.0,
+        "economic_value_min": 100.0,
+        "economic_value_max": 400.0,
         "risk_profile_min": 0.6,
         "risk_profile_max": 1.4,
         "capacity_min": 1.0,
         "capacity_max": 4.0,
-        "capability_value": 1.0,
+        "capability_value": 100.0,
         "racing_factor": 1.5,
-        "reputation_sensitivity": 0.5,
+        "reputation_sensitivity": 50.0,
         "audit_coefficient": 1.0
     }
 }

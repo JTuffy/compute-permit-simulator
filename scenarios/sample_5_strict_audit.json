@@ -1,6 +1,6 @@
 {
     "name": "Strict Enforcement (Audit)",
-    "description": "A refined audit regime with high penalties and accurate detection signals. Designed to enforce near-total compliance.",
+    "description": "A refined audit regime with high penalties and accurate detection signals. Designed to enforce near-total compliance. Values in M$ (millions USD).",
     "n_agents": 20,
     "steps": 10,
     "seed": 999,
@@ -9,7 +9,7 @@
         "high_prob": 0.95,
         "false_positive_rate": 0.05,
         "false_negative_rate": 0.05,
-        "penalty_amount": 5.0,
+        "penalty_amount": 500.0,
         "backcheck_prob": 0.2
     },
     "market": {
@@ -17,15 +17,15 @@
         "fixed_price": null
     },
     "lab": {
-        "economic_value_min": 1.0,
-        "economic_value_max": 2.0,
+        "economic_value_min": 100.0,
+        "economic_value_max": 200.0,
         "risk_profile_min": 0.9,
         "risk_profile_max": 1.1,
         "capacity_min": 1.0,
         "capacity_max": 2.0,
         "capability_value": 0.0,
         "racing_factor": 1.0,
-        "reputation_sensitivity": 2.0,
+        "reputation_sensitivity": 200.0,
         "audit_coefficient": 1.0
     }
 }

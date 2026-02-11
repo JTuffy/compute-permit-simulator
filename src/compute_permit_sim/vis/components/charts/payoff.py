@@ -74,7 +74,7 @@ def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
             fontweight="bold",
         )
 
-    ax.set_ylabel("Avg Net Value ($)")
+    ax.set_ylabel("Avg Net Value (M$)")
     ax.set_title("Payoff by Strategy")
     ax.axhline(y=0, color="gray", linestyle="-", linewidth=0.5)
     ax.grid(True, alpha=0.3, axis="y")
@@ -119,7 +119,7 @@ def WealthDivergencePlot(
     )
 
     ax.set_xlabel("Step", fontsize=10)
-    ax.set_ylabel("Total Wealth ($)", fontsize=10)
+    ax.set_ylabel("Total Wealth (M$)", fontsize=10)
     ax.set_title("Wealth Divergence: Does Crime Pay?")
     ax.legend(loc="upper left")
     ax.grid(True, alpha=0.25, linestyle="--")
