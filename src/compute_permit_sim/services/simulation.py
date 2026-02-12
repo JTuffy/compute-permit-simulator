@@ -199,38 +199,33 @@ class SimulationEngine:
         if not model:
             return
 
+        import base64
+        import hashlib
+        import json
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         logger.info(f"Packing run {timestamp}")
 
         # Calculate final metrics
-        # Calculate final metrics
         agents = model.get_agent_snapshots()
         final_compliance = calculate_compliance(agents)
 
-        # Ensure config has the ACTUAL seed used
+        # Build final config with the ACTUAL seed used (not the UI field)
         final_config = self.config.to_scenario_config()
-        # Force the captured seed into the config record so it can be restored
-        # We need to perform a copy/update since model is frozen
         final_config = final_config.model_copy(
             update={"seed": self.active.state.value.actual_seed}
         )
 
-        # Calculate Regulator Metrics
+        # Regulator metrics
         total_audits = sum(
             len(step.audit) for step in self.active.state.value.current_run_steps
         )
-        # Use simple constant cost for now, or read from config if added later.
-        audit_cost_per_unit = model.config.audit.cost
-        total_enforcement_cost = total_audits * audit_cost_per_unit
+        total_enforcement_cost = total_audits * model.config.audit.cost
 
-        import hashlib
-        import json
+        # Build UrlConfig for hashing and shareable URL
+        from compute_permit_sim.schemas import RunMetrics, UrlConfig
 
-        # We need to recreate the exact dict structure used in solara_app.py
         c = final_config
-        # Use strongly typed UrlConfig
-        from compute_permit_sim.schemas import UrlConfig
-
         run_state = UrlConfig(
             n_agents=c.n_agents,
             steps=c.steps,
@@ -255,17 +250,17 @@ class SimulationEngine:
             audit_coeff=c.lab.audit_coefficient,
         ).model_dump(exclude_none=True)
 
-        # Compute SHA-256 Hash
+        # sim_id: short SHA-256 hash for display label
         json_bytes = json.dumps(run_state, sort_keys=True).encode("utf-8")
-        full_hash = hashlib.sha256(json_bytes).hexdigest()
-        short_hash = full_hash[:8]
+        short_hash = hashlib.sha256(json_bytes).hexdigest()[:8]
 
-        # Use simpler timestamp for display ID, but store sim_id as short hash
-        from compute_permit_sim.schemas import RunMetrics
+        # url_id: base64-encoded JSON for shareable ?id=... URL
+        url_id = base64.b64encode(json.dumps(run_state).encode("utf-8")).decode("utf-8")
 
         run = SimulationRun(
             id=f"run_{timestamp}",
             sim_id=short_hash,
+            url_id=url_id,
             config=final_config,
             steps=self.active.state.value.current_run_steps.copy(),
             metrics=RunMetrics(

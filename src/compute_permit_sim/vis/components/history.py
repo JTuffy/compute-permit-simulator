@@ -248,6 +248,28 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
                 small=True,
             )
 
+        # Copy Shareable Link
+        link_copied, set_link_copied = solara.use_state(False)
+
+        if run.url_id:
+
+            def copy_link():
+                # Build the full URL with ?id= parameter
+                url = f"?id={run.url_id}"
+                # Use JavaScript to copy to clipboard
+                js_code = f'navigator.clipboard.writeText(window.location.origin + window.location.pathname + "{url}").catch(function(e){{console.error(e)}})'
+                solara.display(solara.v.Html(tag="script", children=[js_code]))
+                set_link_copied(True)
+
+            with solara.Tooltip("Copied!" if link_copied else "Copy shareable link"):
+                solara.Button(
+                    icon_name="mdi-check" if link_copied else "mdi-link-variant",
+                    on_click=copy_link,
+                    icon=True,
+                    small=True,
+                    color="success" if link_copied else None,
+                )
+
 
 @solara.component
 def RunHistoryList():
