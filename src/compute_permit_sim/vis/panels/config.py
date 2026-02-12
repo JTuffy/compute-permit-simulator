@@ -2,6 +2,7 @@ import solara
 import solara.lab
 
 from compute_permit_sim.schemas import ScenarioConfig
+from compute_permit_sim.services import engine
 from compute_permit_sim.vis.components import RangeController, RangeView
 from compute_permit_sim.vis.components.dialogs import LoadScenarioDialog
 from compute_permit_sim.vis.components.history import RunHistoryList
@@ -106,15 +107,12 @@ def ConfigPanel():
             solara.Markdown("**SCENARIO**", style="font-size: 0.9rem; opacity: 0.7;")
             with solara.Row():
                 solara.Button(
-                    icon_name="mdi-play"
-                    if not active_sim.state.value.is_playing
-                    else "mdi-pause",
-                    on_click=lambda: active_sim.update(
-                        is_playing=not active_sim.state.value.is_playing
-                    ),
+                    icon_name="mdi-play",
+                    on_click=engine.start_run,
                     icon=True,
                     small=True,
                     color="primary",
+                    disabled=active_sim.state.value.is_playing,
                 )
                 solara.Button(
                     "Load",
@@ -204,13 +202,13 @@ def ConfigPanel():
                     value=ui_config.audit_coefficient,
                     dense=True,
                 )
+        is_running = active_sim.state.value.is_playing
         solara.Button(
-            label="⏸ Pause" if active_sim.state.value.is_playing else "▶ Play",
-            on_click=lambda: active_sim.update(
-                is_playing=not active_sim.state.value.is_playing
-            ),
+            label="⏳ Running..." if is_running else "▶ Play",
+            on_click=engine.start_run,
             color="primary",
             block=True,
+            disabled=is_running,
             style="font-weight: 600;",
         )
 

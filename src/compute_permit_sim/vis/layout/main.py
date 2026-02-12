@@ -2,7 +2,6 @@ from pathlib import Path
 
 import solara
 
-from compute_permit_sim.services import engine
 from compute_permit_sim.vis.components.system import (
     SimulationController,
     UrlManager,
@@ -18,9 +17,8 @@ def EmptyState():
     with solara.Column(
         style="height: 60vh; justify-content: center; align-items: center; color: #888;"
     ):
-        # Using a large icon and clear CTA
         solara.Markdown("## Ready to Simulate")
-        solara.Markdown("Configure parameters on the left and click **Play**.")
+        solara.Markdown("Configure parameters on the left and click **▶ Play**.")
 
 
 @solara.component
@@ -35,19 +33,12 @@ def LoadingState():
 @solara.component
 def Page():
     # Inject CSS
-    # Since we are moving this file deeper, we need to adjust the path to assets
-    # Previous: src/compute_permit_sim/vis/solara_app.py -> assets/style.css
-    # New: src/compute_permit_sim/vis/layout/main.py -> ../assets/style.css
     solara.Style(Path(__file__).parent.parent / "assets" / "style.css")
 
     # Sync URL State
     UrlManager()
 
-    # Initialize if needed
-    if active_sim.state.value.model is None:
-        engine.reset_model()
-
-    # Mount the controller (handles the loop)
+    # Mount the controller (handles the play loop when is_playing becomes True)
     SimulationController()
 
     with solara.Sidebar():

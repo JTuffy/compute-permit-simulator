@@ -7,6 +7,7 @@ and the async play loop.
 
 import asyncio
 import logging
+import random
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -58,34 +59,49 @@ class SimulationEngine:
         self.active = active
         self.history = history
 
-    def reset_model(self) -> None:
-        """Initialize or reset the Mesa model from current UI config."""
-        logger.info("Resetting simulation model")
-        scenario_config = self.config.to_scenario_config()
+    def start_run(self) -> None:
+        """Start a fresh simulation run from the current UI configuration.
 
-        # Dynamic Seeding: If no seed provided in config, Model will handle it.
-        # We capture usage below.
+        This is the ONLY entry point for new runs.  It:
+        1. Resolves the seed (random if the UI field is empty).
+        2. Builds a ScenarioConfig from the live UI reactive state.
+        3. Creates a brand-new ComputePermitModel.
+        4. Sets is_playing=True so SimulationController picks up the loop.
+        """
+        # --- Resolve seed ---
+        ui_seed = self.config.seed.value  # None when the user left it blank
+        run_seed = ui_seed if ui_seed is not None else random.randint(0, 2**31 - 1)
+
+        # Build config from CURRENT UI values
+        scenario_config = self.config.to_scenario_config()
+        # Inject the resolved seed (model_copy because ScenarioConfig is frozen)
+        scenario_config = scenario_config.model_copy(update={"seed": run_seed})
+
+        logger.info(
+            f"Starting new run with seed={run_seed} (user-provided={ui_seed is not None})"
+        )
 
         model = ComputePermitModel(scenario_config)
 
-        # Capture actual seed used by Mesa (for reproducibility)
-        # Mesa 3.x stores it in self._seed
-        actual_seed = getattr(model, "_seed", None)
+        # Capture actual seed written by Mesa (for reproducibility record)
+        actual_seed = getattr(model, "_seed", run_seed)
         logger.info(f"Model initialized with seed: {actual_seed}")
 
-        # Update unified state in ONE transaction
+        # Reset all active state and start playing in ONE transaction
         self.active.update(
             model=model,
             actual_seed=actual_seed,
             step_count=0,
             compliance_history=[],
             price_history=[],
+            wealth_history_compliant=[],
+            wealth_history_non_compliant=[],
             agents_df=None,
-            is_playing=False,
+            is_playing=True,
             current_run_steps=[],
         )
 
-        # Clear selection to show live
+        # Clear history selection to show live view
         self.history.selected_run.value = None
 
     def step(self) -> None:
@@ -145,24 +161,25 @@ class SimulationEngine:
         )
 
     async def play_loop(self) -> None:
-        """Async loop for continuous play.
+        """Async loop that runs all steps until the step limit is reached.
 
+        Triggered by SimulationController when is_playing transitions to True.
         Uses defensive pattern for Python 3.13 compatibility.
         """
         if not self.active.state.value.is_playing:
             return
 
-        logger.info("Starting play loop")
+        logger.info("Play loop started")
         try:
             while self.active.state.value.is_playing:
                 model = self.active.state.value.model
-                config = model.config if model else None
+                if not model:
+                    break
 
                 # Check step limit
-                if config and self.active.state.value.step_count >= config.steps:
-                    logger.info("Step limit reached in play loop")
+                if self.active.state.value.step_count >= model.config.steps:
+                    logger.info("Step limit reached — packing run")
                     self.pack_current_run()
-                    # Safe to update state here as we are not cancelling
                     self.active.update(is_playing=False)
                     break
 
@@ -170,8 +187,6 @@ class SimulationEngine:
                 await asyncio.sleep(0.05)
 
         except asyncio.CancelledError:
-            # DO NOT update reactive state here.
-            # Just acknowledge and exit.
             logger.debug("Play loop task cancelled gracefully.")
             raise
         except Exception as e:
@@ -267,13 +282,16 @@ class SimulationEngine:
         self.history.select_run(run)
 
     def load_scenario(self, filename: str) -> None:
-        """Load a scenario from a JSON file."""
+        """Load a scenario from a JSON file into the UI config.
+
+        This updates UI reactive state only.  The user must click Play
+        to actually start a run with the loaded parameters.
+        """
         logger.info(f"Loading scenario: {filename}")
         try:
             config = load_scenario(filename)
             self.config.from_scenario_config(config)
             self.config.selected_scenario.value = config.name or filename
-            self.reset_model()
         except Exception as e:
             logger.error(f"Error loading scenario {filename}: {e}")
             print(f"Error loading scenario {filename}: {e}")

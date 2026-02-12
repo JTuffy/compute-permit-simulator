@@ -18,7 +18,7 @@ dependencies = [
     "pandas>=3.0.0",
     "pydantic>=2.12.5",
     "seaborn>=0.13.2",
-    "solara>=1.57.1",
+    "solara>=1.57.2",
     "tqdm>=4.67.1",
     "xlsxwriter>=3.2.0",
 ]
