@@ -1,9 +1,12 @@
+import asyncio
+
 import solara
 import solara.lab
 
-from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.services import engine
+from compute_permit_sim.schemas import ScenarioConfig, SimulationRun
 from compute_permit_sim.services.config_manager import save_scenario
+from compute_permit_sim.vis.components import AutoConfigView
+from compute_permit_sim.vis.state import engine
 from compute_permit_sim.vis.state.history import session_history
 
 
@@ -66,76 +69,14 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
                         f"Created: {ts_str}", style="opacity: 0.7; font-size: 0.85rem;"
                     )
 
-                    # General Config
-                    solara.HTML(
-                        tag="h4",
-                        unsafe_innerHTML="General",
-                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
+                    solara.Markdown("---", style="margin: 12px 0;")
+                    AutoConfigView(
+                        schema=ScenarioConfig,
+                        model=c,
+                        readonly=True,
+                        collapsible=True,
                     )
-                    with solara.Columns([1, 1, 1]):
-                        solara.Markdown(f"**Steps:** {c.steps}")
-                        solara.Markdown(f"**Agents:** {c.n_agents}")
-                        solara.Markdown(f"**Token Cap:** {int(c.market.token_cap)}")
-
-                    # Audit Config
-                    solara.HTML(
-                        tag="h4",
-                        unsafe_innerHTML="Audit Policy",
-                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
-                    )
-                    with solara.Columns([1, 1]):
-                        with solara.Column():
-                            solara.Markdown(
-                                f"**Base Prob (π₀):** {c.audit.base_prob:.2%}"
-                            )
-                            solara.Markdown(
-                                f"**High Prob (π₁):** {c.audit.high_prob:.2%}"
-                            )
-                            solara.Markdown(
-                                f"**Backcheck:** {c.audit.backcheck_prob:.2%}"
-                            )
-                        with solara.Column():
-                            solara.Markdown(
-                                f"**Penalty:** ${c.audit.penalty_amount:.0f}M"
-                            )
-                            solara.Markdown(
-                                f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
-                            )
-                            solara.Markdown(
-                                f"**FPR:** {c.audit.false_positive_rate:.2%}"
-                            )
-                            solara.Markdown(f"**Cost:** ${c.audit.cost:.2f}M")
-
-                    # Lab Config
-                    solara.HTML(
-                        tag="h4",
-                        unsafe_innerHTML="Lab Parameters",
-                        style="margin: 16px 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;",
-                    )
-                    with solara.Columns([1, 1]):
-                        with solara.Column():
-                            solara.Markdown(
-                                f"**Economic Value:** {c.lab.economic_value_min:.2f} - {c.lab.economic_value_max:.2f}"
-                            )
-                            solara.Markdown(
-                                f"**Risk Profile:** {c.lab.risk_profile_min:.2f} - {c.lab.risk_profile_max:.2f}"
-                            )
-                            solara.Markdown(
-                                f"**Capacity:** {c.lab.capacity_min:.2f} - {c.lab.capacity_max:.2f}"
-                            )
-                        with solara.Column():
-                            solara.Markdown(
-                                f"**Capability Vb:** {c.lab.capability_value:.2f}"
-                            )
-                            solara.Markdown(
-                                f"**Racing Factor cr:** {c.lab.racing_factor:.2f}"
-                            )
-                            solara.Markdown(
-                                f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
-                            )
-                            solara.Markdown(
-                                f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
-                            )
+                    solara.Markdown("---", style="margin: 12px 0;")
 
                     # Metrics (always available via Typed Object)
                     solara.HTML(
@@ -229,7 +170,7 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
 
         # Excel Export
         def export_excel():
-            from compute_permit_sim.services.export import export_run_to_excel
+            from compute_permit_sim.vis.export import export_run_to_excel
 
             try:
                 output_path = export_run_to_excel(run)
@@ -253,13 +194,18 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
 
         if run.url_id:
 
-            def copy_link():
+            async def _copy_link_async():
                 # Build the full URL with ?id= parameter
                 url = f"?id={run.url_id}"
                 # Use JavaScript to copy to clipboard
                 js_code = f'navigator.clipboard.writeText(window.location.origin + window.location.pathname + "{url}").catch(function(e){{console.error(e)}})'
                 solara.display(solara.v.Html(tag="script", children=[js_code]))
                 set_link_copied(True)
+                await asyncio.sleep(2.0)
+                set_link_copied(False)
+
+            def copy_link():
+                asyncio.create_task(_copy_link_async())
 
             with solara.Tooltip("Copied!" if link_copied else "Copy shareable link"):
                 solara.Button(

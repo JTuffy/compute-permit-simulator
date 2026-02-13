@@ -1,7 +1,7 @@
 """Excel export functionality for simulation runs.
 
 Exports run data to Excel with multiple sheets:
-- Config: All simulation parameters
+- Config: All simulation parameters (auto-generated from schema)
 - Summary: Key metrics and time series data
 - Agent Details: Full agent snapshot from last step
 - Graphs: Embedded matplotlib figures
@@ -12,23 +12,23 @@ import os
 
 import pandas as pd
 import xlsxwriter
+from pydantic import BaseModel
 
-from compute_permit_sim.core.constants import ColumnNames
+from compute_permit_sim.schemas.columns import ColumnNames
+from compute_permit_sim.schemas.config import ScenarioConfig
 from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import plot_scatter, plot_time_series
 
+# Sub-model grouping: maps ScenarioConfig nested keys to display section headers
+_SECTION_LABELS = {
+    "audit": "Audit Parameters",
+    "market": "Market Parameters",
+    "lab": "Lab Generation",
+}
+
 
 def export_run_to_excel(run, output_path: str | None = None) -> str:
-    """Export a simulation run to an Excel file with multiple sheets.
-
-    Args:
-        run: SimulationRun object containing config, steps, and metrics
-        output_path: Optional path for the output file. If None, generates a
-                     timestamped filename in the current directory.
-
-    Returns:
-        Path to the created Excel file.
-    """
+    """Export a simulation run to an Excel file with multiple sheets."""
     if output_path is None:
         os.makedirs("outputs", exist_ok=True)
         # Use simpler Config ID if available, otherwise timestamp
@@ -83,89 +83,99 @@ def export_run_to_excel(run, output_path: str | None = None) -> str:
     return output_path
 
 
+def _get_field_label(model_class, field_name: str) -> str:
+    """Get human-readable label from json_schema_extra or fallback."""
+    field_info = model_class.model_fields.get(field_name)
+    if field_info is None:
+        return field_name
+
+    extra = field_info.json_schema_extra
+    if extra and "ui_label" in extra:
+        return extra["ui_label"]
+    if field_info.description:
+        return field_info.description
+    return field_name.replace("_", " ").title()
+
+
+def _write_config_section(
+    sheet,
+    model_class,
+    data: dict,
+    section_title: str,
+    row: int,
+    header_format,
+    data_format,
+) -> int:
+    """Write a config section header and all its fields.
+
+    Returns the next available row.
+    """
+    sheet.write(row, 0, section_title, header_format)
+    sheet.write(row, 1, "", header_format)
+    row += 1
+
+    for field_name, value in data.items():
+        label = _get_field_label(model_class, field_name)
+        display_value = value if value is not None else "None"
+        sheet.write(row, 0, label, data_format)
+        sheet.write(row, 1, display_value, data_format)
+        row += 1
+
+    return row + 1  # blank spacer row
+
+
 def _write_config_sheet(sheet, config, header_format, data_format):
-    """Write configuration parameters to sheet."""
-    sheet.set_column("A:A", 25)
+    """Write configuration parameters to sheet — fully dynamic from Schema."""
+    sheet.set_column("A:A", 30)
     sheet.set_column("B:B", 20)
 
     row = 0
 
-    # General
-    sheet.write(row, 0, "General Parameters", header_format)
-    sheet.write(row, 1, "", header_format)
-    row += 1
+    # 1. Top-level scalar fields
+    top_level_data = {}
+    for name, field_info in ScenarioConfig.model_fields.items():
+        # Check if field type is a Pydantic model
+        is_model = isinstance(field_info.annotation, type) and issubclass(
+            field_info.annotation, BaseModel
+        )
+        if not is_model:
+            top_level_data[name] = getattr(config, name, None)
 
-    params = [
-        ("Name", config.name),
-        ("Description", config.description or ""),
-        ("Steps", config.steps),
-        ("Number of Agents", config.n_agents),
-        ("Seed", config.seed if config.seed else "None"),
-    ]
-    for label, value in params:
-        sheet.write(row, 0, label, data_format)
-        sheet.write(row, 1, value, data_format)
-        row += 1
+    if top_level_data:
+        row = _write_config_section(
+            sheet,
+            ScenarioConfig,
+            top_level_data,
+            "General Parameters",
+            row,
+            header_format,
+            data_format,
+        )
 
-    row += 1
+    # 2. Sub-models (Sections)
+    for name, field_info in ScenarioConfig.model_fields.items():
+        is_model = isinstance(field_info.annotation, type) and issubclass(
+            field_info.annotation, BaseModel
+        )
+        if is_model:
+            sub_config = getattr(config, name, None)
+            if sub_config:
+                # Use the field name as section title (capitalized) or ui_group if available
+                extra = field_info.json_schema_extra or {}
+                section_title = extra.get("ui_group", name.replace("_", " ").title())
 
-    # Market
-    sheet.write(row, 0, "Market Parameters", header_format)
-    sheet.write(row, 1, "", header_format)
-    row += 1
+                # Helper maps generic names to specific Excel section titles if needed
+                # But dynamic title is better.
 
-    market_params = [
-        ("Token Cap", config.market.token_cap),
-    ]
-    for label, value in market_params:
-        sheet.write(row, 0, label, data_format)
-        sheet.write(row, 1, value, data_format)
-        row += 1
-
-    row += 1
-
-    # Audit
-    sheet.write(row, 0, "Audit Parameters", header_format)
-    sheet.write(row, 1, "", header_format)
-    row += 1
-
-    audit_params = [
-        ("Penalty Amount ($)", config.audit.penalty_amount),
-        ("Base Probability (π₀)", config.audit.base_prob),
-        ("High Probability (π₁)", config.audit.high_prob),
-        ("False Positive Rate", config.audit.false_positive_rate),
-        ("False Negative Rate", config.audit.false_negative_rate),
-        ("Backcheck Probability", config.audit.backcheck_prob),
-        ("Whistleblower Probability", config.audit.whistleblower_prob),
-    ]
-    for label, value in audit_params:
-        sheet.write(row, 0, label, data_format)
-        sheet.write(row, 1, value, data_format)
-        row += 1
-
-    row += 1
-
-    # Lab Generation
-    sheet.write(row, 0, "Lab Generation", header_format)
-    sheet.write(row, 1, "", header_format)
-    row += 1
-
-    lab_params = [
-        ("Economic Value Min", config.lab.economic_value_min),
-        ("Economic Value Max", config.lab.economic_value_max),
-        ("Risk Profile Min", config.lab.risk_profile_min),
-        ("Risk Profile Max", config.lab.risk_profile_max),
-        ("Capacity Min", config.lab.capacity_min),
-        ("Capacity Max", config.lab.capacity_max),
-        ("Capability Value (Vb)", config.lab.capability_value),
-        ("Racing Factor (cr)", config.lab.racing_factor),
-        ("Reputation Sensitivity (β)", config.lab.reputation_sensitivity),
-        ("Audit Coefficient", config.lab.audit_coefficient),
-    ]
-    for label, value in lab_params:
-        sheet.write(row, 0, label, data_format)
-        sheet.write(row, 1, value, data_format)
-        row += 1
+                row = _write_config_section(
+                    sheet,
+                    field_info.annotation,
+                    sub_config.model_dump(),
+                    section_title,
+                    row,
+                    header_format,
+                    data_format,
+                )
 
 
 def _write_summary_sheet(

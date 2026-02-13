@@ -16,6 +16,7 @@ import pandas as pd
 
 from compute_permit_sim.schemas import (
     MarketSnapshot,
+    RunMetrics,
     SimulationRun,
     StepResult,
 )
@@ -26,11 +27,11 @@ if TYPE_CHECKING:
     from compute_permit_sim.vis.state.history import SessionHistory
 
 from compute_permit_sim.services.config_manager import load_scenario
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 from compute_permit_sim.services.metrics import (
     calculate_compliance,
     calculate_wealth_stats,
 )
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +61,9 @@ class SimulationEngine:
         self.history = history
 
     def start_run(self) -> None:
-        """Start a fresh simulation run from the current UI configuration.
-
-        This is the ONLY entry point for new runs.  It:
-        1. Resolves the seed (random if the UI field is empty).
-        2. Builds a ScenarioConfig from the live UI reactive state.
-        3. Creates a brand-new ComputePermitModel.
-        4. Sets is_playing=True so SimulationController picks up the loop.
-        """
+        """Start a fresh simulation run from the current UI configuration."""
         # --- Resolve seed ---
-        ui_seed = self.config.seed.value  # None when the user left it blank
+        ui_seed = self.config.seed.value
         run_seed = ui_seed if ui_seed is not None else random.randint(0, 2**31 - 1)
 
         # Build config from CURRENT UI values
@@ -222,33 +216,9 @@ class SimulationEngine:
         )
         total_enforcement_cost = total_audits * model.config.audit.cost
 
-        # Build UrlConfig for hashing and shareable URL
-        from compute_permit_sim.schemas import RunMetrics, UrlConfig
-
-        c = final_config
-        run_state = UrlConfig(
-            n_agents=c.n_agents,
-            steps=c.steps,
-            token_cap=c.market.token_cap,
-            seed=c.seed,
-            penalty=c.audit.penalty_amount,
-            base_prob=c.audit.base_prob,
-            high_prob=c.audit.high_prob,
-            signal_fpr=c.audit.false_positive_rate,
-            signal_tpr=1.0 - c.audit.false_negative_rate,
-            backcheck_prob=c.audit.backcheck_prob,
-            audit_cost=c.audit.cost,
-            ev_min=c.lab.economic_value_min,
-            ev_max=c.lab.economic_value_max,
-            risk_min=c.lab.risk_profile_min,
-            risk_max=c.lab.risk_profile_max,
-            cap_min=c.lab.capacity_min,
-            cap_max=c.lab.capacity_max,
-            vb=c.lab.capability_value,
-            cr=c.lab.racing_factor,
-            rep=c.lab.reputation_sensitivity,
-            audit_coeff=c.lab.audit_coefficient,
-        ).model_dump(exclude_none=True)
+        # Build compact config for hashing and shareable URL
+        # We use exclude_defaults=True to keep the URL short and avoid maintaining a separate UrlConfig DTO.
+        run_state = final_config.model_dump(exclude_defaults=True, exclude_none=True)
 
         # sim_id: short SHA-256 hash for display label
         json_bytes = json.dumps(run_state, sort_keys=True).encode("utf-8")
@@ -294,36 +264,7 @@ class SimulationEngine:
     def restore_config(self, run: SimulationRun) -> None:
         """Restore configuration from a past run."""
         logger.info(f"Restoring config from run {run.id}")
-        c = run.config
-
-        # Apply Top Level
-        self.config.n_agents.value = c.n_agents
-        self.config.steps.value = c.steps
-        self.config.token_cap.value = int(c.market.token_cap)
-
-        # Audit
-        self.config.base_prob.value = c.audit.base_prob
-        self.config.high_prob.value = c.audit.high_prob
-        self.config.penalty.value = c.audit.penalty_amount
-
-        # Lab
-        self.config.economic_value_min.value = c.lab.economic_value_min
-        self.config.economic_value_max.value = c.lab.economic_value_max
-        self.config.risk_profile_min.value = c.lab.risk_profile_min
-        self.config.risk_profile_max.value = c.lab.risk_profile_max
-        self.config.capacity_min.value = getattr(c.lab, "capacity_min", 1.0)
-        self.config.capacity_max.value = getattr(c.lab, "capacity_max", 2.0)
-        self.config.capability_value.value = getattr(c.lab, "capability_value", 0.0)
-        self.config.racing_factor.value = getattr(c.lab, "racing_factor", 1.0)
-        self.config.reputation_sensitivity.value = getattr(
-            c.lab, "reputation_sensitivity", 0.0
-        )
-        self.config.audit_coefficient.value = getattr(c.lab, "audit_coefficient", 1.0)
-
-        # Restore SEED
-        self.config.seed.value = c.seed
-        logger.info(f"Restored seed: {c.seed}")
-
+        self.config.from_scenario_config(run.config)
         self.config.selected_scenario.value = "Restored"
 
     def save_run(self, name_prefix="run") -> str | None:

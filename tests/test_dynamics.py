@@ -4,7 +4,7 @@ from compute_permit_sim.schemas import (
     MarketConfig,
     ScenarioConfig,
 )
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 
 def get_base_configs():
@@ -59,7 +59,7 @@ def test_higher_audit_rate_higher_compliance():
     # Setup: High incentive to cheat.
     # fixed_price=2.0 (Gain from cheating is 2.0).
     # We need p*B > 2.0 to deter.
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={"penalty_amount": 4.0}
     )  # B=4.0, need to add this as function to that class
@@ -81,7 +81,7 @@ def test_higher_backcheck_rate_higher_compliance():
     """Check higher backcheck rate leads to higher compliance rate (non-zero FNR)."""
     audit, market, lab = get_base_configs()
     # Price > Value so they rely on cheating vs desisting
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={
             "penalty_amount": 4.0,
@@ -111,7 +111,7 @@ def test_zero_enforcement_zero_compliance():
     """Zero audit rate and zero reputation sensitivity lead to zero compliance rate."""
     audit, market, lab = get_base_configs()
     # Price > Value to prevent buying
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     # Zero enforcement
     audit = audit.model_copy(
         update={
@@ -131,7 +131,7 @@ def test_high_racing_factor_zero_compliance():
     """Very high racing factor with max supply leads to zero compliance rate."""
     audit, market, lab = get_base_configs()
 
-    market.set_fixed_price(2.0)  # Price > Value (1.0)
+    market = market.model_copy(update={"fixed_price": 2.0})  # Price > Value (1.0)
     lab = lab.model_copy(
         update={
             "economic_value_min": 1.0,

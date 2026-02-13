@@ -4,7 +4,8 @@ import matplotlib
 import pandas as pd
 from matplotlib.figure import Figure
 
-from compute_permit_sim.core.constants import CHART_COLOR_MAP, ColumnNames
+from compute_permit_sim.schemas.columns import ColumnNames
+from compute_permit_sim.vis.constants import CHART_COLOR_MAP
 
 # Ensure non-interactive backend for thread safety in Solara/Exports
 matplotlib.use("Agg")

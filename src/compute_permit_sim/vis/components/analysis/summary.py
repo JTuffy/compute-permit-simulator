@@ -1,88 +1,53 @@
-import solara
+"""Analysis Summary component — config + key metrics for a simulation run."""
 
-from compute_permit_sim.vis.components import MetricCard
-from compute_permit_sim.vis.state.active import active_sim
+import solara
+import solara.lab
+
+from compute_permit_sim.schemas import ScenarioConfig
+from compute_permit_sim.vis.components import AutoConfigView
 
 
 @solara.component
 def AnalysisSummary(
     is_live: bool,
-    config,
+    config: ScenarioConfig | None,
     step_count: int,
     compliance_series: list,
     price_series: list,
 ):
-    """Summary card showing key metrics and run configuration details."""
-    # --- Compute derived values for cards ---
-    current_compliance = "N/A"
-    comp_color = "primary"
-    if compliance_series:
-        comp_val = compliance_series[-1]
-        current_compliance = f"{comp_val:.1%}"
-        comp_color = "success" if comp_val >= 0.8 else "warning"
+    """Display key metrics and full run configuration."""
+    if not config:
+        return
 
-    current_price = f"${price_series[-1]:.2f}" if price_series else "N/A"
+    # Derive display values
+    final_compliance = compliance_series[-1] if compliance_series else None
+    final_price = price_series[-1] if price_series else None
 
-    with solara.Card("Key Metrics"):
-        # Determine seed to display
-        display_seed = "Random"
-        if is_live:
-            if active_sim.state.value.actual_seed is not None:
-                display_seed = str(active_sim.state.value.actual_seed)
-        elif config and config.seed is not None:
-            display_seed = str(config.seed)
+    with solara.Card("Summary", style="margin-bottom: 12px;"):
+        with solara.Row(style="gap: 24px; flex-wrap: wrap;"):
+            _MetricChip("Steps", str(step_count))
+            _MetricChip(
+                "Compliance",
+                f"{final_compliance:.0%}" if final_compliance is not None else "—",
+            )
+            _MetricChip(
+                "Final Price",
+                f"${final_price:.2f}" if final_price is not None else "—",
+            )
+            if config.seed is not None:
+                _MetricChip("Seed", str(config.seed))
 
-        with solara.Columns([1, 1, 1, 1]):
-            MetricCard("Steps", f"{step_count}", "primary")
-            MetricCard("Compliance", current_compliance, comp_color)
-            MetricCard("Price", current_price, "primary")
-            MetricCard("Seed", display_seed, "secondary")
+        solara.Markdown("---")
+        with solara.Column(style="font-size: 0.95em;"):
+            AutoConfigView(
+                schema=ScenarioConfig,
+                model=config,
+                readonly=True,
+                collapsible=True,
+            )
 
-    # Run Configuration (Historical Only)
-    if config is not None:
-        with solara.Card():
-            with solara.Details("Run Configuration", expand=False):
-                c = config
-                with solara.lab.Tabs():
-                    with solara.lab.Tab("General"):
-                        with solara.Columns([1, 1]):
-                            with solara.Column():
-                                solara.Markdown(f"**Steps:** {c.steps}")
-                                solara.Markdown(f"**Agents:** {c.n_agents}")
-                            with solara.Column():
-                                solara.Markdown(
-                                    f"**Token Cap:** {int(c.market.token_cap)}"
-                                )
 
-                    with solara.lab.Tab("Audit Policy"):
-                        with solara.Columns([1, 1]):
-                            with solara.Column():
-                                solara.Markdown(f"**Base π₀:** {c.audit.base_prob:.2%}")
-                                solara.Markdown(f"**High π₁:** {c.audit.high_prob:.2%}")
-                                solara.Markdown(
-                                    f"**Penalty:** ${c.audit.penalty_amount:.0f}M"
-                                )
-                            with solara.Column():
-                                solara.Markdown(
-                                    f"**TPR:** {1 - c.audit.false_negative_rate:.2%}"
-                                )
-                                solara.Markdown(
-                                    f"**FPR:** {c.audit.false_positive_rate:.2%}"
-                                )
-
-                    with solara.lab.Tab("Lab Dynamics"):
-                        with solara.Columns([1, 1]):
-                            with solara.Column():
-                                solara.Markdown(
-                                    f"**Racing cr:** {c.lab.racing_factor:.2f}"
-                                )
-                                solara.Markdown(
-                                    f"**Capability Vb:** {c.lab.capability_value:.2f}"
-                                )
-                            with solara.Column():
-                                solara.Markdown(
-                                    f"**Reputation β:** {c.lab.reputation_sensitivity:.2f}"
-                                )
-                                solara.Markdown(
-                                    f"**Audit Coeff:** {c.lab.audit_coefficient:.2f}"
-                                )
+@solara.component
+def _MetricChip(label: str, value: str):
+    """Small metric display chip."""
+    solara.Markdown(f"**{label}:** {value}", style="white-space: nowrap;")

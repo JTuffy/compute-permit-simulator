@@ -1,7 +1,7 @@
 import solara
 import solara.lab
 
-from compute_permit_sim.services import engine
+from compute_permit_sim.vis.state import engine
 from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
 
@@ -33,7 +33,7 @@ def UrlManager():
         import json
         from urllib.parse import parse_qs
 
-        from compute_permit_sim.schemas import UrlConfig
+        from compute_permit_sim.schemas import ScenarioConfig
 
         query = router.search
         if not query:
@@ -52,56 +52,12 @@ def UrlManager():
             json_str = base64.b64decode(encoded_id).decode("utf-8")
             config_dict = json.loads(json_str)
 
-            # Parse and validate strictly
-            url_config = UrlConfig(**config_dict)
+            # Validate and reconstruct ScenarioConfig
+            # Missing fields in JSON (due to exclude_defaults) will use defaults from schema
+            loaded_config = ScenarioConfig(**config_dict)
 
             # Apply to UI Config
-            if url_config.n_agents is not None:
-                ui_config.n_agents.value = url_config.n_agents
-            if url_config.steps is not None:
-                ui_config.steps.value = url_config.steps
-            if url_config.token_cap is not None:
-                ui_config.token_cap.value = url_config.token_cap
-            if url_config.seed is not None:
-                ui_config.seed.value = url_config.seed
-
-            # Audit
-            if url_config.penalty is not None:
-                ui_config.penalty.value = url_config.penalty
-            if url_config.base_prob is not None:
-                ui_config.base_prob.value = url_config.base_prob
-            if url_config.high_prob is not None:
-                ui_config.high_prob.value = url_config.high_prob
-            if url_config.signal_fpr is not None:
-                ui_config.signal_fpr.value = url_config.signal_fpr
-            if url_config.signal_tpr is not None:
-                ui_config.signal_tpr.value = url_config.signal_tpr
-            if url_config.backcheck_prob is not None:
-                ui_config.backcheck_prob.value = url_config.backcheck_prob
-            if url_config.audit_cost is not None:
-                ui_config.audit_cost.value = url_config.audit_cost
-
-            # Lab
-            if url_config.ev_min is not None:
-                ui_config.economic_value_min.value = url_config.ev_min
-            if url_config.ev_max is not None:
-                ui_config.economic_value_max.value = url_config.ev_max
-            if url_config.risk_min is not None:
-                ui_config.risk_profile_min.value = url_config.risk_min
-            if url_config.risk_max is not None:
-                ui_config.risk_profile_max.value = url_config.risk_max
-            if url_config.cap_min is not None:
-                ui_config.capacity_min.value = url_config.cap_min
-            if url_config.cap_max is not None:
-                ui_config.capacity_max.value = url_config.cap_max
-            if url_config.vb is not None:
-                ui_config.capability_value.value = url_config.vb
-            if url_config.cr is not None:
-                ui_config.racing_factor.value = url_config.cr
-            if url_config.rep is not None:
-                ui_config.reputation_sensitivity.value = url_config.rep
-            if url_config.audit_coeff is not None:
-                ui_config.audit_coefficient.value = url_config.audit_coeff
+            ui_config.from_scenario_config(loaded_config)
 
         except (
             ValueError,

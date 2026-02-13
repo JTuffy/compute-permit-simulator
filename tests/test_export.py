@@ -19,7 +19,7 @@ from compute_permit_sim.schemas.data import (
     SimulationRun,
     StepResult,
 )
-from compute_permit_sim.services.export import export_run_to_excel
+from compute_permit_sim.vis.export import export_run_to_excel
 
 
 @pytest.fixture

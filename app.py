@@ -12,7 +12,7 @@ src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.append(str(src_path))
 
-from compute_permit_sim.vis.solara_app import Page  # noqa: E402
+from compute_permit_sim.vis.page import Page  # noqa: E402
 
 # Expose Page for Solara
 __all__ = ["Page"]

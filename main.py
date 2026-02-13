@@ -3,7 +3,7 @@
 import logging
 
 from compute_permit_sim.schemas import ScenarioConfig
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 # Configure logging for CLI
 logging.basicConfig(

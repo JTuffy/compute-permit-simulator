@@ -1,6 +1,6 @@
 import solara
 
-from compute_permit_sim.services import engine
+from compute_permit_sim.vis.state import engine
 from compute_permit_sim.vis.state.history import session_history
 
 

@@ -1,3 +1,9 @@
+"""Root page for the Solara application.
+
+Logic is distributed across `vis/panels`, `vis/components`, and `vis/state`.
+"""
+
+import logging
 from pathlib import Path
 
 import solara
@@ -10,6 +16,24 @@ from compute_permit_sim.vis.panels.analysis import AnalysisPanel
 from compute_permit_sim.vis.panels.config import ConfigPanel
 from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.history import session_history
+
+# --- Logging Configuration ---
+logger = logging.getLogger("compute_permit_sim")
+logger.setLevel(logging.INFO)
+if logger.handlers:
+    logger.handlers.clear()
+
+file_handler = logging.FileHandler("outputs/simulation.log")
+file_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+)
+
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 
 @solara.component
@@ -33,7 +57,7 @@ def LoadingState():
 @solara.component
 def Page():
     # Inject CSS
-    solara.Style(Path(__file__).parent.parent / "assets" / "style.css")
+    solara.Style(Path(__file__).parent / "assets" / "style.css")
 
     # Sync URL State
     UrlManager()
