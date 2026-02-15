@@ -1,5 +1,6 @@
 """Expose all components from submodules for cleaner importing."""
 
+from .auto_config import AutoConfigView
 from .cards import MetricCard, ScenarioCard
 from .charts import (
     AuditTargetingPlot,
@@ -22,6 +23,7 @@ __all__ = [
     "PayoffByStrategyPlot",
     "QuantitativeScatterPlot",
     "WealthDivergencePlot",
+    "AutoConfigView",
     "RangeController",
     "RangeView",
 ]

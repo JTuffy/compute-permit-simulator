@@ -59,6 +59,7 @@ We use `uv` for all development tasks to ensure reproducibility.
 |------|---------|
 | **Run Tests** | `uv run pytest` |
 | **Lint** | `uv run ruff check .` |
+| **Type Check** | `uv run mypy .` |
 | **Format** | `uv run ruff format .` |
 
 

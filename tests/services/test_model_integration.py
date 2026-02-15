@@ -4,7 +4,7 @@ from compute_permit_sim.schemas import (
     MarketConfig,
     ScenarioConfig,
 )
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 
 def test_simulation_integration() -> None:
@@ -53,8 +53,7 @@ def test_fixed_price_integration() -> None:
         backcheck_prob=0.0,
     )
     # Fixed price 1.0, effectively unlimited cap.
-    market_config = MarketConfig(token_cap=100)
-    market_config.set_fixed_price(1.0)
+    market_config = MarketConfig(token_cap=100, fixed_price=1.0)
     lab_config = LabConfig()
 
     config = ScenarioConfig(

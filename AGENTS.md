@@ -8,6 +8,7 @@ Guidelines for the Compute Permit Simulator. For detailed architecture diagrams,
 pytest                           # Verify all tests pass
 pytest tests/test_file.py -v     # Single file test
 solara run vis/app.py            # Start UI
+mypy .                           # Run type checker
 ```
 
 ## 1. Architecture Overview
@@ -61,7 +62,7 @@ solara run vis/app.py            # Start UI
 1. **Modify Schemas First**: When adding a parameter, add it to `schemas/config.py` first.
 2. **Update UI State**: Then update `vis/state/config.py` to expose it reactively.
 3. **Update Logic**: Then implement the logic in `services/`.
-4. **Verify**: Run `pytest` to ensure no regressions.
+4. **Verify**: Run `pytest` and `mypy .` to ensure no regressions.
 
 ## 4. Boundaries
 

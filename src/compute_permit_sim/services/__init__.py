@@ -1,14 +1,11 @@
-"""Services package for simulation orchestration.
+"""Services package — infrastructure adapters.
 
-This package contains:
-- simulation.py: SimulationEngine for controlling simulation execution
-- model_wrapper.py: Mesa model integration (ComputePermitModel)
-- config_manager.py: Scenario file loading/saving
-- data_collect.py: Mesa data collection functions
+Modules:
+ - mesa_model.py: Mesa model integration (ComputePermitModel)
+ - config_manager.py: Scenario file loading/saving
+ - metrics.py: Pure metric calculations
 """
 
-from compute_permit_sim.services.engine_instance import engine
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
-from compute_permit_sim.services.simulation import SimulationEngine
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
-__all__ = ["SimulationEngine", "engine", "ComputePermitModel"]
+__all__ = ["ComputePermitModel"]

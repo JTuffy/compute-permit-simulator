@@ -27,6 +27,7 @@ def MetricCard(
             style="font-size: 1.8rem; font-weight: 500;",
             unsafe_innerHTML=value,
         )
+    # type: ignore[return-value] # Implicit return via context manager side-effect
 
 
 @solara.component
@@ -44,3 +45,4 @@ def ScenarioCard(title: str, children: list[solara.Element] = []) -> solara.Elem
             unsafe_innerHTML=title,
         )
         solara.Column(children=children)
+    # type: ignore[return-value] # Implicit return via context manager side-effect

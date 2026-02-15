@@ -107,13 +107,47 @@ def AnalysisPanel():
 
     # --- Render Unified Layout ---
     with solara.Column(classes=["analysis-panel"]):
+        if is_live:
+            # Derive metrics from current simulation state
+            metrics = None
+            if active_sim.state.value.step_count > 0:
+                try:
+                    # Let's create a temporary object with what we have.
+                    from compute_permit_sim.schemas.data import RunMetrics
+
+                    # Get latest values from state
+                    state = active_sim.state.value
+                    final_compliance = (
+                        state.compliance_history[-1]
+                        if state.compliance_history
+                        else 0.0
+                    )
+                    final_price = (
+                        state.price_history[-1] if state.price_history else 0.0
+                    )
+                    avg_compliance = (
+                        sum(state.compliance_history) / len(state.compliance_history)
+                        if state.compliance_history
+                        else 0.0
+                    )
+
+                    metrics = RunMetrics(
+                        final_compliance=final_compliance,
+                        final_price=final_price,
+                        total_enforcement_cost=0.0,  # Not tracked in live state yet
+                        deterrence_success_rate=avg_compliance,
+                    )
+                except Exception:
+                    pass
+        else:
+            metrics = run.metrics if run else None
+
         # SECTION 1: Key Metrics & Config
         AnalysisSummary(
             is_live=is_live,
             config=config,
             step_count=step_count,
-            compliance_series=compliance_series,
-            price_series=price_series,
+            metrics=metrics,
         )
 
         # SECTION 2: Time Series Graphs

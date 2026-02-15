@@ -1,6 +1,7 @@
 import solara
 
-from compute_permit_sim.core.constants import ColumnNames
+from compute_permit_sim.schemas.columns import ColumnNames
+from compute_permit_sim.vis.components.factories import ChartFactory
 from compute_permit_sim.vis.state.config import ui_config
 
 
@@ -38,9 +39,6 @@ def StepInspector(
     if agents_df is not None and not agents_df.empty:
         with solara.Card("Step Analysis"):
             # Row 1: Risk Analysis (Scatter, Targeting, Capacity)
-            # REFACTOR: Use ChartFactory to standardize this grouping
-            from compute_permit_sim.vis.components.factories import ChartFactory
-
             ChartFactory.render_risk_analysis(agents_df)
 
             # Row 2: Theoretical & Deep Dives
@@ -48,7 +46,7 @@ def StepInspector(
             # Determine efficient detection p and penalty
             if is_live:
                 p_eff = ui_config.high_prob.value
-                penalty = ui_config.penalty.value
+                penalty = ui_config.penalty_amount.value
             elif config:
                 p_eff = config.audit.high_prob
                 penalty = config.audit.penalty_amount

@@ -1,0 +1,7 @@
+{
+    "name": "Lawless World (Status Quo)",
+    "description": "High evasion, minimal oversight. Default baseline (uses all defaults).",
+    "steps": 10,
+    "n_agents": 20,
+    "market": {}
+}

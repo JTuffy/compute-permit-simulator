@@ -6,7 +6,7 @@ from compute_permit_sim.schemas import (
     MarketConfig,
     ScenarioConfig,
 )
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 
 def get_base_configs():
@@ -101,7 +101,7 @@ def test_higher_backcheck_reduces_false_compliance():
     - Moderate Base Audit (0.1).
     """
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
     )
@@ -122,7 +122,7 @@ def test_higher_backcheck_reduces_false_compliance():
 def test_audit_capacity_constraint():
     """Test that max_audits_per_step limits penalized agents."""
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
 
     # 100% detection + low penalty so everyone cheats but audits capped
     audit = audit.model_copy(
@@ -195,7 +195,7 @@ def test_collateral_seized_on_violation():
     Collateral should be seized (not refunded).
     """
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     # Very low penalty so they still cheat even with collateral
     audit = audit.model_copy(
         update={
@@ -233,7 +233,7 @@ def test_collateral_refunded_when_compliant():
     Net effect on wealth: zero from collateral.
     """
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={"penalty_amount": 100.0, "base_prob": 1.0, "high_prob": 1.0}
     )
@@ -262,7 +262,7 @@ def test_collateral_refunded_when_compliant():
 def test_zero_collateral_unchanged():
     """Test that zero collateral preserves existing behavior exactly."""
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(2.0)
+    market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
     )
@@ -384,7 +384,7 @@ def test_audit_targeting_efficiency():
     - Base audit parameters insufficient to deter high-value agents.
     """
     audit, market, lab = get_base_configs()
-    market.set_fixed_price(3.0)
+    market = market.model_copy(update={"fixed_price": 3.0})
     audit = audit.model_copy(
         update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
     )

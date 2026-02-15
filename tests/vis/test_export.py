@@ -19,7 +19,7 @@ from compute_permit_sim.schemas.data import (
     SimulationRun,
     StepResult,
 )
-from compute_permit_sim.services.export import export_run_to_excel
+from compute_permit_sim.vis.export import export_run_to_excel
 
 
 @pytest.fixture
@@ -88,4 +88,4 @@ def test_export_run_to_excel_creates_file(sample_run: SimulationRun) -> None:
         df_agents = pd.read_excel(result_path, sheet_name="Agent Details")
         # Header row is parsed, we expect 2 agents
         assert len(df_agents) == 2
-        assert "Revenue" in df_agents.columns
+        assert "Gross economic value generated" in df_agents.columns
