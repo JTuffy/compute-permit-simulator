@@ -5,10 +5,11 @@ Guidelines for the Compute Permit Simulator. For detailed architecture diagrams,
 ## Commands
 
 ```bash
-pytest                           # Verify all tests pass
-pytest tests/test_file.py -v     # Single file test
-solara run vis/app.py            # Start UI
-mypy .                           # Run type checker
+uv run pytest                           # Verify all tests pass
+uv run pytest tests/test_file.py -v     # Single file test
+uv run solara run vis/app.py            # Start UI
+uv run mypy .                           # Run type checker
+uv run ruff check --fix                 # Run ruff check
 ```
 
 ## 1. Architecture Overview

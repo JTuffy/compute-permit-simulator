@@ -4,11 +4,7 @@
     "steps": 10,
     "n_agents": 20,
     "audit": {
-        "base_prob": 0.1,
-        "high_prob": 0.2
-    },
-    "lab": {
-        "audit_coefficient": 0.5
+        "base_prob": 0.2
     },
     "collateral_amount": 15.75,
     "market": {
