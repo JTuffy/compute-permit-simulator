@@ -17,7 +17,12 @@ from pydantic import BaseModel
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.schemas.config import ScenarioConfig
 from compute_permit_sim.services.metrics import calculate_compliance
-from compute_permit_sim.vis.plotting import plot_scatter, plot_time_series
+from compute_permit_sim.vis.plotting import (
+    plot_deterrence_frontier,
+    plot_payoff_distribution,
+    plot_scatter,
+    plot_time_series,
+)
 
 # Sub-model grouping: maps ScenarioConfig nested keys to display section headers
 _SECTION_LABELS = {
@@ -354,9 +359,20 @@ def _write_graphs_sheet(sheet, run, workbook):
             ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honest (y=x)")
             ax.legend()
             scatter_fig.tight_layout()
-
             scatter_img = _fig_to_bytes(scatter_fig)
             sheet.insert_image(26, 0, "scatter.png", {"image_data": scatter_img})
+
+            # Deterrence Frontier
+            sheet.write(25, 8, "Deterrence Frontier (Value vs Risk)")
+            det_fig, _ = plot_deterrence_frontier(agents_df)
+            det_img = _fig_to_bytes(det_fig)
+            sheet.insert_image(26, 8, "deterrence.png", {"image_data": det_img})
+
+            # Payoff Distribution
+            sheet.write(50, 0, "Payoff Analysis")
+            payoff_fig, _ = plot_payoff_distribution(agents_df)
+            payoff_img = _fig_to_bytes(payoff_fig)
+            sheet.insert_image(51, 0, "payoff.png", {"image_data": payoff_img})
 
 
 def _fig_to_bytes(fig) -> io.BytesIO:

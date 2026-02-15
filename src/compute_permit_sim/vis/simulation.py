@@ -261,12 +261,6 @@ class SimulationEngine:
             logger.error(f"Error loading scenario {filename}: {e}")
             print(f"Error loading scenario {filename}: {e}")
 
-    def restore_config(self, run: SimulationRun) -> None:
-        """Restore configuration from a past run."""
-        logger.info(f"Restoring config from run {run.id}")
-        self.config.from_scenario_config(run.config)
-        self.config.selected_scenario.value = "Restored"
-
     def save_run(self, name_prefix="run") -> str | None:
         """Persist the structured simulation run to a JSON file."""
         model = self.active.state.value.model

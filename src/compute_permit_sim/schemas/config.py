@@ -33,6 +33,8 @@ from compute_permit_sim.schemas.defaults import (
     DEFAULT_LAB_RISK_PROFILE_MIN,
     DEFAULT_LAB_TRAINING_FLOPS_MAX,
     DEFAULT_LAB_TRAINING_FLOPS_MIN,
+    DEFAULT_MARKET_FIXED_PRICE,
+    DEFAULT_MARKET_TOKEN_CAP,
     DEFAULT_RACING_GAP_SENSITIVITY,
     DEFAULT_REPUTATION_ESCALATION_FACTOR,
     DEFAULT_SCENARIO_N_AGENTS,
@@ -175,13 +177,13 @@ class MarketConfig(BaseModel):
     """Configuration for the Permit Market."""
 
     token_cap: float = Field(
-        ...,
+        DEFAULT_MARKET_TOKEN_CAP,
         gt=0,
         description="Total permits available (Q)",
         json_schema_extra=_ui("General", "Token Cap (Q)", "float"),
     )
     fixed_price: float | None = Field(
-        None,
+        DEFAULT_MARKET_FIXED_PRICE,
         ge=0,
         description="Fixed price for unlimited permits (optional)",
         json_schema_extra=_ui("General", "Fixed Price (M$)", "currency"),
@@ -351,8 +353,8 @@ class ScenarioConfig(BaseModel):
     )
 
     # Sub-configs
-    audit: AuditConfig
-    market: MarketConfig
+    audit: AuditConfig = Field(default_factory=AuditConfig)
+    market: MarketConfig = Field(default_factory=MarketConfig)
     lab: LabConfig = Field(default_factory=LabConfig)
 
     seed: int | None = None

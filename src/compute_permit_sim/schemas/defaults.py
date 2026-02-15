@@ -57,12 +57,13 @@ DEFAULT_LAB_TRAINING_FLOPS_MIN = 1e24  # FLOP: small frontier run
 DEFAULT_LAB_TRAINING_FLOPS_MAX = 1e26  # FLOP: large frontier run
 
 # --- Audit Policy Defaults ---
+# --- Audit Policy Defaults ---
 # Audit occurrence probabilities (whether an audit is initiated)
-DEFAULT_AUDIT_BASE_PROB = 0.05  # pi_0: baseline audit probability (random checks)
-DEFAULT_AUDIT_HIGH_PROB = 0.30  # pi_1: audit prob given suspicious signal
+DEFAULT_AUDIT_BASE_PROB = 0.05  # pi_0: Lawless baseline
+DEFAULT_AUDIT_HIGH_PROB = 0.0  # pi_1: Monitoring = 0 in Lawless
 # Audit outcome probabilities (whether an audit catches a violator)
 DEFAULT_AUDIT_FALSE_POS_RATE = 0.10  # alpha: P(false alarm | compliant firm audited)
-DEFAULT_AUDIT_FALSE_NEG_RATE = 0.20  # beta: P(miss | non-compliant firm audited)
+DEFAULT_AUDIT_FALSE_NEG_RATE = 0.40  # beta: 40% miss rate in Lawless env
 # Penalty structure:
 #   Legacy: penalty_amount (flat penalty, always available)
 #   Flexible (opt-in): max(penalty_fixed, penalty_percentage × firm_revenue)
@@ -82,11 +83,11 @@ DEFAULT_AUDIT_COST = 0.5  # M$: cost per audit for regulator
 # Seized on verified violation; returned otherwise. 0 = disabled.
 # Reference: Christoph (2026) Section 2.5, Proposition 3
 #   P_eff = min(K + phi, L) where K = collateral, phi = ex post fine, L = liability
-DEFAULT_COLLATERAL_AMOUNT = 0.0  # M$: per-lab collateral (0 = disabled)
+DEFAULT_COLLATERAL_AMOUNT = 0.0  # M$: Lawless = 0 collateral
 
 # --- Market Defaults ---
 DEFAULT_MARKET_TOKEN_CAP = 20.0  # Number of permits available
-DEFAULT_MARKET_FIXED_PRICE = None
+DEFAULT_MARKET_FIXED_PRICE = 70.0  # M$: Lawless implied delta C
 
 # --- Lab Agent Defaults ---
 # Economic value: value of a frontier training run (M$)
@@ -105,7 +106,7 @@ DEFAULT_LAB_RACING_FACTOR = 1.0  # c_r: 1.0 = no racing pressure
 # Reputation sensitivity: perceived reputation cost if caught (M$)
 DEFAULT_LAB_REPUTATION_SENSITIVITY = 50.0  # R: brand/trust damage
 # Audit coefficient: firm-specific audit rate scaling (dimensionless)
-DEFAULT_LAB_AUDIT_COEFFICIENT = 1.0  # c(i): 1.0 = average scrutiny
+DEFAULT_LAB_AUDIT_COEFFICIENT = 0.8  # c(i): Lawless = 0.8 evasion factor
 # Firm revenue: total annual revenue/turnover for penalty calculation (M$)
 # Major AI labs (2025): Anthropic ~$1B, OpenAI ~$5B, Google DeepMind (parent ~$300B)
 # For frontier labs specifically: ~$500M - $5,000M annual revenue
@@ -133,5 +134,5 @@ DEFAULT_RACING_GAP_SENSITIVITY = 0.0  # 0 = static; 0.5 = moderate dynamics
 DEFAULT_CAPABILITY_SCALE = 100.0  # normalization for capability gap
 
 # --- Scenario Defaults ---
-DEFAULT_SCENARIO_N_AGENTS = 50
-DEFAULT_SCENARIO_STEPS = 10
+DEFAULT_SCENARIO_N_AGENTS = 20  # Constraint: Max 20
+DEFAULT_SCENARIO_STEPS = 10  # Constraint: Max 10

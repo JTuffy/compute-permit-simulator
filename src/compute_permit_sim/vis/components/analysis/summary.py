@@ -38,13 +38,14 @@ def AnalysisSummary(
                 _MetricChip("Seed", str(config.seed))
 
         solara.Markdown("---")
-        with solara.Column(style="font-size: 0.95em;"):
-            AutoConfigView(
-                schema=ScenarioConfig,
-                model=config,
-                readonly=True,
-                collapsible=True,
-            )
+        with solara.Details("Full Configuration"):
+            with solara.Column(style="font-size: 0.95em;"):
+                AutoConfigView(
+                    schema=ScenarioConfig,
+                    model=config,
+                    readonly=True,
+                    render_mode="tabs",
+                )
 
 
 @solara.component

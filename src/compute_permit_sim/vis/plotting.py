@@ -117,5 +117,162 @@ def plot_scatter(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
+    #
+    return fig, ax
+
+
+def plot_deterrence_frontier(
+    df: pd.DataFrame,
+    title: str = "Deterrence Frontier",
+) -> tuple[Figure, any]:
+    """Scatter plot of Economic Value vs Risk Profile, colored by outcome."""
+    fig, ax = create_figure(figsize=(7, 5))
+
+    # X: Economic Value (Incentive), Y: Risk Profile (Sensitivity)
+    # Check if columns exist (snake_case from pydantic dump)
+    x_col = ColumnNames.ECONOMIC_VALUE
+    y_col = ColumnNames.RISK_PROFILE
+
+    if x_col not in df.columns or y_col not in df.columns:
+        return fig, ax  # empty
+
+    colors = []
+    labels = []
+
+    # Logic:
+    # Green: Compliant
+    # Red: Non-Compliant (Cheated) but NOT Caught
+    # Black: Caught (Non-Compliant + Caught)
+
+    has_status = (
+        ColumnNames.IS_COMPLIANT in df.columns and ColumnNames.WAS_CAUGHT in df.columns
+    )
+
+    if has_status:
+        for _, row in df.iterrows():
+            if row[ColumnNames.WAS_CAUGHT]:
+                colors.append("black")
+                labels.append("Caught")
+            elif not row[ColumnNames.IS_COMPLIANT]:
+                colors.append("red")
+                labels.append("Cheated")
+            else:
+                colors.append("green")
+                labels.append("Compliant")
+    else:
+        colors = ["blue"] * len(df)
+
+    ax.scatter(df[x_col], df[y_col], c=colors, alpha=0.7, edgecolors="w", s=80)
+
+    ax.set_xlabel("Economic Value (Incentive)")
+    ax.set_ylabel("Risk Profile (Sensitivity)")
+    ax.set_title(title)
+
+    # Custom Legend
+    from matplotlib.lines import Line2D
+
+    custom_lines = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor="green",
+            markersize=10,
+            label="Compliant",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor="red",
+            markersize=10,
+            label="Cheated",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor="black",
+            markersize=10,
+            label="Caught",
+        ),
+    ]
+    ax.legend(handles=custom_lines, loc="best")
+
+    return fig, ax
+
+
+def plot_payoff_distribution(
+    df: pd.DataFrame,
+    title: str = "Payoff by Strategy",
+) -> tuple[Figure, any]:
+    """Bar chart of Average Step Profit for Compliant vs Non-Compliant/Caught."""
+    fig, ax = create_figure(figsize=(6, 5))
+
+    if ColumnNames.STEP_PROFIT not in df.columns:
+        return fig, ax
+
+    # Strategies: Compliant, Cheated (Uncaught), Caught
+    # We group by status and take mean profit
+
+    groups = {"Compliant": [], "Uncaught": [], "Caught": []}
+
+    if ColumnNames.IS_COMPLIANT in df.columns and ColumnNames.WAS_CAUGHT in df.columns:
+        for _, row in df.iterrows():
+            profit = row[ColumnNames.STEP_PROFIT]
+            if row[ColumnNames.WAS_CAUGHT]:
+                groups["Caught"].append(profit)
+            elif not row[ColumnNames.IS_COMPLIANT]:
+                groups["Uncaught"].append(profit)
+            else:
+                groups["Compliant"].append(profit)
+
+    # Calculate means
+    means = []
+    labels = []
+    colors = []
+
+    # Order: Compliant, Caught, Uncaught
+    if groups["Compliant"]:
+        means.append(sum(groups["Compliant"]) / len(groups["Compliant"]))
+        labels.append(f"Compliant\n(n={len(groups['Compliant'])})")
+        colors.append("green")
+
+    if groups["Caught"]:
+        means.append(sum(groups["Caught"]) / len(groups["Caught"]))
+        labels.append(f"Caught\n(n={len(groups['Caught'])})")
+        colors.append("black")
+
+    if groups["Uncaught"]:
+        means.append(sum(groups["Uncaught"]) / len(groups["Uncaught"]))
+        labels.append(f"Uncaught\n(n={len(groups['Uncaught'])})")
+        colors.append("red")
+
+    if not means:
+        return fig, ax
+
+    bars = ax.bar(labels, means, color=colors, alpha=0.7, edgecolor="black")
+
+    # Add value labels
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(
+            f"${height:.2f}",
+            xy=(bar.get_x() + bar.get_width() / 2, height),
+            xytext=(0, 3),  # 3 points vertical offset
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontweight="bold",
+        )
+
+    ax.set_ylabel("Avg Net Value (M$)")
+    ax.set_title(title)
+    # Increase y-limit slightly for labels
+    if means:
+        ax.set_ylim(top=max(means) * 1.15)
 
     return fig, ax

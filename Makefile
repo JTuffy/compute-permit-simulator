@@ -8,6 +8,7 @@ help:
 	@echo "  make viz       - Run the Solara interactive dashboard"
 	@echo "  make heatmap   - Generate the Deterrence Heatmap"
 	@echo "  make lint      - Run linters (ruff)"
+	@echo "  make mypy      - Run type checker (mypy)"
 	@echo "  make format    - Format code (ruff)"
 	@echo "  make clean     - Remove artifacts (__pycache__, etc.)"
 
@@ -24,6 +25,9 @@ heatmap:
 
 lint:
 	uv run ruff check .
+
+mypy:
+	uv run mypy .
 
 format:
 	uv run ruff format .

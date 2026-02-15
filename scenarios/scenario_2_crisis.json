@@ -1,0 +1,16 @@
+{
+    "name": "Crisis World (Maximum Safety)",
+    "description": "Intrusive telemetry (100% monitoring), rigid enforcement (30% base audit), high collateral.",
+    "steps": 10,
+    "n_agents": 20,
+    "audit": {
+        "base_prob": 0.3,
+        "high_prob": 1.0,
+        "false_negative_rate": 0.1
+    },
+    "lab": {
+        "audit_coefficient": 0.1
+    },
+    "collateral_amount": 15.75,
+    "market": {}
+}

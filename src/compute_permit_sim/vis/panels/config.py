@@ -52,29 +52,11 @@ def ConfigPanel():
                     text=True,
                 )
 
-        # Run Settings (Seed)
-        def _update_seed(val):
-            try:
-                ui_config.seed.value = int(val) if val else None
-            except ValueError:
-                pass
-
-        with solara.Card("Run Settings", style="margin-bottom: 6px;"):
-            solara.InputText(
-                label="Seed (Optional)",
-                value=str(ui_config.seed.value)
-                if ui_config.seed.value is not None
-                else "",
-                on_value=_update_seed,
-            )
-
-        # Auto-Generated Config
-        # Exclude seed.
         AutoConfigView(
             schema=ScenarioConfig,
             model=ui_config,
             readonly=False,
-            exclude=["seed", "name", "description"],
+            exclude=["name", "description"],  # Seed is handled explicitly now
         )
 
         is_running = active_sim.state.value.is_playing

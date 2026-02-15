@@ -24,7 +24,15 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["jupyter>=1.1.1", "pre-commit>=4.5.1", "pytest>=9.0.2", "ruff>=0.14.14"]
+dev = [
+    "jupyter>=1.1.1",
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "pypdf>=6.7.0",
+    "pytest>=9.0.2",
+    "python-docx>=1.2.0",
+    "ruff>=0.14.14",
+]
 
 [tool.ruff]
 line-length = 88
@@ -37,3 +45,7 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true

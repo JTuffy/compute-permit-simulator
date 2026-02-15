@@ -1,12 +1,9 @@
-import asyncio
-
 import solara
 import solara.lab
 
 from compute_permit_sim.schemas import ScenarioConfig, SimulationRun
 from compute_permit_sim.services.config_manager import save_scenario
 from compute_permit_sim.vis.components import AutoConfigView
-from compute_permit_sim.vis.state import engine
 from compute_permit_sim.vis.state.history import session_history
 
 
@@ -29,8 +26,6 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
     label = display_id
 
     # Actions
-    def load_config():
-        engine.restore_config(run)
 
     def view_run():
         session_history.selected_run.value = run
@@ -121,15 +116,6 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
             color="primary" if is_selected else None,
         )
 
-        # Load Config
-        with solara.Tooltip("Load these parameters to Config Panel"):
-            solara.Button(
-                icon_name="mdi-upload",
-                on_click=load_config,
-                icon=True,
-                small=True,
-            )
-
         # Save Scenario
         show_save, set_show_save = solara.use_state(False)
         save_name, set_save_name = solara.use_state(f"scenario_{run.id}")
@@ -189,32 +175,22 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
                 small=True,
             )
 
-        # Copy Shareable Link
-        link_copied, set_link_copied = solara.use_state(False)
+            # Pure HTML/JS Button: "Just copy the ID"
+            # This bypasses Solara's event loop and works directly in the browser.
+            url = f"?id={run.url_id}"
 
-        if run.url_id:
-
-            async def _copy_link_async():
-                # Build the full URL with ?id= parameter
-                url = f"?id={run.url_id}"
-                # Use JavaScript to copy to clipboard
-                js_code = f'navigator.clipboard.writeText(window.location.origin + window.location.pathname + "{url}").catch(function(e){{console.error(e)}})'
-                solara.display(solara.v.Html(tag="script", children=[js_code]))
-                set_link_copied(True)
-                await asyncio.sleep(2.0)
-                set_link_copied(False)
-
-            def copy_link():
-                asyncio.create_task(_copy_link_async())
-
-            with solara.Tooltip("Copied!" if link_copied else "Copy shareable link"):
-                solara.Button(
-                    icon_name="mdi-check" if link_copied else "mdi-link-variant",
-                    on_click=copy_link,
-                    icon=True,
-                    small=True,
-                    color="success" if link_copied else None,
-                )
+            # Using a simplified HTML button that looks like a Solara button (MDI icon)
+            # relying on default button styling or inline styles.
+            btn_html = (
+                f"""<button onclick="navigator.clipboard.writeText(window.location.origin + window.location.pathname + '{url}'); alert('Link copied!');" """
+                f"""style="background:none; border:none; cursor:pointer; padding:6px; color:#2196F3; border-radius:50%; transition: background 0.2s;" """
+                f"""onmouseover="this.style.background='rgba(33, 150, 243, 0.1)'" """
+                f"""onmouseout="this.style.background='none'" """
+                f"""title="Copy shareable link">"""
+                f"""<i class="mdi mdi-link-variant" style="font-size:20px;"></i>"""
+                f"""</button>"""
+            )
+            solara.HTML(tag="div", unsafe_innerHTML=btn_html)
 
 
 @solara.component
