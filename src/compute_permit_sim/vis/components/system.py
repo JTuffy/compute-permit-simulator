@@ -9,9 +9,20 @@ from compute_permit_sim.vis.state.config import ui_config
 @solara.component
 def SimulationController():
     """Invisible component to handle the play loop."""
+
     # Using raise_error=False to gracefully handle Python 3.13 asyncio race conditions
+    async def run_loop():
+        try:
+            await engine.play_loop()
+        except RuntimeError:
+            # "RuntimeError: Set changed size during iteration" can happen in solara hooks
+            # "InvalidStateError" can happen in asyncio event loop
+            pass
+        except Exception:
+            pass
+
     solara.lab.use_task(
-        engine.play_loop,
+        run_loop,
         dependencies=[active_sim.state.value.is_playing],
         raise_error=False,
     )

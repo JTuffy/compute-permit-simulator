@@ -14,8 +14,8 @@ import pandas as pd
 import xlsxwriter
 from pydantic import BaseModel
 
+from compute_permit_sim.schemas import AgentSnapshot, RunMetrics, ScenarioConfig
 from compute_permit_sim.schemas.columns import ColumnNames
-from compute_permit_sim.schemas.config import ScenarioConfig
 from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import (
     plot_deterrence_frontier,
@@ -24,24 +24,37 @@ from compute_permit_sim.vis.plotting import (
     plot_time_series,
 )
 
-# Sub-model grouping: maps ScenarioConfig nested keys to display section headers
-_SECTION_LABELS = {
-    "audit": "Audit Parameters",
-    "market": "Market Parameters",
-    "lab": "Lab Generation",
-}
 
+def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
+    """Export a simulation run to an Excel file.
 
-def export_run_to_excel(run, output_path: str | None = None) -> str:
-    """Export a simulation run to an Excel file with multiple sheets."""
-    if output_path is None:
+    Args:
+        run: The simulation run to export.
+        output_path: File path to write to.
+                     - If None (default): Generates a path in outputs/.
+                     - If "": Returns bytes (in-memory).
+                     - If valid path: Writes to that path.
+
+    Returns:
+        str (path) if written to file.
+        bytes if output_path was empty string.
+    """
+    return_bytes = False
+
+    if output_path == "":
+        # Special flag for in-memory
+        output = io.BytesIO()
+        return_bytes = True
+    elif output_path is None:
         os.makedirs("outputs", exist_ok=True)
-        # Use simpler Config ID if available, otherwise timestamp
         fname = run.sim_id if run.sim_id else run.id
         output_path = f"outputs/simulation_run_{fname}.xlsx"
+        output = output_path
+    else:
+        output = output_path
 
-    # Create workbook with xlsxwriter for image embedding support
-    workbook = xlsxwriter.Workbook(output_path)
+    # Create workbook with xlsxwriter
+    workbook = xlsxwriter.Workbook(output)
 
     # Define formats
     header_format = workbook.add_format(
@@ -85,6 +98,12 @@ def export_run_to_excel(run, output_path: str | None = None) -> str:
     finally:
         workbook.close()
 
+    if return_bytes:
+        # output is BytesIO
+        output.seek(0)
+        return output.read()
+
+    assert output_path is not None
     return output_path
 
 
@@ -92,7 +111,7 @@ def _get_field_label(model_class, field_name: str) -> str:
     """Get human-readable label from json_schema_extra or fallback."""
     field_info = model_class.model_fields.get(field_name)
     if field_info is None:
-        return field_name
+        return field_name.replace("_", " ").title()
 
     extra = field_info.json_schema_extra
     if extra and "ui_label" in extra:
@@ -111,10 +130,7 @@ def _write_config_section(
     header_format,
     data_format,
 ) -> int:
-    """Write a config section header and all its fields.
-
-    Returns the next available row.
-    """
+    """Write a config section header and all its fields."""
     sheet.write(row, 0, section_title, header_format)
     sheet.write(row, 1, "", header_format)
     row += 1
@@ -139,7 +155,6 @@ def _write_config_sheet(sheet, config, header_format, data_format):
     # 1. Top-level scalar fields
     top_level_data = {}
     for name, field_info in ScenarioConfig.model_fields.items():
-        # Check if field type is a Pydantic model
         is_model = isinstance(field_info.annotation, type) and issubclass(
             field_info.annotation, BaseModel
         )
@@ -168,9 +183,6 @@ def _write_config_sheet(sheet, config, header_format, data_format):
                 # Use the field name as section title (capitalized) or ui_group if available
                 extra = field_info.json_schema_extra or {}
                 section_title = extra.get("ui_group", name.replace("_", " ").title())
-
-                # Helper maps generic names to specific Excel section titles if needed
-                # But dynamic title is better.
 
                 row = _write_config_section(
                     sheet,
@@ -203,40 +215,39 @@ def _write_summary_sheet(
     sheet.write(row, 1, "", header_format)
     row += 1
 
+    # Basic Run Metadata
     sheet.write(row, 0, "Run ID", data_format)
-    # Prefer nicer Config ID
     display_id = run.sim_id if run.sim_id else run.id
     sheet.write(row, 1, display_id, data_format)
     row += 1
 
     sheet.write(row, 0, "Total Steps", data_format)
     sheet.write(row, 1, len(run.steps), data_format)
-    row += 1
+    row += 2
 
-    row += 1
-
-    # Key Metrics
+    # Key Metrics (Dynamic from RunMetrics schema)
     sheet.write(row, 0, "Final Metrics", header_format)
     sheet.write(row, 1, "", header_format)
     row += 1
 
     if run.metrics:
-        metrics = [
-            (
-                "Final Compliance",
-                run.metrics.final_compliance,
-                percent_format,
-            ),
-            ("Final Price ($)", run.metrics.final_price, number_format),
-            ("Total Cost", run.metrics.total_enforcement_cost, number_format),
-            ("Deterrence Rate", run.metrics.deterrence_success_rate, percent_format),
-        ]
-        for label, value, fmt in metrics:
+        # Dynamically iterate over metrics fields
+        for field_name, field_info in RunMetrics.model_fields.items():
+            value = getattr(run.metrics, field_name)
+            label = _get_field_label(RunMetrics, field_name)
+
+            # Heuristic for formatting based on name
+            fmt = number_format
+            if "rate" in field_name or "compliance" in field_name:
+                fmt = percent_format
+            elif "price" in field_name or "cost" in field_name:
+                fmt = number_format  # Could use currency format if added
+
             sheet.write(row, 0, label, data_format)
             sheet.write(row, 1, value, fmt)
             row += 1
 
-    row += 1
+    row += 2
 
     # Time Series Data
     sheet.write(row, 0, "Time Series Data", header_format)
@@ -245,7 +256,6 @@ def _write_summary_sheet(
     row += 1
 
     for i, step in enumerate(run.steps):
-        # Calculate compliance for this step
         compliance = calculate_compliance(step.agents)
         price = step.market.price
 
@@ -256,50 +266,32 @@ def _write_summary_sheet(
 
 
 def _write_agents_sheet(sheet, last_step, header_format, data_format, number_format):
-    """Write agent details from last step to sheet."""
+    """Write agent details from last step - dynamically."""
     if not last_step.agents:
         sheet.write(0, 0, "No agent data available")
         return
 
-    # Convert to DataFrame properly from Pydantic models
+    # Convert to DataFrame
     agents_df = pd.DataFrame([a.model_dump() for a in last_step.agents])
 
-    # Define columns to export (using correct snake_case Pydantic field names)
-    cols = [
-        (ColumnNames.ID, "ID"),
-        (ColumnNames.REVENUE, "Revenue"),
-        (ColumnNames.STEP_PROFIT, "Step Profit"),
-        (ColumnNames.CAPACITY, "Capacity"),
-        (ColumnNames.USED_COMPUTE, "Used Compute"),
-        (ColumnNames.REPORTED_COMPUTE, "Reported Compute"),
-        (ColumnNames.IS_COMPLIANT, "Compliant"),
-        (ColumnNames.WAS_AUDITED, "Audited"),
-        (ColumnNames.WAS_CAUGHT, "Caught"),
-        (ColumnNames.PENALTY_AMOUNT, "Penalty"),
-        (ColumnNames.WEALTH, "Total Wealth"),
-    ]
-
-    valid_cols = []
+    # Dynamic Column Headers from AgentSnapshot schema
     headers = []
+    valid_cols = []
 
-    # Check which columns exist
-    for field, header in cols:
-        if field in agents_df.columns:
-            valid_cols.append(field)
-            headers.append(header)
+    for field_name, field_info in AgentSnapshot.model_fields.items():
+        if field_name in agents_df.columns:
+            headers.append(_get_field_label(AgentSnapshot, field_name))
+            valid_cols.append(field_name)
 
     # Write headers
     for col_idx, header in enumerate(headers):
         sheet.write(0, col_idx, header, header_format)
-
-    # Set column widths
-    for col_idx in range(len(headers)):
-        sheet.set_column(col_idx, col_idx, 15)
+        sheet.set_column(col_idx, col_idx, 15)  # Set width
 
     # Write data
     for row_idx, (_, row) in enumerate(agents_df[valid_cols].iterrows()):
         for col_idx, value in enumerate(row):
-            if isinstance(value, (int, float)):
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
                 sheet.write(row_idx + 1, col_idx, value, number_format)
             else:
                 sheet.write(row_idx + 1, col_idx, str(value), data_format)
@@ -311,72 +303,86 @@ def _write_graphs_sheet(sheet, run, workbook):
         sheet.write(0, 0, "No data for graphs")
         return
 
-    # Calculate time series for the graphs
-    compliance_series = []
-    price_series = []
+    # 1. Time Series
+    compliance_series = [calculate_compliance(step.agents) for step in run.steps]
+    price_series = [step.market.price for step in run.steps]
 
-    for step in run.steps:
-        compliance_series.append(calculate_compliance(step.agents))
-        price_series.append(step.market.price)
-
-    # Create and embed compliance graph
     sheet.write(0, 0, "Compliance Over Time")
-    comp_fig = plot_time_series(compliance_series, "Compliance", "green")
-    comp_img = _fig_to_bytes(comp_fig)
-    sheet.insert_image(1, 0, "compliance.png", {"image_data": comp_img})
+    sheet.insert_image(
+        1,
+        0,
+        "compliance.png",
+        {
+            "image_data": _fig_to_bytes(
+                plot_time_series(compliance_series, "Compliance", "green")
+            )
+        },
+    )
 
-    # Create and embed price graph (offset to the right)
     sheet.write(0, 8, "Price Over Time")
-    price_fig = plot_time_series(price_series, "Price ($)", "blue")
-    price_img = _fig_to_bytes(price_fig)
-    sheet.insert_image(1, 8, "price.png", {"image_data": price_img})
+    sheet.insert_image(
+        1,
+        8,
+        "price.png",
+        {
+            "image_data": _fig_to_bytes(
+                plot_time_series(price_series, "Price ($)", "blue")
+            )
+        },
+    )
 
-    # If we have agents in last step, create scatter plot
+    # 2. Snapshot Graphs (Last Step)
     if run.steps[-1].agents:
         agents_df = pd.DataFrame([a.model_dump() for a in run.steps[-1].agents])
-        # Check for numeric columns (snake_case)
+
+        # Row offset for next set of graphs
+        row_offset = 25
+
+        # Plot 1: Scatter (Reported vs Used)
+        # Check if columns exist (using string literals for safety if keys changed, dynamic is better but risky for logic)
         if (
             ColumnNames.USED_COMPUTE in agents_df.columns
             and ColumnNames.REPORTED_COMPUTE in agents_df.columns
         ):
-            sheet.write(25, 0, "True vs Reported Compute (Last Step)")
-
-            scatter_fig, ax = plot_scatter(
+            sheet.write(row_offset, 0, "True vs Reported Compute (Last Step)")
+            fig, ax = plot_scatter(
                 agents_df,
                 ColumnNames.REPORTED_COMPUTE,
                 ColumnNames.USED_COMPUTE,
                 "True vs Reported Compute",
-                "Reported Compute",
-                "True Compute",
+                "Reported",
+                "True",
                 color_logic="compliance",
             )
-
-            # Add y=x line locally
+            # Add y=x line
             max_val = max(
                 agents_df[ColumnNames.USED_COMPUTE].max(),
                 agents_df[ColumnNames.REPORTED_COMPUTE].max(),
             )
-            ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honest (y=x)")
+            ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5)
             ax.legend()
-            scatter_fig.tight_layout()
-            scatter_img = _fig_to_bytes(scatter_fig)
-            sheet.insert_image(26, 0, "scatter.png", {"image_data": scatter_img})
+            sheet.insert_image(
+                row_offset + 1, 0, "scatter.png", {"image_data": _fig_to_bytes(fig)}
+            )
 
-            # Deterrence Frontier
-            sheet.write(25, 8, "Deterrence Frontier (Value vs Risk)")
-            det_fig, _ = plot_deterrence_frontier(agents_df)
-            det_img = _fig_to_bytes(det_fig)
-            sheet.insert_image(26, 8, "deterrence.png", {"image_data": det_img})
+        # Plot 2: Deterrence Frontier
+        sheet.write(row_offset, 8, "Deterrence Frontier")
+        fig, _ = plot_deterrence_frontier(agents_df)
+        sheet.insert_image(
+            row_offset + 1, 8, "deterrence.png", {"image_data": _fig_to_bytes(fig)}
+        )
 
-            # Payoff Distribution
-            sheet.write(50, 0, "Payoff Analysis")
-            payoff_fig, _ = plot_payoff_distribution(agents_df)
-            payoff_img = _fig_to_bytes(payoff_fig)
-            sheet.insert_image(51, 0, "payoff.png", {"image_data": payoff_img})
+        # Plot 3: Payoff Distribution
+        row_offset += 25
+        sheet.write(row_offset, 0, "Payoff Analysis")
+        fig, _ = plot_payoff_distribution(agents_df)
+        sheet.insert_image(
+            row_offset + 1, 0, "payoff.png", {"image_data": _fig_to_bytes(fig)}
+        )
 
 
 def _fig_to_bytes(fig) -> io.BytesIO:
-    """Convert matplotlib figure to bytes for embedding in Excel."""
+    """Convert matplotlib figure to bytes."""
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
     buf.seek(0)

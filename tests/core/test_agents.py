@@ -1,6 +1,7 @@
 """Tests for Lab agent behavior and initialization."""
 
 import pytest
+
 from compute_permit_sim.core.agents import Lab
 from compute_permit_sim.schemas import LabConfig
 

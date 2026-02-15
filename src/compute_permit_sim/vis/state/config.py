@@ -31,7 +31,9 @@ class UIConfig:
 
         # Special handling for Scenario metadata
         self.selected_scenario = solara.reactive("Custom")
-        self.seed = solara.reactive(None)  # Default to random
+        self.seed: solara.Reactive[int | None] = solara.reactive(
+            None
+        )  # Default to random
 
         # Recursively flatten and create reactive fields
         self._create_reactive_fields(default)

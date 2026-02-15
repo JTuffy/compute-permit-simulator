@@ -12,5 +12,7 @@
         "audit_coefficient": 0.1
     },
     "collateral_amount": 15.75,
-    "market": {}
+    "market": {
+        "fixed_price": 70.0
+    }
 }

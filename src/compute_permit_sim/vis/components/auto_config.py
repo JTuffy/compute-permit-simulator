@@ -196,21 +196,32 @@ def AutoConfigView(
                     return _setter
 
                 # Render based on type/format
+                # Helper to wrap in tooltip if description exists
+                def wrap_tooltip(element):
+                    description = item["info"].description
+                    if description:
+                        return solara.Tooltip(tooltip=description, children=[element])
+                    return element
+
                 if fmt == "percent":
                     if not readonly and is_reactive:
-                        solara.InputFloat(
-                            label=label,
-                            value=val,
-                            dense=True,
-                            disabled=disabled,
+                        wrap_tooltip(
+                            solara.InputFloat(
+                                label=label,
+                                value=val,
+                                dense=True,
+                                disabled=disabled,
+                            )
                         )
                     else:
                         if current_val is not None:
-                            solara.InputFloat(
-                                label=label,
-                                value=current_val,
-                                dense=True,
-                                disabled=True,
+                            wrap_tooltip(
+                                solara.InputFloat(
+                                    label=label,
+                                    value=current_val,
+                                    dense=True,
+                                    disabled=True,
+                                )
                             )
 
                 elif fmt == "int" or (
@@ -219,45 +230,63 @@ def AutoConfigView(
                 ):
                     # Handle int inputs that might be None
                     if not readonly and is_reactive:
-                        solara.InputText(
-                            label=label,
-                            value=str(current_val) if current_val is not None else "",
-                            on_value=make_setter(val, int),
-                            dense=True,
-                            disabled=disabled,
+                        wrap_tooltip(
+                            solara.InputText(
+                                label=label,
+                                value=str(current_val)
+                                if current_val is not None
+                                else "",
+                                on_value=make_setter(val, int),
+                                dense=True,
+                                disabled=disabled,
+                            )
                         )
                     else:
                         if current_val is not None:
-                            solara.InputInt(
-                                label=label,
-                                value=current_val,
-                                dense=True,
-                                disabled=True,
+                            wrap_tooltip(
+                                solara.InputInt(
+                                    label=label,
+                                    value=current_val,
+                                    dense=True,
+                                    disabled=True,
+                                )
                             )
 
                 elif isinstance(current_val, bool):
                     if not readonly and is_reactive:
-                        solara.Checkbox(label=label, value=val, disabled=disabled)
+                        wrap_tooltip(
+                            solara.Checkbox(label=label, value=val, disabled=disabled)
+                        )
                     else:
                         # For readonly bool, checkbox is fine
-                        solara.Checkbox(label=label, value=current_val, disabled=True)
+                        wrap_tooltip(
+                            solara.Checkbox(
+                                label=label, value=current_val, disabled=True
+                            )
+                        )
 
                 else:  # float, currency, scientific
                     if not readonly and is_reactive:
-                        solara.InputText(
-                            label=label,
-                            value=str(current_val) if current_val is not None else "",
-                            on_value=make_setter(val, float),
-                            dense=True,
-                            disabled=disabled,
+                        wrap_tooltip(
+                            solara.InputText(
+                                label=label,
+                                value=str(current_val)
+                                if current_val is not None
+                                else "",
+                                on_value=make_setter(val, float),
+                                dense=True,
+                                disabled=disabled,
+                            )
                         )
                     else:
                         if current_val is not None:
-                            solara.InputFloat(
-                                label=label,
-                                value=current_val,
-                                dense=True,
-                                disabled=True,
+                            wrap_tooltip(
+                                solara.InputFloat(
+                                    label=label,
+                                    value=current_val,
+                                    dense=True,
+                                    disabled=True,
+                                )
                             )
 
         # Render all groups vertically

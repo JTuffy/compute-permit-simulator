@@ -1,6 +1,7 @@
 """Tests for Auditor behavior and penalty calculations."""
 
 import pytest
+
 from compute_permit_sim.core.enforcement import Auditor
 from compute_permit_sim.schemas import AuditConfig
 

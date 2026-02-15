@@ -3,7 +3,7 @@
 import solara
 import solara.lab
 
-from compute_permit_sim.schemas import ScenarioConfig
+from compute_permit_sim.schemas import RunMetrics, ScenarioConfig
 from compute_permit_sim.vis.components import AutoConfigView
 
 
@@ -12,28 +12,39 @@ def AnalysisSummary(
     is_live: bool,
     config: ScenarioConfig | None,
     step_count: int,
-    compliance_series: list,
-    price_series: list,
+    metrics: RunMetrics | None,  # Pass full metrics object
 ):
     """Display key metrics and full run configuration."""
     if not config:
         return
 
-    # Derive display values
-    final_compliance = compliance_series[-1] if compliance_series else None
-    final_price = price_series[-1] if price_series else None
-
     with solara.Card("Summary", style="margin-bottom: 12px;"):
         with solara.Row(style="gap: 24px; flex-wrap: wrap;"):
             _MetricChip("Steps", str(step_count))
-            _MetricChip(
-                "Compliance",
-                f"{final_compliance:.0%}" if final_compliance is not None else "—",
-            )
-            _MetricChip(
-                "Final Price",
-                f"${final_price:.2f}" if final_price is not None else "—",
-            )
+
+            # Dynamically render metrics from global source of truth
+            if metrics:
+                for field_name, field_info in RunMetrics.model_fields.items():
+                    val = getattr(metrics, field_name)
+                    # Use description or title as label
+                    label = (
+                        field_info.description.split("(")[0].strip()
+                        if field_info.description
+                        else field_name.replace("_", " ").title()
+                    )
+
+                    # Simple heuristic formatting (shared logic with export.py ideally)
+                    if "rate" in field_name or "compliance" in field_name:
+                        value_str = f"{val:.1%}"
+                    elif "price" in field_name or "cost" in field_name:
+                        value_str = f"${val:.2f}"
+                    else:
+                        value_str = f"{val:.2f}"
+
+                    _MetricChip(label, value_str)
+            else:
+                _MetricChip("Status", "In Progress..." if is_live else "No Metrics")
+
             if config.seed is not None:
                 _MetricChip("Seed", str(config.seed))
 

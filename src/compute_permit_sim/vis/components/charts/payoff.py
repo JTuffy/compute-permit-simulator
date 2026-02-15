@@ -27,6 +27,8 @@ def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
         solara.Markdown("No data for payoff plot.")
         return
 
+    assert agents_df is not None
+
     compliant = agents_df[agents_df[ColumnNames.IS_COMPLIANT]]
     cheated_caught = agents_df[
         ~agents_df[ColumnNames.IS_COMPLIANT] & agents_df[ColumnNames.WAS_CAUGHT]
