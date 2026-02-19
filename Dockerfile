@@ -8,10 +8,10 @@ WORKDIR /app
 RUN pip install uv
 
 # Copy project definition
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 
 # Install dependencies (frozen, no dev deps)
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --no-dev --no-install-project
 
 # Copy application code
 COPY . .
