@@ -1,4 +1,14 @@
+"""Tests for Market mechanism and clearing."""
+
 from compute_permit_sim.core.market import SimpleClearingMarket
+
+
+def test_market_initialization() -> None:
+    """Verify that the SimpleClearingMarket initializes with correct supply and default price."""
+    market = SimpleClearingMarket(token_cap=10)
+    assert market.max_supply == 10
+    assert market.current_price == 0.0
+    assert market.fixed_price is None
 
 
 def test_market_clearing_scarce():

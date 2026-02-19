@@ -11,7 +11,7 @@ from compute_permit_sim.schemas import (
     ScenarioConfig,
 )
 from compute_permit_sim.schemas.data import AgentSnapshot
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 from .factories import (
     create_agent_snapshot,

@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from compute_permit_sim.core.constants import (
+from compute_permit_sim.schemas.defaults import (
     DEFAULT_AUDIT_BACKCHECK_PROB,
     DEFAULT_AUDIT_BASE_PROB,
     DEFAULT_AUDIT_COST,
@@ -33,38 +33,31 @@ from compute_permit_sim.core.constants import (
     DEFAULT_LAB_RISK_PROFILE_MIN,
     DEFAULT_LAB_TRAINING_FLOPS_MAX,
     DEFAULT_LAB_TRAINING_FLOPS_MIN,
+    DEFAULT_MARKET_FIXED_PRICE,
+    DEFAULT_MARKET_TOKEN_CAP,
     DEFAULT_RACING_GAP_SENSITIVITY,
     DEFAULT_REPUTATION_ESCALATION_FACTOR,
     DEFAULT_SCENARIO_N_AGENTS,
     DEFAULT_SCENARIO_STEPS,
 )
 
+# ---------------------------------------------------------------------------
+# UI metadata helpers — attached to each Field via json_schema_extra.
+# Keys:
+#   ui_group  – sidebar card / export section heading
+#   ui_label  – human-readable control label
+#   ui_format – rendering hint (percent | currency | scientific | int | float)
+# ---------------------------------------------------------------------------
 
-class UrlConfig(BaseModel):
-    """Schema for URL state synchronization (abbreviated keys)."""
 
-    n_agents: int | None = None
-    steps: int | None = None
-    token_cap: float | None = None
-    seed: int | None = None
-    penalty: float | None = None
-    base_prob: float | None = None
-    high_prob: float | None = None
-    signal_fpr: float | None = None
-    signal_tpr: float | None = None
-    backcheck_prob: float | None = None
-    ev_min: float | None = None
-    ev_max: float | None = None
-    risk_min: float | None = None
-    risk_max: float | None = None
-    cap_min: float | None = None
-    cap_max: float | None = None
-    vb: float | None = None
-    cr: float | None = None
-    rep: float | None = None
-    audit_coeff: float | None = None
-
-    model_config = ConfigDict(frozen=True)
+def _ui(
+    group: str, label: str, fmt: str = "float", component: str | None = None
+) -> dict:
+    """Build json_schema_extra dict for a config field."""
+    extra = {"ui_group": group, "ui_label": label, "ui_format": fmt}
+    if component:
+        extra["ui_component"] = component
+    return extra
 
 
 class AuditConfig(BaseModel):
@@ -84,80 +77,97 @@ class AuditConfig(BaseModel):
     """
 
     base_prob: float = Field(
-        DEFAULT_AUDIT_BASE_PROB, ge=0, le=1, description="Base audit probability (pi_0)"
+        DEFAULT_AUDIT_BASE_PROB,
+        ge=0,
+        le=1,
+        description="Base audit probability (pi_0)",
+        json_schema_extra=_ui("Audit Policy", "Base π₀", "percent"),
     )
     high_prob: float = Field(
         DEFAULT_AUDIT_HIGH_PROB,
         ge=0,
         le=1,
         description="High suspicion audit probability (pi_1)",
+        json_schema_extra=_ui("Audit Policy", "High π₁", "percent"),
     )
     false_positive_rate: float = Field(
         DEFAULT_AUDIT_FALSE_POS_RATE,
         ge=0,
         le=1,
         description="P(false alarm | compliant firm audited) — alpha",
+        json_schema_extra=_ui("Audit Policy", "Signal FPR", "percent"),
     )
     false_negative_rate: float = Field(
         DEFAULT_AUDIT_FALSE_NEG_RATE,
         ge=0,
         le=1,
         description="P(miss | non-compliant firm audited) — beta",
+        json_schema_extra=_ui("Audit Policy", "Signal FNR (1-TPR)", "percent"),
     )
     penalty_amount: float = Field(
         DEFAULT_AUDIT_PENALTY_AMOUNT,
         ge=0,
         description="Legacy flat penalty amount (used when penalty_fixed is not set)",
+        json_schema_extra=_ui("Audit Policy", "Penalty (M$)", "currency"),
     )
     penalty_fixed: float = Field(
         DEFAULT_AUDIT_PENALTY_FIXED,
         ge=0,
         description="Fixed penalty floor (M$) — like EU AI Act €35M",
+        json_schema_extra=_ui("Audit Policy", "Penalty Fixed (M$)", "currency"),
     )
     penalty_percentage: float = Field(
         DEFAULT_AUDIT_PENALTY_PERCENTAGE,
         ge=0,
         le=1.0,
         description="Percentage of firm value — like EU AI Act 7% turnover",
+        json_schema_extra=_ui("Audit Policy", "Penalty % Revenue", "percent"),
     )
     penalty_ceiling: float | None = Field(
         DEFAULT_AUDIT_PENALTY_CEILING,
         ge=0,
         description="Optional cap on total penalty (M$) — None means no cap",
+        json_schema_extra=_ui("Audit Policy", "Penalty Ceiling (M$)", "currency"),
     )
     backcheck_prob: float = Field(
         DEFAULT_AUDIT_BACKCHECK_PROB,
         ge=0,
         le=1,
         description="Backcheck probability (p_b)",
+        json_schema_extra=_ui("Audit Policy", "Backcheck Prob", "percent"),
     )
     whistleblower_prob: float = Field(
         DEFAULT_AUDIT_WHISTLEBLOWER_PROB,
         ge=0,
         le=1,
         description="Probability of detection by whistleblower (p_w)",
+        json_schema_extra=_ui("Audit Policy", "Whistleblower Prob", "percent"),
     )
     cost: float = Field(
         DEFAULT_AUDIT_COST,
         ge=0,
         description="Cost per audit for the regulator",
+        json_schema_extra=_ui("Audit Policy", "Audit Cost (M$)", "currency"),
     )
     max_audits_per_step: int | None = Field(
         None,
         ge=0,
         description="Max number of audits allowed per step (budget constraint)",
+        json_schema_extra=_ui("Audit Policy", "Max Audits/Step", "int"),
     )
     # Audit rate escalation (active when dynamic_factors=True)
     audit_escalation: float = Field(
         DEFAULT_AUDIT_ESCALATION,
         ge=0,
         description="Added to audit_coefficient on failed audit",
+        json_schema_extra=_ui("Dynamic Factors", "Audit Escalation", "float"),
     )
     audit_decay_rate: float = Field(
         DEFAULT_AUDIT_DECAY_RATE,
         ge=0,
         le=1,
         description="Per-step decay factor for escalated audit coefficient",
+        json_schema_extra=_ui("Dynamic Factors", "Audit Decay Rate", "percent"),
     )
 
     model_config = ConfigDict(frozen=True)
@@ -166,14 +176,18 @@ class AuditConfig(BaseModel):
 class MarketConfig(BaseModel):
     """Configuration for the Permit Market."""
 
-    token_cap: float = Field(..., gt=0, description="Total permits available (Q)")
-    fixed_price: float | None = Field(
-        None, ge=0, description="Fixed price for unlimited permits (optional)"
+    token_cap: float = Field(
+        DEFAULT_MARKET_TOKEN_CAP,
+        gt=0,
+        description="Total permits available (Q)",
+        json_schema_extra=_ui("General", "Token Cap (Q)", "float"),
     )
-
-    def set_fixed_price(self, price: float) -> None:
-        """Set a fixed price for the market (unlimited supply mode)."""
-        object.__setattr__(self, "fixed_price", price)
+    fixed_price: float | None = Field(
+        DEFAULT_MARKET_FIXED_PRICE,
+        ge=0,
+        description="Fixed price for unlimited permits (optional)",
+        json_schema_extra=_ui("General", "Fixed Price (M$)", "currency"),
+    )
 
 
 class LabConfig(BaseModel):
@@ -187,75 +201,116 @@ class LabConfig(BaseModel):
     for these can be added by converting to min/max ranges later.
     """
 
-    economic_value_min: float = DEFAULT_LAB_ECON_VALUE_MIN
-    economic_value_max: float = DEFAULT_LAB_ECON_VALUE_MAX
-    risk_profile_min: float = DEFAULT_LAB_RISK_PROFILE_MIN
-    risk_profile_max: float = DEFAULT_LAB_RISK_PROFILE_MAX
+    economic_value_min: float = Field(
+        DEFAULT_LAB_ECON_VALUE_MIN,
+        json_schema_extra=_ui(
+            "Lab Generation", "Econ Value Min (M$)", "currency", "range_min"
+        ),
+    )
+    economic_value_max: float = Field(
+        DEFAULT_LAB_ECON_VALUE_MAX,
+        json_schema_extra=_ui(
+            "Lab Generation", "Econ Value Max (M$)", "currency", "range_max"
+        ),
+    )
+    risk_profile_min: float = Field(
+        DEFAULT_LAB_RISK_PROFILE_MIN,
+        json_schema_extra=_ui(
+            "Lab Generation", "Risk Profile Min", "float", "range_min"
+        ),
+    )
+    risk_profile_max: float = Field(
+        DEFAULT_LAB_RISK_PROFILE_MAX,
+        json_schema_extra=_ui(
+            "Lab Generation", "Risk Profile Max", "float", "range_max"
+        ),
+    )
     capacity_min: float = Field(
         DEFAULT_LAB_CAPACITY_MIN,
         ge=0,
         description="Min compute capacity (q_max) for agent generation",
+        json_schema_extra=_ui("Lab Generation", "Capacity Min", "float", "range_min"),
     )
     capacity_max: float = Field(
         DEFAULT_LAB_CAPACITY_MAX,
         ge=0,
         description="Max compute capacity (q_max) for agent generation",
+        json_schema_extra=_ui("Lab Generation", "Capacity Max", "float", "range_max"),
     )
     capability_value: float = Field(
         DEFAULT_LAB_CAPABILITY_VALUE,
         ge=0,
         description="V_b: baseline value of model capabilities from training",
+        json_schema_extra=_ui("Lab Generation", "Capability Vb (M$)", "currency"),
     )
     racing_factor: float = Field(
         DEFAULT_LAB_RACING_FACTOR,
         ge=0,
         description="c_r: urgency multiplier on capability value",
+        json_schema_extra=_ui("Lab Generation", "Racing Factor cr", "float"),
     )
     reputation_sensitivity: float = Field(
         DEFAULT_LAB_REPUTATION_SENSITIVITY,
         ge=0,
         description="R: perceived reputation cost if caught",
+        json_schema_extra=_ui("Lab Generation", "Reputation Sen. R (M$)", "currency"),
     )
     audit_coefficient: float = Field(
         DEFAULT_LAB_AUDIT_COEFFICIENT,
         ge=0,
         description="c(i): firm-specific audit rate scaling",
+        json_schema_extra=_ui("Lab Generation", "Audit Coeff c(i)", "float"),
     )
     firm_revenue_min: float = Field(
         DEFAULT_LAB_FIRM_REVENUE_MIN,
         ge=0,
         description="Min annual revenue/turnover (M$) for penalty calculation",
+        json_schema_extra=_ui(
+            "Lab Generation", "Firm Revenue Min (M$)", "currency", "range_min"
+        ),
     )
     firm_revenue_max: float = Field(
         DEFAULT_LAB_FIRM_REVENUE_MAX,
         ge=0,
         description="Max annual revenue/turnover (M$) for penalty calculation",
+        json_schema_extra=_ui(
+            "Lab Generation", "Firm Revenue Max (M$)", "currency", "range_max"
+        ),
     )
     training_flops_min: float = Field(
         DEFAULT_LAB_TRAINING_FLOPS_MIN,
         ge=0,
         description="Min planned training run size (FLOP)",
+        json_schema_extra=_ui(
+            "Lab Generation", "Training FLOP Min", "scientific", "range_min"
+        ),
     )
     training_flops_max: float = Field(
         DEFAULT_LAB_TRAINING_FLOPS_MAX,
         ge=0,
         description="Max planned training run size (FLOP)",
+        json_schema_extra=_ui(
+            "Lab Generation", "Training FLOP Max", "scientific", "range_max"
+        ),
     )
     # Dynamic factor params (active when dynamic_factors=True on ScenarioConfig)
     reputation_escalation_factor: float = Field(
         DEFAULT_REPUTATION_ESCALATION_FACTOR,
         ge=0,
         description="Reputation increase per failed audit (0.5 = +50%)",
+        json_schema_extra=_ui("Dynamic Factors", "Reputation Escalation", "float"),
     )
     racing_gap_sensitivity: float = Field(
         DEFAULT_RACING_GAP_SENSITIVITY,
         ge=0,
         description="How much capability gap affects racing factor",
+        json_schema_extra=_ui("Dynamic Factors", "Racing Gap Sensitivity", "float"),
     )
     capability_scale: float = Field(
         DEFAULT_CAPABILITY_SCALE,
         gt=0,
         description="Normalization factor for capability gap",
+        json_schema_extra=_ui("Dynamic Factors", "Capability Scale", "float"),
     )
 
     model_config = ConfigDict(frozen=True)
@@ -266,8 +321,16 @@ class ScenarioConfig(BaseModel):
 
     name: str = "Scenario"
     description: str = ""
-    n_agents: int = Field(DEFAULT_SCENARIO_N_AGENTS, gt=0)
-    steps: int = Field(DEFAULT_SCENARIO_STEPS, gt=0)
+    n_agents: int = Field(
+        DEFAULT_SCENARIO_N_AGENTS,
+        gt=0,
+        json_schema_extra=_ui("General", "N Agents", "int"),
+    )
+    steps: int = Field(
+        DEFAULT_SCENARIO_STEPS,
+        gt=0,
+        json_schema_extra=_ui("General", "Steps", "int"),
+    )
 
     # Regulatory threshold: training runs require permits when
     # planned_training_flops > flop_threshold.
@@ -276,6 +339,7 @@ class ScenarioConfig(BaseModel):
         DEFAULT_FLOP_THRESHOLD,
         ge=0,
         description="FLOP threshold for permit requirement (e.g. 1e25)",
+        json_schema_extra=_ui("General", "FLOP Threshold", "scientific"),
     )
 
     # Collateral: refundable deposit posted before market participation.
@@ -285,11 +349,12 @@ class ScenarioConfig(BaseModel):
         DEFAULT_COLLATERAL_AMOUNT,
         ge=0,
         description="Required collateral per lab (M$). 0 = disabled.",
+        json_schema_extra=_ui("General", "Collateral (M$)", "currency"),
     )
 
     # Sub-configs
-    audit: AuditConfig
-    market: MarketConfig
+    audit: AuditConfig = Field(default_factory=AuditConfig)
+    market: MarketConfig = Field(default_factory=MarketConfig)
     lab: LabConfig = Field(default_factory=LabConfig)
 
     seed: int | None = None

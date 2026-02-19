@@ -69,7 +69,10 @@ class SimulationRun(BaseModel):
     """Encapsulation of a full simulation run."""
 
     id: str = Field(..., description="Unique run identifier (timestamp/uuid)")
-    sim_id: str | None = Field(None, description="Config Hash ID (Base64)")
+    sim_id: str | None = Field(None, description="Config Hash ID (short SHA-256)")
+    url_id: str | None = Field(
+        None, description="Base64-encoded config for shareable URL (?id=...)"
+    )
     config: ScenarioConfig
     steps: list[StepResult] = Field(default_factory=list)
     metrics: RunMetrics = Field(..., description="Aggregate metrics")

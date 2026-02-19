@@ -4,8 +4,9 @@ import pandas as pd
 import solara
 from matplotlib.figure import Figure
 
-from compute_permit_sim.core.constants import CHART_COLOR_MAP, ColumnNames
+from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.vis.components.charts.base import validate_dataframe
+from compute_permit_sim.vis.constants import CHART_COLOR_MAP
 
 
 @solara.component
@@ -25,6 +26,8 @@ def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
     ):
         solara.Markdown("No data for payoff plot.")
         return
+
+    assert agents_df is not None
 
     compliant = agents_df[agents_df[ColumnNames.IS_COMPLIANT]]
     cheated_caught = agents_df[

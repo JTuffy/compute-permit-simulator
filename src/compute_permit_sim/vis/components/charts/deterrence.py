@@ -5,8 +5,9 @@ import pandas as pd
 import solara
 from matplotlib.figure import Figure
 
-from compute_permit_sim.core.constants import CHART_COLOR_MAP, ColumnNames
+from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.vis.components.charts.base import validate_dataframe
+from compute_permit_sim.vis.constants import CHART_COLOR_MAP
 
 
 @solara.component
@@ -121,5 +122,9 @@ def LabDecisionPlot(agents_df: pd.DataFrame | None, audit_prob: float, penalty: 
     ax.grid(True, alpha=0.3)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.legend()
+    ax.spines["right"].set_visible(False)
+
+    # Only show legend if we plotted the line (which has a label)
+    if penalty > 0 and audit_prob > 0:
+        ax.legend()
     solara.FigureMatplotlib(fig)

@@ -7,6 +7,7 @@ and the async play loop.
 
 import asyncio
 import logging
+import random
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,7 @@ import pandas as pd
 
 from compute_permit_sim.schemas import (
     MarketSnapshot,
+    RunMetrics,
     SimulationRun,
     StepResult,
 )
@@ -25,11 +27,11 @@ if TYPE_CHECKING:
     from compute_permit_sim.vis.state.history import SessionHistory
 
 from compute_permit_sim.services.config_manager import load_scenario
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 from compute_permit_sim.services.metrics import (
     calculate_compliance,
     calculate_wealth_stats,
 )
-from compute_permit_sim.services.model_wrapper import ComputePermitModel
 
 logger = logging.getLogger(__name__)
 
@@ -58,34 +60,42 @@ class SimulationEngine:
         self.active = active
         self.history = history
 
-    def reset_model(self) -> None:
-        """Initialize or reset the Mesa model from current UI config."""
-        logger.info("Resetting simulation model")
-        scenario_config = self.config.to_scenario_config()
+    def start_run(self) -> None:
+        """Start a fresh simulation run from the current UI configuration."""
+        # --- Resolve seed ---
+        ui_seed = self.config.seed.value
+        run_seed = ui_seed if ui_seed is not None else random.randint(0, 2**31 - 1)
 
-        # Dynamic Seeding: If no seed provided in config, Model will handle it.
-        # We capture usage below.
+        # Build config from CURRENT UI values
+        scenario_config = self.config.to_scenario_config()
+        # Inject the resolved seed (model_copy because ScenarioConfig is frozen)
+        scenario_config = scenario_config.model_copy(update={"seed": run_seed})
+
+        logger.info(
+            f"Starting new run with seed={run_seed} (user-provided={ui_seed is not None})"
+        )
 
         model = ComputePermitModel(scenario_config)
 
-        # Capture actual seed used by Mesa (for reproducibility)
-        # Mesa 3.x stores it in self._seed
-        actual_seed = getattr(model, "_seed", None)
+        # Capture actual seed written by Mesa (for reproducibility record)
+        actual_seed = getattr(model, "_seed", run_seed)
         logger.info(f"Model initialized with seed: {actual_seed}")
 
-        # Update unified state in ONE transaction
+        # Reset all active state and start playing in ONE transaction
         self.active.update(
             model=model,
             actual_seed=actual_seed,
             step_count=0,
             compliance_history=[],
             price_history=[],
+            wealth_history_compliant=[],
+            wealth_history_non_compliant=[],
             agents_df=None,
-            is_playing=False,
+            is_playing=True,
             current_run_steps=[],
         )
 
-        # Clear selection to show live
+        # Clear history selection to show live view
         self.history.selected_run.value = None
 
     def step(self) -> None:
@@ -145,24 +155,25 @@ class SimulationEngine:
         )
 
     async def play_loop(self) -> None:
-        """Async loop for continuous play.
+        """Async loop that runs all steps until the step limit is reached.
 
+        Triggered by SimulationController when is_playing transitions to True.
         Uses defensive pattern for Python 3.13 compatibility.
         """
         if not self.active.state.value.is_playing:
             return
 
-        logger.info("Starting play loop")
+        logger.info("Play loop started")
         try:
             while self.active.state.value.is_playing:
                 model = self.active.state.value.model
-                config = model.config if model else None
+                if not model:
+                    break
 
                 # Check step limit
-                if config and self.active.state.value.step_count >= config.steps:
-                    logger.info("Step limit reached in play loop")
+                if self.active.state.value.step_count >= model.config.steps:
+                    logger.info("Step limit reached — packing run")
                     self.pack_current_run()
-                    # Safe to update state here as we are not cancelling
                     self.active.update(is_playing=False)
                     break
 
@@ -170,8 +181,6 @@ class SimulationEngine:
                 await asyncio.sleep(0.05)
 
         except asyncio.CancelledError:
-            # DO NOT update reactive state here.
-            # Just acknowledge and exit.
             logger.debug("Play loop task cancelled gracefully.")
             raise
         except Exception as e:
@@ -184,73 +193,44 @@ class SimulationEngine:
         if not model:
             return
 
+        import base64
+        import hashlib
+        import json
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         logger.info(f"Packing run {timestamp}")
 
         # Calculate final metrics
-        # Calculate final metrics
         agents = model.get_agent_snapshots()
         final_compliance = calculate_compliance(agents)
 
-        # Ensure config has the ACTUAL seed used
+        # Build final config with the ACTUAL seed used (not the UI field)
         final_config = self.config.to_scenario_config()
-        # Force the captured seed into the config record so it can be restored
-        # We need to perform a copy/update since model is frozen
         final_config = final_config.model_copy(
             update={"seed": self.active.state.value.actual_seed}
         )
 
-        # Calculate Regulator Metrics
+        # Regulator metrics
         total_audits = sum(
             len(step.audit) for step in self.active.state.value.current_run_steps
         )
-        # Use simple constant cost for now, or read from config if added later.
-        audit_cost_per_unit = model.config.audit.cost
-        total_enforcement_cost = total_audits * audit_cost_per_unit
+        total_enforcement_cost = total_audits * model.config.audit.cost
 
-        import hashlib
-        import json
+        # Build compact config for hashing and shareable URL
+        # We use exclude_defaults=True to keep the URL short and avoid maintaining a separate UrlConfig DTO.
+        run_state = final_config.model_dump(exclude_defaults=True, exclude_none=True)
 
-        # We need to recreate the exact dict structure used in solara_app.py
-        c = final_config
-        # Use strongly typed UrlConfig
-        from compute_permit_sim.schemas import UrlConfig
-
-        run_state = UrlConfig(
-            n_agents=c.n_agents,
-            steps=c.steps,
-            token_cap=c.market.token_cap,
-            seed=c.seed,
-            penalty=c.audit.penalty_amount,
-            base_prob=c.audit.base_prob,
-            high_prob=c.audit.high_prob,
-            signal_fpr=c.audit.false_positive_rate,
-            signal_tpr=1.0 - c.audit.false_negative_rate,
-            backcheck_prob=c.audit.backcheck_prob,
-            audit_cost=c.audit.cost,
-            ev_min=c.lab.economic_value_min,
-            ev_max=c.lab.economic_value_max,
-            risk_min=c.lab.risk_profile_min,
-            risk_max=c.lab.risk_profile_max,
-            cap_min=c.lab.capacity_min,
-            cap_max=c.lab.capacity_max,
-            vb=c.lab.capability_value,
-            cr=c.lab.racing_factor,
-            rep=c.lab.reputation_sensitivity,
-            audit_coeff=c.lab.audit_coefficient,
-        ).model_dump(exclude_none=True)
-
-        # Compute SHA-256 Hash
+        # sim_id: short SHA-256 hash for display label
         json_bytes = json.dumps(run_state, sort_keys=True).encode("utf-8")
-        full_hash = hashlib.sha256(json_bytes).hexdigest()
-        short_hash = full_hash[:8]
+        short_hash = hashlib.sha256(json_bytes).hexdigest()[:8]
 
-        # Use simpler timestamp for display ID, but store sim_id as short hash
-        from compute_permit_sim.schemas import RunMetrics
+        # url_id: base64-encoded JSON for shareable ?id=... URL
+        url_id = base64.b64encode(json.dumps(run_state).encode("utf-8")).decode("utf-8")
 
         run = SimulationRun(
             id=f"run_{timestamp}",
             sim_id=short_hash,
+            url_id=url_id,
             config=final_config,
             steps=self.active.state.value.current_run_steps.copy(),
             metrics=RunMetrics(
@@ -267,51 +247,19 @@ class SimulationEngine:
         self.history.select_run(run)
 
     def load_scenario(self, filename: str) -> None:
-        """Load a scenario from a JSON file."""
+        """Load a scenario from a JSON file into the UI config.
+
+        This updates UI reactive state only.  The user must click Play
+        to actually start a run with the loaded parameters.
+        """
         logger.info(f"Loading scenario: {filename}")
         try:
             config = load_scenario(filename)
             self.config.from_scenario_config(config)
             self.config.selected_scenario.value = config.name or filename
-            self.reset_model()
         except Exception as e:
             logger.error(f"Error loading scenario {filename}: {e}")
             print(f"Error loading scenario {filename}: {e}")
-
-    def restore_config(self, run: SimulationRun) -> None:
-        """Restore configuration from a past run."""
-        logger.info(f"Restoring config from run {run.id}")
-        c = run.config
-
-        # Apply Top Level
-        self.config.n_agents.value = c.n_agents
-        self.config.steps.value = c.steps
-        self.config.token_cap.value = int(c.market.token_cap)
-
-        # Audit
-        self.config.base_prob.value = c.audit.base_prob
-        self.config.high_prob.value = c.audit.high_prob
-        self.config.penalty.value = c.audit.penalty_amount
-
-        # Lab
-        self.config.economic_value_min.value = c.lab.economic_value_min
-        self.config.economic_value_max.value = c.lab.economic_value_max
-        self.config.risk_profile_min.value = c.lab.risk_profile_min
-        self.config.risk_profile_max.value = c.lab.risk_profile_max
-        self.config.capacity_min.value = getattr(c.lab, "capacity_min", 1.0)
-        self.config.capacity_max.value = getattr(c.lab, "capacity_max", 2.0)
-        self.config.capability_value.value = getattr(c.lab, "capability_value", 0.0)
-        self.config.racing_factor.value = getattr(c.lab, "racing_factor", 1.0)
-        self.config.reputation_sensitivity.value = getattr(
-            c.lab, "reputation_sensitivity", 0.0
-        )
-        self.config.audit_coefficient.value = getattr(c.lab, "audit_coefficient", 1.0)
-
-        # Restore SEED
-        self.config.seed.value = c.seed
-        logger.info(f"Restored seed: {c.seed}")
-
-        self.config.selected_scenario.value = "Restored"
 
     def save_run(self, name_prefix="run") -> str | None:
         """Persist the structured simulation run to a JSON file."""
