@@ -23,16 +23,10 @@ logger.setLevel(logging.INFO)
 if logger.handlers:
     logger.handlers.clear()
 
-file_handler = logging.FileHandler("outputs/simulation.log")
-file_handler.setFormatter(
-    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(
     logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 )
-
-logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
 
