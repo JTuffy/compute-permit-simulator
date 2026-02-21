@@ -1,10 +1,8 @@
-"""Excel export functionality for simulation runs.
+"""Export functionality for simulation runs (Excel and CSV).
 
-Exports run data to Excel with multiple sheets:
-- Config: All simulation parameters (auto-generated from schema)
-- Summary: Key metrics and time series data
-- Agent Details: Full agent snapshot from last step
-- Graphs: Embedded matplotlib figures
+Exports run data to:
+1. Excel with multiple sheets (Config, Summary, Agent Details, Graphs)
+2. CSV with flattened step-by-step agent data and full configuration context.
 """
 
 import io
@@ -104,6 +102,72 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
         return output.read()
 
     assert output_path is not None
+    return output_path
+
+
+def export_run_to_csv(run, output_path: str | None = None) -> str | bytes:
+    """Export a simulation run to a flattened CSV file.
+
+    Includes all configuration parameters in every row to ensure the file is
+    self-describing and comprehensive for external analysis tools.
+
+    Args:
+        run: The simulation run to export.
+        output_path: File path to write to (None=auto, ""=bytes).
+
+    Returns:
+        str (path) if written to file.
+        bytes if output_path was empty string.
+    """
+    # 1. Flatten config to include in every row
+    config_dict = run.config.model_dump()
+
+    def _flatten_dict(d, prefix="config_"):
+        items = []
+        for k, v in d.items():
+            new_key = f"{prefix}{k}"
+            if isinstance(v, dict):
+                items.extend(_flatten_dict(v, f"{new_key}_").items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    flat_config = _flatten_dict(config_dict)
+
+    # 2. Collect all agent-steps
+    rows = []
+    for step_res in run.steps:
+        # Market data for this step
+        market_data = {
+            "run_id": run.id,
+            "sim_id": run.sim_id,
+            "step": step_res.step,
+            "market_price": step_res.market.price,
+            "market_supply": step_res.market.supply,
+            **flat_config,
+        }
+        for agent in step_res.agents:
+            row = market_data.copy()
+            # Prefix agent fields for clarity
+            agent_data = {f"agent_{k}": v for k, v in agent.model_dump().items()}
+            row.update(agent_data)
+            rows.append(row)
+
+    if not rows:
+        # Fallback if no steps were recorded
+        df = pd.DataFrame([{"run_id": run.id, **flat_config}])
+    else:
+        df = pd.DataFrame(rows)
+
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+
+    if output_path is None:
+        os.makedirs("outputs", exist_ok=True)
+        fname = run.sim_id if run.sim_id else run.id
+        output_path = f"outputs/simulation_run_{fname}.csv"
+
+    df.to_csv(output_path, index=False)
     return output_path
 
 
