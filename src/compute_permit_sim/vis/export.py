@@ -106,58 +106,32 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
 
 
 def export_run_to_csv(run, output_path: str | None = None) -> str | bytes:
-    """Export a simulation run to a flattened CSV file.
+    """Export a simulation run to a CSV file with step-wise agent data.
 
-    Includes all configuration parameters in every row to ensure the file is
-    self-describing and comprehensive for external analysis tools.
+    Each row represents one agent at one simulation step.
+    Config parameters are NOT included — use the Excel export for full config.
 
     Args:
         run: The simulation run to export.
         output_path: File path to write to (None=auto, ""=bytes).
 
     Returns:
-        str (path) if written to file.
-        bytes if output_path was empty string.
+        str (path) if written to file, bytes if output_path was "".
     """
-    # 1. Flatten config to include in every row
-    config_dict = run.config.model_dump()
-
-    def _flatten_dict(d, prefix="config_"):
-        items = []
-        for k, v in d.items():
-            new_key = f"{prefix}{k}"
-            if isinstance(v, dict):
-                items.extend(_flatten_dict(v, f"{new_key}_").items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
-
-    flat_config = _flatten_dict(config_dict)
-
-    # 2. Collect all agent-steps
     rows = []
     for step_res in run.steps:
-        # Market data for this step
         market_data = {
             "run_id": run.id,
-            "sim_id": run.sim_id,
             "step": step_res.step,
             "market_price": step_res.market.price,
             "market_supply": step_res.market.supply,
-            **flat_config,
         }
         for agent in step_res.agents:
             row = market_data.copy()
-            # Prefix agent fields for clarity
-            agent_data = {f"agent_{k}": v for k, v in agent.model_dump().items()}
-            row.update(agent_data)
+            row.update({f"agent_{k}": v for k, v in agent.model_dump().items()})
             rows.append(row)
 
-    if not rows:
-        # Fallback if no steps were recorded
-        df = pd.DataFrame([{"run_id": run.id, **flat_config}])
-    else:
-        df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows) if rows else pd.DataFrame()
 
     if output_path == "":
         return df.to_csv(index=False).encode("utf-8")
@@ -423,7 +397,13 @@ def _write_graphs_sheet(sheet, run, workbook):
                 agents_df[ColumnNames.USED_COMPUTE].max(),
                 agents_df[ColumnNames.REPORTED_COMPUTE].max(),
             )
-            ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5)
+            ax.plot(
+                [0, max_val],
+                [0, max_val],
+                "k--",
+                alpha=0.5,
+                label="y=x (perfect reporting)",
+            )
             ax.legend()
             sheet.insert_image(
                 row_offset + 1, 0, "scatter.png", {"image_data": _fig_to_bytes(fig)}

@@ -157,8 +157,8 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
         # Export Actions
         from compute_permit_sim.vis.export import export_run_to_csv, export_run_to_excel
 
-        excel_fname = f"run_{run.id}.xlsx"
-        csv_fname = f"run_{run.id}.csv"
+        excel_fname = f"{run.id}.xlsx"
+        csv_fname = f"{run.id}.csv"
 
         with solara.Tooltip("Export to Excel"):
             with solara.FileDownload(
@@ -168,7 +168,7 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
             ):
                 solara.Button(icon_name="mdi-file-excel", icon=True, small=True)
 
-        with solara.Tooltip("Export to CSV (Raw Data)"):
+        with solara.Tooltip("Export to CSV (Step Data)"):
             with solara.FileDownload(
                 filename=csv_fname,
                 data=lambda: export_run_to_csv(run, output_path=""),
