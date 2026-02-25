@@ -212,17 +212,17 @@ def plot_payoff_distribution(
     """Bar chart of Average Step Profit for Compliant vs Non-Compliant/Caught."""
     fig, ax = create_figure(figsize=(6, 5))
 
-    if ColumnNames.STEP_PROFIT not in df.columns:
+    if ColumnNames.ECONOMIC_VALUE not in df.columns:
         return fig, ax
 
     # Strategies: Compliant, Cheated (Uncaught), Caught
-    # We group by status and take mean profit
+    # We group by status and take mean economic value
 
     groups = {"Compliant": [], "Uncaught": [], "Caught": []}
 
     if ColumnNames.IS_COMPLIANT in df.columns and ColumnNames.WAS_CAUGHT in df.columns:
         for _, row in df.iterrows():
-            profit = row[ColumnNames.STEP_PROFIT]
+            profit = row[ColumnNames.ECONOMIC_VALUE]
             if row[ColumnNames.WAS_CAUGHT]:
                 groups["Caught"].append(profit)
             elif not row[ColumnNames.IS_COMPLIANT]:

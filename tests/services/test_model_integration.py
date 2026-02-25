@@ -11,7 +11,6 @@ def test_simulation_integration() -> None:
     """Run a minimal simulation for a few steps to check for crashes and basic logic."""
     audit_config = AuditConfig(
         base_prob=0.1,
-        high_prob=0.5,
         false_positive_rate=0.05,
         false_negative_rate=0.1,
         penalty_amount=0.5,
@@ -46,7 +45,6 @@ def test_fixed_price_integration() -> None:
     """Run a simulation with fixed price market."""
     audit_config = AuditConfig(
         base_prob=0.1,
-        high_prob=0.5,
         false_positive_rate=0.05,
         false_negative_rate=0.1,
         penalty_amount=0.5,

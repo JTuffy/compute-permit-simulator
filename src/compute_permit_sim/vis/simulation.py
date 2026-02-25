@@ -30,7 +30,6 @@ from compute_permit_sim.services.config_manager import load_scenario
 from compute_permit_sim.services.mesa_model import ComputePermitModel
 from compute_permit_sim.services.metrics import (
     calculate_compliance,
-    calculate_wealth_stats,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,8 +87,6 @@ class SimulationEngine:
             step_count=0,
             compliance_history=[],
             price_history=[],
-            wealth_history_compliant=[],
-            wealth_history_non_compliant=[],
             agents_df=None,
             is_playing=True,
             current_run_steps=[],
@@ -115,17 +112,10 @@ class SimulationEngine:
         agents = model.get_agent_snapshots()  # Returns list[AgentSnapshot]
         agents_df = pd.DataFrame([a.model_dump() for a in agents])
 
-        # Update time series
-        # Update time series
         state = self.active.state.value
         compliance = calculate_compliance(agents)
         new_compliance = state.compliance_history + [compliance]
         new_price = state.price_history + [model.market.current_price]
-
-        # Update wealth history
-        compliant_wealth, non_compliant_wealth = calculate_wealth_stats(agents)
-        new_wealth_c = state.wealth_history_compliant + [compliant_wealth]
-        new_wealth_nc = state.wealth_history_non_compliant + [non_compliant_wealth]
 
         logger.info(
             f"Step {step_num} complete. Price: {model.market.current_price:.2f}, Compliance: {compliance:.2%}"
@@ -149,8 +139,6 @@ class SimulationEngine:
             agents_df=agents_df,
             compliance_history=new_compliance,
             price_history=new_price,
-            wealth_history_compliant=new_wealth_c,
-            wealth_history_non_compliant=new_wealth_nc,
             current_run_steps=new_run_steps,
         )
 
@@ -211,11 +199,7 @@ class SimulationEngine:
         )
 
         # Regulator metrics
-        total_audits = sum(
-            len(step.audit) for step in self.active.state.value.current_run_steps
-        )
-        total_enforcement_cost = total_audits * model.config.audit.cost
-
+        
         # Build compact config for hashing and shareable URL
         # We use exclude_defaults=True to keep the URL short and avoid maintaining a separate UrlConfig DTO.
         run_state = final_config.model_dump(exclude_defaults=True, exclude_none=True)
@@ -236,7 +220,6 @@ class SimulationEngine:
             metrics=RunMetrics(
                 final_compliance=final_compliance,
                 final_price=model.market.current_price,
-                total_enforcement_cost=total_enforcement_cost,
                 deterrence_success_rate=final_compliance,
             ),
         )

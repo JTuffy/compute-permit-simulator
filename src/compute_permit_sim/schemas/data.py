@@ -9,21 +9,23 @@ class AgentSnapshot(BaseModel):
     """Standardized snapshot of a single agent's state at one step."""
 
     id: int = Field(..., description="Unique agent identifier")
-    capacity: float = Field(..., description="Max compute capacity")
-    has_permit: bool = Field(..., description="Whether the agent holds a permit")
-    used_compute: float = Field(..., description="Actual compute units consumed")
-    reported_compute: float = Field(
-        ..., description="Compute usage reported to regulator"
+    compute_capacity: float = Field(..., description="Max compute capacity (FLOP)")
+    planned_training_flops: float = Field(
+        ..., description="Planned training run size (FLOP)"
     )
+    used_training_flops: float = Field(
+        ..., description="FLOPs consumed this step (0 if deterred)"
+    )
+    reported_training_flops: float = Field(
+        ..., description="FLOPs reported to regulator (permit coverage)"
+    )
+    has_permit: bool = Field(..., description="Whether the agent holds a permit")
     is_compliant: bool = Field(..., description="Compliance status")
     was_audited: bool = Field(..., description="Audit status this step")
     was_caught: bool = Field(..., description="Caught cheating this step")
     penalty_amount: float = Field(..., description="Penalty applied this step")
-    revenue: float = Field(..., description="Gross economic value generated")
     economic_value: float = Field(..., description="Agent's base economic value (v_i)")
     risk_profile: float = Field(..., description="Agent's risk profile")
-    step_profit: float = Field(..., description="Net profit/loss this step")
-    wealth: float = Field(..., description="Cumulative wealth")
 
     model_config = ConfigDict(frozen=True)
 
@@ -57,7 +59,6 @@ class RunMetrics(BaseModel):
 
     final_compliance: float = Field(..., description="Final compliance rate (0-1)")
     final_price: float = Field(..., description="Final market price")
-    total_enforcement_cost: float = Field(..., description="Total cost of audits")
     deterrence_success_rate: float = Field(
         ..., description="Rate of successful deterrence (proxy: compliance)"
     )

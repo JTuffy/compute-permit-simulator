@@ -1,21 +1,29 @@
 """Enforcement logic for the Auditor.
 
-Implements a two-stage audit model:
+Implements a two-stage audit model plus independent detection channels:
 
-1. SIGNAL GENERATION & AUDIT OCCURRENCE:
-   - Auditor observes signals from firms based on their compute usage
-   - Non-compliant firms generate stronger signals based on compute excess
-   - Audit probability depends on signal strength (pi_0 baseline, pi_1 suspicious)
+Stage 1 — AUDIT OCCURRENCE: Will the firm be audited?
+    signal = min(1.0, (excess_compute / flop_threshold) ^ signal_exponent)
+    p_audit = min(1.0, (base_prob + signal × (1.0 - base_prob)) × c(i))
 
-2. AUDIT OUTCOME:
-   - If audit occurs, FPR/FNR determine whether violation is detected
-   - false_positive_rate (alpha): P(false alarm | compliant firm audited)
-   - false_negative_rate (beta): P(miss | non-compliant firm audited)
+    When signal_dependent=False, signal is ignored (pure random auditing):
+    p_audit = min(1.0, base_prob × c(i))
 
-Effective detection probability:
-    p_audit = base_prob + signal_strength * (high_prob - base_prob)
-    p_catch = p_audit * (1 - false_negative_rate)
-    p_eff = p_catch + (1 - p_catch) * backcheck_prob
+    Budget-capped mode (max_audits_per_step set): randomly sample N from
+    triggered labs — no implicit prioritisation.
+
+Stage 2 — AUDIT OUTCOME: Given an audit, is the violation found?
+    p_stage2 = (1 - FNR) + FNR × backcheck_prob
+
+Independent detection channels:
+    p_total = 1 - (1 - p_audit × p_stage2) × (1 - p_whistleblower) × (1 - p_monitoring)
+    whistleblower and monitoring are rolled independently of the audit.
+
+Detection channel labels (used in AgentOutcome.caught_by):
+    "audit"        — caught on the audit's first pass (Stage 2a)
+    "backcheck"    — caught on the audit's historical review (Stage 2b)
+    "whistleblower"— caught via the independent whistleblower channel
+    "monitoring"   — caught via global hardware/electricity monitoring
 """
 
 import random
@@ -32,13 +40,6 @@ class Auditor:
     """
 
     def __init__(self, config: AuditConfig, rng: random.Random | None = None) -> None:
-        """Initialize the Auditor.
-
-        Args:
-            config: Audit configuration parameters.
-            rng: Optional seeded Random instance for reproducibility.
-                 If None, uses the global random module.
-        """
         self.config = config
         self._rng = rng
 
@@ -48,195 +49,194 @@ class Auditor:
             return self._rng.random()
         return random.random()
 
-    def compute_signal_strength(
-        self,
-        used_compute: float,
-        flop_threshold: float,
-        is_compliant: bool,
-    ) -> float:
-        """Compute signal strength based on compute usage relative to threshold.
+    # ------------------------------------------------------------------
+    # Stage 1: Signal & Audit Occurrence
+    # ------------------------------------------------------------------
 
-        For non-compliant firms, signal strength increases with compute excess.
-        Compliant firms have zero signal (no suspicious activity).
+    def compute_signal(
+        self,
+        excess_compute: float,
+        flop_threshold: float,
+    ) -> float:
+        """Compute suspicion signal from unpermitted excess compute.
+
+        Formula: signal = min(1.0, (excess / threshold) ^ exponent)
 
         Args:
-            used_compute: Actual compute used by the firm.
+            excess_compute: Unpermitted FLOPs above what permits cover (>=0).
             flop_threshold: Regulatory threshold requiring permits.
-            is_compliant: Whether the firm is compliant.
 
         Returns:
-            Signal strength in [0, 1]. Higher = more suspicious.
+            Signal strength in [0, 1].
+        """
+        if excess_compute <= 0:
+            return 0.0
+        if flop_threshold <= 0:
+            return 1.0
+        raw_ratio = excess_compute / flop_threshold
+        return min(1.0, raw_ratio**self.config.signal_exponent)
+
+    def compute_audit_probability(
+        self,
+        signal: float,
+        audit_coefficient: float = 1.0,
+    ) -> float:
+        """Compute the probability of an audit occurring for one firm.
+
+        When signal_dependent=True:
+            p_audit = min(1.0, (base_prob + signal × (1.0 - base_prob)) × c(i))
+        When signal_dependent=False:
+            p_audit = min(1.0, base_prob × c(i))
+
+        Args:
+            signal: Suspicion signal in [0, 1] from compute_signal().
+            audit_coefficient: Firm-specific scaling factor c(i).
+
+        Returns:
+            Audit probability in [0, 1].
+        """
+        if self.config.signal_dependent:
+            p_base = self.config.base_prob + signal * (1.0 - self.config.base_prob)
+        else:
+            p_base = self.config.base_prob
+        return min(1.0, p_base * audit_coefficient)
+
+    # ------------------------------------------------------------------
+    # Stage 2: Audit Outcome
+    # ------------------------------------------------------------------
+
+    def compute_catch_probability(self, p_w: float = 0.0, p_m: float = 0.0) -> float:
+        """Probability of catching a real violation once audited.
+
+        NOTE: p_w and p_m are no longer fed directly into this calculation
+        if we want them to act outside the audit loop. However, to keep the
+        API consistent for now, we will return just the Stage 2 probability here.
+        The overall combining will happen in compute_detection_probability.
+
+        Formula:
+            p_stage2 = (1 - FNR) + FNR × backcheck_prob
+
+        Args:
+            p_w: Whistleblower detection probability (ignored here).
+            p_m: Monitoring detection probability (ignored here).
+
+        Returns:
+            Catch probability in [0, 1].
+        """
+        fnr = self.config.false_negative_rate
+        backcheck = self.config.backcheck_prob
+        return (1.0 - fnr) + (fnr * backcheck)
+
+    def audit_detection_channel(
+        self,
+        is_compliant: bool,
+        p_w: float = 0.0,
+        p_m: float = 0.0,
+    ) -> tuple[bool, bool]:
+        """Run the full audit outcome and return (caught, caught_via_backcheck).
+
+        All detection channels (direct audit, backcheck, whistleblower,
+        monitoring) are resolved together as part of one audit event.
+
+        Sequential logic preserves the aggregate catch probability from
+        compute_catch_probability(p_w, p_m):
+            1. Direct pass: P = 1 - FNR
+            2. Backcheck:   P = backcheck_prob  (only if direct missed)
+            3. Whistleblower: P = p_w  (independent of steps 1-2)
+            4. Monitoring:    P = p_m  (independent of steps 1-2)
+
+        Args:
+            is_compliant: True if the firm has no real violation.
+            p_w: Whistleblower detection probability.
+            p_m: Monitoring detection probability.
+
+        Returns:
+            Tuple (caught, caught_via_backcheck):
+                caught             — True if any channel found a violation
+                caught_via_backcheck — True if the backcheck specifically fired
         """
         if is_compliant:
-            # Compliant firms: no suspicious signal
-            return 0.0
+            # False positive: same sequential structure as non-compliant.
+            # p_w/p_m don't apply (no real violation to find via those channels).
+            if self._random() < self.config.false_positive_rate:
+                return True, False  # false positive on direct pass
+            caught_backcheck = self._random() < self.config.backcheck_prob
+            return caught_backcheck, caught_backcheck
 
-        # Non-compliant firms: signal scales with compute excess above threshold
-        if flop_threshold <= 0:
-            # No threshold means any unpermitted compute is visible
-            return 1.0 if used_compute > 0 else 0.0
+        # Steps 3-4: whistleblower and monitoring
+        # Even if audit misses, these fire independently outside. However, we're
+        # combining them in one return here for simplicity of outcome.
+        caught_wb = self._random() < p_w
+        caught_mon = self._random() < p_m
 
-        if used_compute <= flop_threshold:
-            # Below threshold: minimal signal (borderline case)
-            return 0.1
+        # Step 1: direct audit pass
+        caught_direct = self._random() < (1.0 - self.config.false_negative_rate)
 
-        # Signal strength based on how far above threshold
-        # At threshold: signal ~= 0.5 (borderline suspicious)
-        # At 2x threshold: signal = 1.0 (very suspicious)
-        # This models: larger training runs are harder to hide
-        excess_ratio = (used_compute - flop_threshold) / flop_threshold
-        signal = 0.5 + 0.5 * min(1.0, excess_ratio)
-        return signal
+        # Step 2: backcheck (only runs if the direct pass missed)
+        caught_backcheck = False
+        if not caught_direct:
+            caught_backcheck = self._random() < self.config.backcheck_prob
 
-    def compute_effective_detection(
-        self,
-        audit_coefficient: float = 1.0,
-        signal_strength: float = 1.0,
-    ) -> float:
-        """Compute the effective detection probability for a firm.
-
-        This accounts for:
-        - Probability of audit occurring (based on signal strength)
-        - Probability of audit success (based on FNR)
-        - Backcheck probability (historical discovery)
-
-        Args:
-            audit_coefficient: Firm-specific scaling factor c(i) for audit rate.
-            signal_strength: How detectable the violation is (0-1).
-
-        Returns:
-            The effective detection probability p_eff in [0, 1].
-        """
-        # Probability of audit occurring (interpolate between base and high prob)
-        p_audit = self.config.base_prob + signal_strength * (
-            self.config.high_prob - self.config.base_prob
-        )
-        p_audit = min(1.0, p_audit * audit_coefficient)
-
-        # Probability of catching violation if audited (1 - FNR)
-        p_catch_if_audited = 1.0 - self.config.false_negative_rate
-
-        # Combined probability: audit occurs AND catches violation
-        p_catch = p_audit * p_catch_if_audited
-
-        # Add backcheck probability for historical discovery
-        p_eff = p_catch + (1.0 - p_catch) * self.config.backcheck_prob
-        return p_eff
-
-    def generate_signal(
-        self,
-        used_compute: float,
-        flop_threshold: float,
-        is_compliant: bool,
-    ) -> float:
-        """Generate a suspicion signal based on compute usage.
-
-        Args:
-            used_compute: Actual compute used by the firm.
-            flop_threshold: Regulatory threshold requiring permits.
-            is_compliant: Whether the firm is compliant.
-
-        Returns:
-            Signal strength in [0, 1]. Used to determine audit probability.
-        """
-        return self.compute_signal_strength(used_compute, flop_threshold, is_compliant)
-
-    def decide_audit(self, signal_strength: float) -> bool:
-        """Decide whether to audit based on signal strength.
-
-        Policy:
-            - All firms face base_prob (pi_0) chance of random audit
-            - Additional probability from signal: interpolate to high_prob (pi_1)
-            - Final audit_prob = base_prob + signal_strength * (high_prob - base_prob)
-
-        Args:
-            signal_strength: Suspicion level from 0 (clean) to 1 (very suspicious).
-
-        Returns:
-            True if an audit is triggered.
-        """
-        audit_prob = self.config.base_prob + signal_strength * (
-            self.config.high_prob - self.config.base_prob
-        )
-        return self._random() < audit_prob
+        caught = caught_direct or caught_backcheck or caught_wb or caught_mon
+        return caught, caught_backcheck
 
     def audit_finds_violation(self, is_compliant: bool) -> bool:
-        """Determine if an audit discovers a violation.
+        """Convenience wrapper — returns only the boolean from audit_detection_channel."""
+        found, _ = self.audit_detection_channel(is_compliant)
+        return found
 
-        Uses FPR/FNR to model audit accuracy:
-        - Compliant firm: false_positive_rate chance of wrongly flagging
-        - Non-compliant firm: (1 - false_negative_rate) chance of catching
+    # ------------------------------------------------------------------
+    # Combined: Detection probability (for firm compliance decisions)
+    # ------------------------------------------------------------------
 
-        Args:
-            is_compliant: True if the firm is actually compliant.
-
-        Returns:
-            True if the audit finds (or falsely reports) a violation.
-        """
-        if is_compliant:
-            # False positive: wrongly finding a violation
-            return self._random() < self.config.false_positive_rate
-        else:
-            # True positive: correctly finding a violation
-            # P(catch) = 1 - P(miss) = 1 - false_negative_rate
-            return self._random() < (1.0 - self.config.false_negative_rate)
-
-    def compute_penalty_amount(self, firm_value: float | None = None) -> float:
-        """Compute the penalty for a given firm.
-
-        Two modes:
-        1. Flexible (opt-in): max(penalty_fixed, penalty_percentage × firm_revenue)
-           Activated when penalty_fixed > 0 or penalty_percentage > 0.
-           Optionally capped by penalty_ceiling.
-        2. Flat (default): penalty_amount — used when flexible system is off
-           or firm_value is not provided.
-
-        Reference: Christoph (2026) Section 2.5 — effective punishment
-        P = min(K + phi, L) where L is the limited liability bound.
-        Here penalty_ceiling plays the role of L (limited liability).
-
-        Args:
-            firm_value: The firm's annual revenue (M$) for flexible penalty.
-                If None, uses flat penalty_amount.
-
-        Returns:
-            The computed penalty amount (M$).
-        """
-        if firm_value is None:
-            return self.config.penalty_amount
-
-        # Check if flexible penalty system is configured
-        has_fixed = self.config.penalty_fixed > 0
-        has_pct = self.config.penalty_percentage > 0
-
-        if not has_fixed and not has_pct:
-            # Flexible system not configured — use flat penalty
-            penalty = self.config.penalty_amount
-        else:
-            # Flexible: max(fixed floor, percentage × revenue)
-            fixed = self.config.penalty_fixed
-            pct_penalty = self.config.penalty_percentage * firm_value
-            penalty = max(fixed, pct_penalty)
-
-        # Apply ceiling (limited liability bound) if set
-        if self.config.penalty_ceiling is not None:
-            penalty = min(penalty, self.config.penalty_ceiling)
-
-        return penalty
-
-    def apply_penalty(
-        self, violation_found: bool, firm_value: float | None = None
+    def compute_detection_probability(
+        self,
+        excess_compute: float,
+        flop_threshold: float,
+        audit_coefficient: float = 1.0,
+        p_w: float = 0.0,
+        p_m: float = 0.0,
     ) -> float:
-        """Compute the penalty based on audit outcome.
+        """Compute total detection probability for a firm.
+
+        Combines Stage 1 (audit occurrence) with Stage 2 (catch if audited),
+        including whistleblower and monitoring contributions to the catch:
+            p_detection = p_audit × p_catch(p_w, p_m)
+
+        Args:
+            excess_compute: Unpermitted FLOPs above what permits cover.
+            flop_threshold: Regulatory threshold requiring permits.
+            audit_coefficient: Firm-specific scaling factor c(i).
+            p_w: Whistleblower detection probability.
+            p_m: Monitoring detection probability.
+
+        Returns:
+            Total detection probability in [0, 1].
+        """
+        signal = self.compute_signal(excess_compute, flop_threshold)
+        p_audit = self.compute_audit_probability(signal, audit_coefficient)
+        p_stage2 = self.compute_catch_probability()
+
+        p_audit_detection = p_audit * p_stage2
+
+        p_escape = (1.0 - p_audit_detection) * (1.0 - p_w) * (1.0 - p_m)
+        return 1.0 - p_escape
+
+    # ------------------------------------------------------------------
+    # Penalty computation
+    # ------------------------------------------------------------------
+
+    def apply_penalty(self, violation_found: bool, penalty_amount: float) -> float:
+        """Return the penalty if a violation was found.
+
+        The penalty amount is a per-firm attribute; the auditor only decides
+        whether the violation was caught, not what the penalty is.
 
         Args:
             violation_found: Whether the audit found a violation.
-            firm_value: The firm's economic value (M$) for flexible penalty.
-                If None, falls back to flat penalty_amount.
+            penalty_amount: The firm's configured penalty (M$).
 
         Returns:
-            The penalty amount if violation found, 0.0 otherwise.
+            penalty_amount if violation_found, else 0.0.
         """
-        if violation_found:
-            return self.compute_penalty_amount(firm_value)
-        return 0.0
+        return penalty_amount if violation_found else 0.0

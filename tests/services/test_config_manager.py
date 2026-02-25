@@ -21,7 +21,7 @@ def mock_scenario_dir():
             "steps": 10,
             "n_agents": 5,
             "market": {"token_cap": 100},
-            "audit": {"base_prob": 0.05, "high_prob": 0.2, "penalty_amount": 10},
+            "audit": {"base_prob": 0.05, "penalty_amount": 10},
             "lab": {},
         }
 

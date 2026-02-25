@@ -24,13 +24,14 @@ class Lab:
         economic_value: The value (v_i) the lab generates from a training run.
         risk_profile: Multiplier on perceived penalty
             (>1 = risk-averse, <1 = risk-seeking).
-        capacity: Maximum compute capacity (q_max) for this lab.
+        planned_training_flops: Planned training run size (FLOP).
+        penalty_amount: Flat penalty if caught (M$).
         capability_value: V_b, baseline value of model capabilities from training.
         racing_factor: c_r, urgency multiplier on capability value.
         reputation_sensitivity: R, perceived reputation cost if caught.
         audit_coefficient: c(i), firm-specific scaling on base audit rate.
         is_compliant: State of the last compliance decision.
-        has_permit: Whether the lab holds a valid permit this period.
+        permits_held: Number of permits held this period (0 = none).
     """
 
     def __init__(
@@ -39,27 +40,14 @@ class Lab:
         config: "LabConfig",
         economic_value: float,
         risk_profile: float,
-        capacity: float,
-        firm_revenue: float = 0.0,
         planned_training_flops: float = 0.0,
+        penalty_amount: float = 0.0,
     ) -> None:
-        """Initialize the Lab.
-
-        Args:
-            lab_id: Unique integer identifier.
-            config: Static configuration shared across labs.
-            economic_value: Generated economic value (v_i) of a training run.
-            risk_profile: Generated risk profile.
-            capacity: Generated capacity (q_max).
-            firm_revenue: Annual revenue/turnover (M$) for penalty calculation.
-            planned_training_flops: Planned training run size (FLOP).
-        """
         self.lab_id: int = lab_id
         self.economic_value: float = economic_value
         self.risk_profile: float = risk_profile
-        self.capacity: float = capacity
-        self.firm_revenue: float = firm_revenue
         self.planned_training_flops: float = planned_training_flops
+        self.penalty_amount: float = penalty_amount
 
         # Static params from config (base values, never modified)
         self.capability_value: float = config.capability_value
@@ -75,7 +63,7 @@ class Lab:
 
         # Per-step state
         self.is_compliant: bool = True
-        self.has_permit: bool = False
+        self.permits_held: int = 0  # 0 = no permits; >=1 in multi-unit mode
         self.collateral_posted: float = 0.0  # M$: collateral held this step
 
         # Dynamic state (evolves over steps)
@@ -85,6 +73,27 @@ class Lab:
             self.reputation_sensitivity
         )  # may escalate
         self.cumulative_capability: float = 0.0  # cumulative successful runs
+
+    @property
+    def has_permit(self) -> bool:
+        """Whether the lab holds at least one permit."""
+        return self.permits_held > 0
+
+    def excess_flops(self, flops_per_permit: float | None) -> float:
+        """Compute unpermitted FLOPs above what permits cover.
+
+        Args:
+            flops_per_permit: FLOPs covered per permit. None = binary mode
+                (any permit covers the full training run).
+
+        Returns:
+            Excess FLOPs not covered by held permits (>= 0).
+        """
+        if flops_per_permit is None:
+            # Binary mode: 1 permit covers everything
+            return 0.0 if self.permits_held > 0 else self.planned_training_flops
+        permitted = self.permits_held * flops_per_permit
+        return max(0.0, self.planned_training_flops - permitted)
 
     def get_bid(self, cost: float = 0.0) -> float:
         """Return willingness to pay for a permit.
@@ -106,15 +115,15 @@ class Lab:
     ) -> bool:
         """Decide whether to comply, applying the deterrence condition p * B >= g.
 
-        Decision logic:
-            1. If has_permit -> compliant (already paid for legal usage).
-            2. Compute gain from cheating: g = delta_c + V.
-            3. If g <= 0 -> compliant (no incentive to cheat).
-            4. Compute perceived penalty:
+        Called only for labs with unpermitted excess (the game loop skips
+        fully-covered labs).  Decision logic:
+            1. Compute gain from cheating: g = delta_c + V.
+            2. If g <= 0 -> compliant (no incentive to cheat).
+            3. Compute perceived penalty:
                B_total = (penalty + collateral + reputation) * risk_profile
                Ref: Christoph (2026) §2.5 — P_eff = K + phi (collateral + fine)
-            5. If detection_prob * B_total >= g -> compliant (deterred).
-            6. Otherwise -> non-compliant (cheat).
+            4. If detection_prob * B_total >= g -> compliant (deterred).
+            5. Otherwise -> non-compliant (cheat).
 
         Args:
             market_price: Current permit price (used as delta_c for binary q).
@@ -125,12 +134,7 @@ class Lab:
         Returns:
             True if compliant, False if non-compliant.
         """
-        # 1. Permitted firms are compliant
-        if self.has_permit:
-            self.is_compliant = True
-            return True
-
-        # 2. Gain from cheating: g = delta_c + V
+        # 1. Gain from cheating: g = delta_c + V
         #    delta_c = market_price (savings from not buying permit)
         #    BUT if v_i < market_price, the agent wouldn't buy anyway.
         #    So the benefit of cheating is getting to run
@@ -140,7 +144,7 @@ class Lab:
         capability_gain = self.racing_factor * self.capability_value
         gain = delta_c + capability_gain
 
-        # 3. No gain -> compliant (don't run or no incentive)
+        # 2. No gain -> compliant (don't run or no incentive)
         if gain <= 0:
             self.is_compliant = True
             return True
@@ -151,7 +155,7 @@ class Lab:
             self.is_compliant = True
             return True
 
-        # 4. Perceived total penalty: B = (penalty + collateral + reputation) * risk_profile
+        # 3. Perceived total penalty: B = (penalty + collateral + reputation) * risk_profile
         #    Collateral is seized on violation, so it's part of the effective punishment.
         #    Ref: Christoph (2026) §2.5 — P_eff = K + phi
         #    Uses current_reputation_sensitivity (may be escalated from base via dynamic factors)
@@ -159,14 +163,14 @@ class Lab:
             penalty + self.collateral_posted + self.current_reputation_sensitivity
         ) * self.risk_profile
 
-        # 5. Deterrence condition: p * B >= g
-        # Uses current_audit_coefficient (may be escalated via dynamic factors)
-        agent_specific_prob = detection_prob * self.current_audit_coefficient
-        expected_penalty = agent_specific_prob * b_total
+        # 4. Deterrence condition: p * B >= g
+        # detection_prob already incorporates the firm-specific audit coefficient
+        # c(i) via auditor.compute_detection_probability() in the game loop.
+        expected_penalty = detection_prob * b_total
 
         logger.debug(
             f"Lab {self.lab_id} Decision: Gain={gain:.3f}, "
-            f"Prob={agent_specific_prob:.3f}, B={b_total:.3f}, "
+            f"Prob={detection_prob:.3f}, B={b_total:.3f}, "
             f"ExpPenalty={expected_penalty:.3f}"
         )
 
@@ -174,7 +178,7 @@ class Lab:
             self.is_compliant = True
             return True
 
-        # 6. Not deterred -> cheat
+        # 5. Not deterred -> cheat
         self.is_compliant = False
         logger.info(
             f"Lab {self.lab_id} CHEATING: Gain ({gain:.3f}) > ExpPenalty ({expected_penalty:.3f})"

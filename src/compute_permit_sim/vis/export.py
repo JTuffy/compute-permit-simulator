@@ -341,23 +341,23 @@ def _write_graphs_sheet(sheet, run, workbook):
         # Plot 1: Scatter (Reported vs Used)
         # Check if columns exist (using string literals for safety if keys changed, dynamic is better but risky for logic)
         if (
-            ColumnNames.USED_COMPUTE in agents_df.columns
-            and ColumnNames.REPORTED_COMPUTE in agents_df.columns
+            ColumnNames.USED_TRAINING_FLOPS in agents_df.columns
+            and ColumnNames.REPORTED_TRAINING_FLOPS in agents_df.columns
         ):
-            sheet.write(row_offset, 0, "True vs Reported Compute (Last Step)")
+            sheet.write(row_offset, 0, "True vs Reported FLOPs (Last Step)")
             fig, ax = plot_scatter(
                 agents_df,
-                ColumnNames.REPORTED_COMPUTE,
-                ColumnNames.USED_COMPUTE,
-                "True vs Reported Compute",
+                ColumnNames.REPORTED_TRAINING_FLOPS,
+                ColumnNames.USED_TRAINING_FLOPS,
+                "True vs Reported FLOPs",
                 "Reported",
                 "True",
                 color_logic="compliance",
             )
             # Add y=x line
             max_val = max(
-                agents_df[ColumnNames.USED_COMPUTE].max(),
-                agents_df[ColumnNames.REPORTED_COMPUTE].max(),
+                agents_df[ColumnNames.USED_TRAINING_FLOPS].max(),
+                agents_df[ColumnNames.REPORTED_TRAINING_FLOPS].max(),
             )
             ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5)
             ax.legend()

@@ -41,7 +41,6 @@ def basic_config() -> ScenarioConfig:
         audit=AuditConfig(
             audit_cost=1.0,
             base_prob=0.1,
-            high_prob=0.5,
             penalty_amount=10.0,
         ),
         lab=LabConfig(

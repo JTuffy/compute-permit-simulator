@@ -92,19 +92,8 @@ FLOP scaling reference:
 | Near-future frontier | 10²⁵ | ~$500M |
 | Projected 2027 | 10²⁶ | ~$5B |
 
-### Flexible Penalty Structure
-Penalties follow the formula (inspired by EU AI Act Article 99):
-```
-penalty = max(penalty_fixed, penalty_percentage × firm_revenue)
-if penalty_ceiling: penalty = min(penalty, penalty_ceiling)
-```
-
-- `penalty_fixed` (M$): Fixed floor, e.g. EU AI Act €35M
-- `penalty_percentage`: Fraction of annual revenue, e.g. EU AI Act 7%
-- `penalty_ceiling` (M$): Optional cap
-- When both are 0 (default), falls back to flat `penalty_amount`
-- `firm_revenue` (annual turnover) is distinct from `economic_value` (training run value)
-
+### Penalty Structure
+Penalties are defined simply via a flat per-firm amount (`penalty_amount`) set at instantiation.
 Ref: Christoph (2026) §2.5 — P_eff = min(K + φ, L)
 
 ### Collateral / Staking Mechanism
@@ -133,17 +122,16 @@ The `Auditor` implements a realistic enforcement process:
 
 **Signal Strength Formula** (for non-compliant firms):
 ```
-signal = 0.5 + 0.5 × min(1, (used_compute - threshold) / threshold)
+signal = min(1.0, (used_compute / flop_threshold)^signal_exponent)
 ```
-- At threshold: signal ≈ 0.5 (borderline suspicious)
-- At 2× threshold: signal = 1.0 (very suspicious)
-- Larger training runs are harder to hide
+- At `signal_exponent=1.0` (linear), 50% excess → 0.5 signal. 
+- Higher exponents create a more convex, lenient regime for minor infractions.
 
 **Effective Detection Probability**:
 ```
-p_audit = base_prob + signal_strength × (high_prob - base_prob)
-p_catch = p_audit × (1 - false_negative_rate)
-p_eff = p_catch + (1 - p_catch) × backcheck_prob
+p_audit = base_prob + signal_strength × (1.0 - base_prob)  # if signal_dependent
+p_catch = (1 - false_negative_rate) + false_negative_rate × backcheck_prob
+p_eff = p_audit × p_catch
 ```
 
 ## Simulation Loop
@@ -252,12 +240,9 @@ where `gap = cumulative_capability - mean_capability`.
 
 All monetary values are in **millions of USD (M$)**. This includes:
 - `economic_value`: Training run value (M$)
-- `firm_revenue`: Annual revenue/turnover (M$)
-- `penalty_amount`, `penalty_fixed`, `penalty_ceiling`: Penalties (M$)
+- `penalty_amount`: Flat per-firm penalty (M$)
 - `collateral_amount`: Refundable deposit (M$)
 - `reputation_sensitivity`: Perceived brand/trust damage (M$)
-- `wealth`, `step_profit`: Cumulative and per-step financials (M$)
-- `cost`: Per-audit cost for regulator (M$)
 
 Training run compute is measured in **FLOPs** (floating point operations).
 - `flop_threshold`: Regulatory threshold (FLOP)

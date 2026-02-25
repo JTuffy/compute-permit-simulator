@@ -1,4 +1,4 @@
-"""Payoff comparison and wealth divergence plots."""
+"""Payoff comparison plots."""
 
 import pandas as pd
 import solara
@@ -6,21 +6,20 @@ from matplotlib.figure import Figure
 
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.vis.components.charts.base import validate_dataframe
-from compute_permit_sim.vis.constants import CHART_COLOR_MAP
 
 
 @solara.component
 def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
-    """Bar chart comparing average net value by strategy outcome.
+    """Bar chart comparing average economic value by strategy outcome.
 
-    Shows payoffs for: compliant, caught cheating, and uncaught cheating strategies.
+    Shows economic value at stake for: compliant, caught cheating, and uncaught cheating.
     """
     if not validate_dataframe(
         agents_df,
         [
             ColumnNames.IS_COMPLIANT,
             ColumnNames.WAS_CAUGHT,
-            ColumnNames.STEP_PROFIT,
+            ColumnNames.ECONOMIC_VALUE,
         ],
         "Missing required columns for payoff plot.",
     ):
@@ -38,13 +37,15 @@ def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
     ]
 
     avg_compliant = (
-        compliant[ColumnNames.STEP_PROFIT].mean() if len(compliant) > 0 else 0
+        compliant[ColumnNames.ECONOMIC_VALUE].mean() if len(compliant) > 0 else 0
     )
     avg_caught = (
-        cheated_caught[ColumnNames.STEP_PROFIT].mean() if len(cheated_caught) > 0 else 0
+        cheated_caught[ColumnNames.ECONOMIC_VALUE].mean()
+        if len(cheated_caught) > 0
+        else 0
     )
     avg_uncaught = (
-        cheated_uncaught[ColumnNames.STEP_PROFIT].mean()
+        cheated_uncaught[ColumnNames.ECONOMIC_VALUE].mean()
         if len(cheated_uncaught) > 0
         else 0
     )
@@ -77,56 +78,12 @@ def PayoffByStrategyPlot(agents_df: pd.DataFrame | None):
             fontweight="bold",
         )
 
-    ax.set_ylabel("Avg Net Value (M$)")
-    ax.set_title("Payoff by Strategy")
+    ax.set_ylabel("Avg Economic Value (M$)")
+    ax.set_title("Economic Value by Strategy")
     ax.axhline(y=0, color="gray", linestyle="-", linewidth=0.5)
     ax.grid(True, alpha=0.3, axis="y")
     y_min = min(0, min(payoffs) * 1.3)
     y_max = max(payoffs) * 1.3 if max(payoffs) > 0 else 1
     ax.set_ylim(y_min, y_max)
-    fig.tight_layout()
-    solara.FigureMatplotlib(fig)
-
-
-@solara.component
-def WealthDivergencePlot(
-    compliant_history: list[float], non_compliant_history: list[float]
-):
-    """Line chart showing Total Wealth of Compliant vs Non-Compliant agents over time.
-
-    Demonstrates whether crime pays in the long run by comparing wealth trajectories.
-    """
-    if not compliant_history and not non_compliant_history:
-        solara.Markdown("No Wealth Data")
-        return
-
-    fig = Figure(figsize=(8, 4), dpi=100)
-    ax = fig.subplots()
-    steps = list(range(1, len(compliant_history) + 1))
-
-    ax.plot(
-        steps,
-        compliant_history,
-        label="Compliant Total Wealth",
-        color=CHART_COLOR_MAP["green"],
-        linewidth=2.5,
-        alpha=0.9,
-    )
-    ax.plot(
-        steps,
-        non_compliant_history,
-        label="Non-Compliant Total Wealth",
-        color=CHART_COLOR_MAP["red"],
-        linewidth=2.5,
-        alpha=0.9,
-    )
-
-    ax.set_xlabel("Step", fontsize=10)
-    ax.set_ylabel("Total Wealth (M$)", fontsize=10)
-    ax.set_title("Wealth Divergence: Does Crime Pay?")
-    ax.legend(loc="upper left")
-    ax.grid(True, alpha=0.25, linestyle="--")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
     fig.tight_layout()
     solara.FigureMatplotlib(fig)

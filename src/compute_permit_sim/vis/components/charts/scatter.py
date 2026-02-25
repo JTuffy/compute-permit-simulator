@@ -18,7 +18,7 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
     """
     if not validate_dataframe(
         agents_df,
-        [ColumnNames.REPORTED_COMPUTE, ColumnNames.USED_COMPUTE],
+        [ColumnNames.REPORTED_TRAINING_FLOPS, ColumnNames.USED_TRAINING_FLOPS],
         "No data for scatter plot.",
     ):
         solara.Markdown("No data for scatter plot.")
@@ -26,18 +26,18 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
 
     fig, ax = plot_scatter(
         agents_df,
-        ColumnNames.REPORTED_COMPUTE,
-        ColumnNames.USED_COMPUTE,
+        ColumnNames.REPORTED_TRAINING_FLOPS,
+        ColumnNames.USED_TRAINING_FLOPS,
         "Risk Design: True vs Reported",
-        "Reported Compute (r)",
-        "True Compute (q)",
+        "Reported FLOPs (r)",
+        "True FLOPs (q)",
         color_logic="compliance",
     )
 
     max_val = (
         max(
-            agents_df[ColumnNames.USED_COMPUTE].max(),
-            agents_df[ColumnNames.REPORTED_COMPUTE].max(),
+            agents_df[ColumnNames.USED_TRAINING_FLOPS].max(),
+            agents_df[ColumnNames.REPORTED_TRAINING_FLOPS].max(),
         )
         if not agents_df.empty
         else 1.0
@@ -47,43 +47,6 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
 
     solara.FigureMatplotlib(fig)
 
-
-@solara.component
-def CheatingGainPlot(agents_df: pd.DataFrame | None):
-    """Scatter plot of Economic Value vs Step Profit.
-
-    Shows whether higher-value firms benefit more from cheating.
-    """
-    if not validate_dataframe(
-        agents_df,
-        [
-            ColumnNames.ECONOMIC_VALUE,
-            ColumnNames.STEP_PROFIT,
-            ColumnNames.IS_COMPLIANT,
-        ],
-        "Missing data for gain plot.",
-    ):
-        solara.Markdown("Missing data for gain plot.")
-        return
-
-    fig = Figure(figsize=(6, 5), dpi=100)
-    ax = fig.subplots()
-
-    x = agents_df[ColumnNames.ECONOMIC_VALUE]
-    y = agents_df[ColumnNames.STEP_PROFIT]
-    colors = agents_df[ColumnNames.IS_COMPLIANT].map(
-        {True: CHART_COLOR_MAP["green"], False: CHART_COLOR_MAP["red"]}
-    )
-
-    ax.scatter(x, y, c=colors, alpha=0.7, edgecolors="w", s=80)
-
-    ax.set_xlabel("Economic Value (Potential)")
-    ax.set_ylabel("Step Profit (Realized)")
-    ax.set_title("Cheating Gain Analysis")
-    ax.grid(True, alpha=0.3)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    solara.FigureMatplotlib(fig)
 
 
 @solara.component
@@ -95,8 +58,8 @@ def CapacityUtilizationPlot(agents_df: pd.DataFrame | None):
     if not validate_dataframe(
         agents_df,
         [
-            ColumnNames.CAPACITY,
-            ColumnNames.REPORTED_COMPUTE,
+            ColumnNames.PLANNED_TRAINING_FLOPS,
+            ColumnNames.REPORTED_TRAINING_FLOPS,
             ColumnNames.IS_COMPLIANT,
         ],
         "Missing data for capacity plot.",
@@ -107,8 +70,8 @@ def CapacityUtilizationPlot(agents_df: pd.DataFrame | None):
     fig = Figure(figsize=(6, 5), dpi=100)
     ax = fig.subplots()
 
-    x = agents_df[ColumnNames.CAPACITY]
-    y = agents_df[ColumnNames.REPORTED_COMPUTE]
+    x = agents_df[ColumnNames.PLANNED_TRAINING_FLOPS]
+    y = agents_df[ColumnNames.REPORTED_TRAINING_FLOPS]
     colors = agents_df[ColumnNames.IS_COMPLIANT].map(
         {True: CHART_COLOR_MAP["green"], False: CHART_COLOR_MAP["red"]}
     )

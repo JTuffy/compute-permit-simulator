@@ -43,13 +43,22 @@ def StepInspector(
 
             # Row 2: Theoretical & Deep Dives
             # REFACTOR: Use ChartFactory for deterrence logic
-            # Determine efficient detection p and penalty
+            # Compute effective detection = p_audit × p_catch (two-stage model)
+            # p_catch = (1 - FNR) + FNR × backcheck
             if is_live:
-                p_eff = ui_config.high_prob.value
+                bp = ui_config.base_prob.value
+                fnr = ui_config.false_negative_rate.value
+                bc = ui_config.backcheck_prob.value
+                p_catch = (1.0 - fnr) + fnr * bc
+                p_eff = bp * p_catch
                 penalty = ui_config.penalty_amount.value
             elif config:
-                p_eff = config.audit.high_prob
-                penalty = config.audit.penalty_amount
+                a = config.audit
+                p_catch = (
+                    1.0 - a.false_negative_rate
+                ) + a.false_negative_rate * a.backcheck_prob
+                p_eff = a.base_prob * p_catch
+                penalty = a.penalty_amount
             else:
                 p_eff = 0
                 penalty = 0
@@ -60,17 +69,16 @@ def StepInspector(
         with solara.Card("Agent Details"):
             cols = [
                 ColumnNames.ID,
-                ColumnNames.CAPACITY,
+                ColumnNames.COMPUTE_CAPACITY,
+                ColumnNames.PLANNED_TRAINING_FLOPS,
+                ColumnNames.USED_TRAINING_FLOPS,
+                ColumnNames.REPORTED_TRAINING_FLOPS,
                 ColumnNames.HAS_PERMIT,
-                ColumnNames.USED_COMPUTE,
-                ColumnNames.REPORTED_COMPUTE,
                 ColumnNames.IS_COMPLIANT,
                 ColumnNames.WAS_AUDITED,
                 ColumnNames.WAS_CAUGHT,
                 ColumnNames.PENALTY_AMOUNT,
-                ColumnNames.REVENUE,
-                ColumnNames.STEP_PROFIT,
-                ColumnNames.WEALTH,
+                ColumnNames.ECONOMIC_VALUE,
             ]
             valid_cols = [c for c in cols if c in agents_df.columns]
             solara.DataFrame(agents_df[valid_cols], items_per_page=15)

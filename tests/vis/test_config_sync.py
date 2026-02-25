@@ -76,10 +76,6 @@ def test_to_from_scenario_config_roundtrip():
     ui.flop_threshold.value = 1e23
     ui.collateral_amount.value = 50.0
     ui.whistleblower_prob.value = 0.15
-    ui.penalty_fixed.value = 35.0
-    ui.penalty_percentage.value = 0.07
-    ui.firm_revenue_min.value = 100.0
-    ui.firm_revenue_max.value = 10000.0
     ui.racing_gap_sensitivity.value = 0.5
     ui.capability_scale.value = 500.0
 
