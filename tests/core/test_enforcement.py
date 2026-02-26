@@ -225,10 +225,9 @@ def test_compute_detection_probability() -> None:
 # ---------------------------------------------------------------------------
 
 
-
-
-
 def test_apply_penalty() -> None:
     auditor = Auditor(AuditConfig())
     assert auditor.apply_penalty(violation_found=False, penalty_amount=200.0) == 0.0
-    assert auditor.apply_penalty(violation_found=True, penalty_amount=200.0) == pytest.approx(200.0)
+    assert auditor.apply_penalty(
+        violation_found=True, penalty_amount=200.0
+    ) == pytest.approx(200.0)

@@ -7,7 +7,6 @@ from compute_permit_sim.vis.components.cards import MetricCard
 from compute_permit_sim.vis.components.charts import (
     AuditTargetingPlot,
     CapacityUtilizationPlot,
-    CapacityUtilizationPlot,
     LabDecisionPlot,
     PayoffByStrategyPlot,
     QuantitativeScatterPlot,

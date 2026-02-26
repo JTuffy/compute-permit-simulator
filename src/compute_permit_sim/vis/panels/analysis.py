@@ -1,6 +1,7 @@
 import pandas as pd
 import solara
 
+from compute_permit_sim.schemas import ScenarioConfig
 from compute_permit_sim.services.metrics import (
     calculate_compliance,
 )
@@ -54,6 +55,8 @@ def AnalysisPanel():
     )
 
     # --- Extract step-specific data ---
+    config: ScenarioConfig | None = None
+    agents_df: pd.DataFrame | None = None
     if is_live:
         step_count = active_sim.state.value.step_count
         agents_df = active_sim.state.value.agents_df

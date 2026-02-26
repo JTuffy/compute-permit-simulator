@@ -1,0 +1,10 @@
+{
+    "name": "Minimal Enforcement",
+    "description": "Scarce permits, weak random auditing, high false-negative rate. Expected penalty (~5 M$) is far below the gain from running without a permit, so most unpermitted labs cheat.",
+    "steps": 10,
+    "n_agents": 20,
+    "audit": {},
+    "market": {
+        "permit_cap": 5.0
+    }
+}

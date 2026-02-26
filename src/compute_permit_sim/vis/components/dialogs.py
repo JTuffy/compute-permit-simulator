@@ -1,3 +1,5 @@
+from typing import Callable, cast
+
 import solara
 
 from compute_permit_sim.vis.state import engine
@@ -5,9 +7,9 @@ from compute_permit_sim.vis.state.history import session_history
 
 
 @solara.component
-def LoadScenarioDialog(show: bool, set_show: callable):
+def LoadScenarioDialog(show: bool, set_show: Callable[[bool], None]):
     """Dialog for selecting and loading a scenario file."""
-    selected_file, set_selected_file = solara.use_state(None)
+    selected_file, set_selected_file = solara.use_state(cast(str | None, None))
 
     def do_load():
         if selected_file:

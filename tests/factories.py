@@ -49,7 +49,7 @@ def create_scenario_config(
         "n_agents": 5,
         "steps": 10,
         "audit": AuditConfig(),
-        "market": MarketConfig(token_cap=100),
+        "market": MarketConfig(permit_cap=100),
         "lab": LabConfig(),
     }
     data = {**defaults, **kwargs}

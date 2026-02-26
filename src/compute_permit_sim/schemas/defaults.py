@@ -97,7 +97,9 @@ DEFAULT_COLLATERAL_AMOUNT = 0.0  # M$: Lawless = 0 collateral
 
 # --- Market Defaults ---
 DEFAULT_MARKET_PERMIT_CAP = 20.0  # Number of permits available
-DEFAULT_MARKET_FIXED_PRICE = 70.0  # M$: Lawless implied delta C
+DEFAULT_MARKET_FIXED_PRICE = (
+    None  # None = use competitive auction; float = fixed price (M$)
+)
 DEFAULT_FLOPS_PER_PERMIT = (
     None  # None = binary (0/1 per firm); float = FLOP-denominated
 )
@@ -127,9 +129,9 @@ DEFAULT_REPUTATION_ESCALATION_FACTOR = 0.0  # 0 = static; 0.5 = +50% per failure
 
 # 4.2 Audit rate escalation & decay
 # Failed audit increases audit_coefficient; decays back to 1.0 over time
-# Formula: coeff_t = 1.0 + (coeff_{t-1} - 1.0) × decay + escalation_if_caught
+# Formula: coeff_t = 1.0 + (coeff_{t-1} - 1.0) × (1 - decay_rate) + escalation_if_caught
 DEFAULT_AUDIT_ESCALATION = 0.0  # 0 = static; 1.0 = +1.0 per failure
-DEFAULT_AUDIT_DECAY_RATE = 0.8  # per-step decay (0.8 = 20% decay toward 1.0)
+DEFAULT_AUDIT_DECAY_RATE = 0.2  # per-step decay fraction (0.2 = 20% decay toward 1.0)
 
 # 4.3 Racing factor dynamics
 # Racing factor depends on relative capability position

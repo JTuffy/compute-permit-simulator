@@ -1,5 +1,5 @@
 {
-    "name": "Maxwell World (Smart Enforcement)",
+    "name": "Smart Enforcement",
     "description": "Smart targeting (monitoring=0.2), efficient pricing ($2M), moderate audit (10%).",
     "steps": 10,
     "n_agents": 20,

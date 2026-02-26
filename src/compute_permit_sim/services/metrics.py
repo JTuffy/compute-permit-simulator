@@ -7,7 +7,7 @@ historical analysis, and exported reports.
 
 from typing import List
 
-from compute_permit_sim.schemas.data import AgentSnapshot
+from compute_permit_sim.schemas.data import AgentSnapshot, RunMetrics
 
 
 def calculate_compliance(agents: List[AgentSnapshot]) -> float:
@@ -18,7 +18,7 @@ def calculate_compliance(agents: List[AgentSnapshot]) -> float:
     return compliant_count / len(agents)
 
 
-def calculate_run_metrics(steps: list) -> "RunMetrics":  # noqa: F821
+def calculate_run_metrics(steps: list) -> RunMetrics:
     """Calculate aggregate run metrics from a list of steps.
 
     Args:
@@ -27,8 +27,6 @@ def calculate_run_metrics(steps: list) -> "RunMetrics":  # noqa: F821
     Returns:
         RunMetrics object.
     """
-    from compute_permit_sim.schemas.data import RunMetrics
-
     if not steps:
         return RunMetrics(
             final_compliance=0.0,

@@ -35,8 +35,8 @@ def test_market_clearing_surplus():
 
 
 def test_fixed_price_market():
-    """Test market behavior with fixed price (unlimited supply)."""
-    market = SimpleClearingMarket(permit_cap=0)  # Cap shouldn't matter
+    """Test fixed-price market: qualifying labs get permits when supply is sufficient."""
+    market = SimpleClearingMarket(permit_cap=10)  # Enough for all qualifying labs
     market.set_fixed_price(5.0)
 
     bids = [(1, 1, 10.0), (2, 1, 5.0), (3, 1, 4.9), (4, 1, 1.0)]
@@ -44,10 +44,25 @@ def test_fixed_price_market():
     price, allocations = market.allocate(bids)
 
     assert price == 5.0
-    assert allocations[1] == 1
-    assert allocations[2] == 1
+    assert allocations[1] == 1  # bid >= fixed_price
+    assert allocations[2] == 1  # bid == fixed_price
+    assert allocations[3] == 0  # bid < fixed_price
+    assert allocations[4] == 0  # bid < fixed_price
+
+
+def test_fixed_price_market_oversubscribed():
+    """Test fixed-price market when demand exceeds permit_cap: random allocation."""
+    market = SimpleClearingMarket(permit_cap=1)  # Only 1 permit for 2 qualifying labs
+    market.set_fixed_price(5.0)
+
+    bids = [(1, 1, 10.0), (2, 1, 5.0), (3, 1, 4.9)]
+
+    price, allocations = market.allocate(bids)
+
+    assert price == 5.0
+    # Exactly 1 permit allocated total across qualifying labs (1 and 2)
     assert allocations[3] == 0
-    assert allocations[4] == 0
+    assert allocations[1] + allocations[2] == 1
 
 
 def test_fixed_price_no_bids():

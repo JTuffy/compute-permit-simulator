@@ -68,14 +68,14 @@ graph TB
 - `enforcement.py`: `Auditor` implements two-stage audit model (signal → audit → outcome)
 
 **Infrastructure Layer** (`services/`): Mesa integration and simulation control.
-- `model_wrapper.py`: `ComputePermitModel` orchestrates the 7-phase simulation loop (see below)
+- `mesa_model.py`: `ComputePermitModel` orchestrates the simulation loop (see below)
 - `config_manager.py`: Loads/saves JSON scenarios as validated `ScenarioConfig` objects
-- `data_collect.py`: Reporter functions for Mesa DataCollector (compliance rate, price)
+- `metrics.py`: Compliance and run-metrics calculations from agent snapshots
 
 **Visualization Layer** (`vis/`): Interactive UI and state management.
-- `state.py`: `SimulationManager` manages reactive state, bridges UI ↔ Model
-- `solara_app.py`: Solara components (ConfigPanel, Dashboard, InspectorTab)
-- `components.py`: Reusable UI widgets (scatter plots, range controls)
+- `simulation.py`: `SimulationEngine` manages reactive state, bridges UI ↔ Model
+- `page.py`: Solara entry point (ConfigPanel, Dashboard, InspectorTab)
+- `components/`: Reusable UI widgets (scatter plots, range controls, cards)
 
 **Configuration** (`schemas/`): Pydantic models (`AuditConfig`, `MarketConfig`, `LabConfig`, `ScenarioConfig`) used throughout for type-safe configuration.
 
@@ -116,9 +116,10 @@ The `Auditor` implements a realistic enforcement process:
 
 | Stage | Method | Determines | Parameters |
 |-------|--------|------------|------------|
-| **1. Signal Generation** | `compute_signal_strength()` | How suspicious a firm appears | `used_compute`, `flop_threshold` |
-| **2. Audit Occurrence** | `decide_audit()` | Whether audit is initiated | `base_prob` (π₀), `high_prob` (π₁) |
-| **3. Audit Outcome** | `audit_finds_violation()` | Whether violation is detected | `false_positive_rate` (α), `false_negative_rate` (β) |
+| **1a. Signal** | `compute_signal()` | Suspicion signal from excess FLOP | `excess_compute`, `flop_threshold`, `signal_exponent` |
+| **1b. Audit Occurrence** | `compute_audit_probability()` | Whether audit is initiated | `base_prob` (π₀), `audit_coefficient` c(i), `signal_dependent` |
+| **2. Audit Outcome** | `audit_detection_channel()` | Whether violation is detected | `false_negative_rate` (β), `backcheck_prob`, `false_positive_rate` (α) |
+| **Indep. channels** | (combined in `compute_detection_probability()`) | Whistleblower / monitoring catch | `whistleblower_prob`, `monitoring_prob` |
 
 **Signal Strength Formula** (for non-compliant firms):
 ```
@@ -153,32 +154,31 @@ sequenceDiagram
     SM->>Model: step()
 
     Note over Model: Phase 0: Collateral
-    Model->>Lab: Post collateral K (deduct from wealth)
+    Model->>Lab: Post collateral K
 
     Note over Model: Phase 1: Trading
     Model->>Lab: get_bid() for each agent
     Lab-->>Model: bids
     Model->>Market: allocate(bids)
-    Market-->>Model: (price, winners)
-    Model->>Lab: Update has_permit, deduct wealth
+    Market-->>Model: (price, allocations)
+    Model->>Lab: Update permits_held
 
     Note over Model: Phase 2: Compliance Decision
-    Model->>Auditor: compute_signal_strength(planned_training_flops, flop_threshold)
-    Auditor-->>Model: expected_signal
-    Model->>Auditor: compute_effective_detection(signal)
+    Model->>Auditor: compute_signal(excess_compute, flop_threshold)
+    Auditor-->>Model: signal
+    Model->>Auditor: compute_detection_probability(excess, threshold, coeff, p_w, p_m)
     Auditor-->>Model: p_eff
     Model->>Lab: decide_compliance(price, penalty, p_eff)
     Lab-->>Model: is_compliant
 
     Note over Model: Phase 3–4: Signal, Audit & Enforcement
-    Model->>Auditor: generate_signal(used_compute, flop_threshold)
-    Auditor-->>Model: signal_strength
-    Model->>Auditor: decide_audit(signal_strength)
-    Auditor-->>Model: should_audit
-    Model->>Auditor: audit_finds_violation(is_compliant)
-    Auditor-->>Model: violation_found (uses FPR/FNR)
+    Model->>Auditor: compute_audit_probability(signal, audit_coefficient)
+    Auditor-->>Model: p_audit
+    Model->>Auditor: audit_detection_channel(is_compliant, p_w, p_m)
+    Auditor-->>Model: (caught, caught_backcheck)
+    Model->>Auditor: apply_penalty(violation_found, penalty_amount)
+    Auditor-->>Model: penalty
     Model->>Lab: Apply penalties + seize collateral if caught
-    Model->>Lab: Refund collateral if not caught
 
     Note over Model: Phase 5: Value Realization
     Model->>Lab: Realize economic value
@@ -192,15 +192,15 @@ sequenceDiagram
     SM-->>UI: Trigger re-render
 ```
 
-**Phase 0 - Collateral**: Labs post refundable deposit K (deducted from wealth). Skipped when `collateral_amount = 0`.
+**Phase 0 - Collateral**: Labs post refundable deposit K. Skipped when `collateral_amount = 0`.
 
-**Phase 1 - Trading**: Agents submit bids → `Market.allocate()` → price discovery → permit allocation → wealth deduction
+**Phase 1 - Trading**: Above-threshold labs submit bids → `Market.allocate()` → uniform-price auction → `permits_held` updated (supports multi-unit FLOP-denominated permits when `flops_per_permit` is set)
 
-**Phase 2 - Compliance Decision**: Per-agent detection probability calculated using expected signal strength from `planned_training_flops` vs `flop_threshold` → agents without permits call `decide_compliance()` → deterrence condition: `p_eff × B_total >= gain` where `B_total = (penalty + collateral + reputation_sensitivity) × risk_profile`
+**Phase 2 - Compliance Decision**: Per-agent detection probability calculated via `compute_detection_probability()` using expected signal from `planned_training_flops` vs `flop_threshold` → labs with unpermitted excess call `decide_compliance()` → deterrence condition: `p_eff × B_total >= gain` where `B_total = (penalty + collateral + reputation_sensitivity) × risk_profile`
 
-**Phase 3–4 - Signal, Audit & Enforcement**: Actual training FLOP usage generates signal → signal strength determines audit probability (interpolates between `base_prob` and `high_prob`) → `audit_finds_violation()` uses FPR/FNR → penalties applied (flexible: `max(fixed, pct × revenue)` with optional ceiling) → collateral seized on violation → collateral refunded otherwise → `on_audit_failure()` escalates reputation sensitivity and audit coefficient
+**Phase 3–4 - Signal, Audit & Enforcement**: Actual training FLOP excess generates signal → `compute_audit_probability()` applies `base_prob`, `signal_dependent`, and `audit_coefficient` → `audit_detection_channel()` uses FNR/backcheck/FPR for two-stage outcome, plus independent whistleblower (`p_w`) and monitoring (`p_m`) channels → flat `penalty_amount` applied if caught → collateral seized on violation → `on_audit_failure()` escalates reputation sensitivity and audit coefficient
 
-**Phase 5 - Value Realization**: Agents who ran compute (legally or illegally) realize `economic_value`
+**Phase 5 - Value Realization**: Labs that ran realize `economic_value`
 
 **Phase 6 - Dynamic Factor Updates**: Audit coefficients decay toward base via `decay_audit_coefficient()` → racing factors updated via `update_racing_factor()` based on relative capability position
 
@@ -222,10 +222,10 @@ reputation_sensitivity_t = base × (1 + escalation_factor)^failed_audit_count
 Failed audits increase a lab's audit coefficient (making future audits more likely). The excess decays exponentially toward the base each step:
 ```
 on failure: audit_coefficient += audit_escalation
-each step:  excess = current - base; current = base + excess × decay_rate
+each step:  excess = current - base; current = base + excess × (1 - decay_rate)
 ```
 - `audit_escalation = 0.0` (static) or e.g. `1.0` per failure
-- `audit_decay_rate = 0.8` (20% decay per step toward base of 1.0)
+- `audit_decay_rate = 0.2` (20% decay per step toward base of 1.0)
 
 ### Racing Factor Dynamics
 Racing pressure adjusts based on relative capability position:

@@ -151,7 +151,7 @@ class AuditConfig(BaseModel):
         DEFAULT_AUDIT_DECAY_RATE,
         ge=0,
         le=1,
-        description="Per-step decay factor for escalated audit coefficient",
+        description="Fraction of excess audit coefficient that decays each step (0.1 = 10% per step)",
         json_schema_extra=_ui("Dynamic Factors", "Audit Decay Rate", "percent"),
     )
 
@@ -315,8 +315,8 @@ class ScenarioConfig(BaseModel):
     )
 
     # Sub-configs
-    audit: AuditConfig = Field(default_factory=AuditConfig)
-    market: MarketConfig = Field(default_factory=MarketConfig)
-    lab: LabConfig = Field(default_factory=LabConfig)
+    audit: AuditConfig = Field(default_factory=lambda: AuditConfig())
+    market: MarketConfig = Field(default_factory=lambda: MarketConfig())
+    lab: LabConfig = Field(default_factory=lambda: LabConfig())
 
     seed: int | None = None

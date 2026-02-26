@@ -9,8 +9,9 @@ Stage 1 — AUDIT OCCURRENCE: Will the firm be audited?
     When signal_dependent=False, signal is ignored (pure random auditing):
     p_audit = min(1.0, base_prob × c(i))
 
-    Budget-capped mode (max_audits_per_step set): randomly sample N from
-    triggered labs — no implicit prioritisation.
+    Budget-capped mode (max_audits_per_step set):
+      - signal_dependent=True:  rank triggered labs by signal desc, take top N
+      - signal_dependent=False: random sample N from triggered labs
 
 Stage 2 — AUDIT OUTCOME: Given an audit, is the violation found?
     p_stage2 = (1 - FNR) + FNR × backcheck_prob
@@ -106,19 +107,12 @@ class Auditor:
     # ------------------------------------------------------------------
 
     def compute_catch_probability(self, p_w: float = 0.0, p_m: float = 0.0) -> float:
-        """Probability of catching a real violation once audited.
+        """Probability of catching a real violation once audited (Stage 2).
 
-        NOTE: p_w and p_m are no longer fed directly into this calculation
-        if we want them to act outside the audit loop. However, to keep the
-        API consistent for now, we will return just the Stage 2 probability here.
-        The overall combining will happen in compute_detection_probability.
+        Formula: p_stage2 = (1 - FNR) + FNR × backcheck_prob
 
-        Formula:
-            p_stage2 = (1 - FNR) + FNR × backcheck_prob
-
-        Args:
-            p_w: Whistleblower detection probability (ignored here).
-            p_m: Monitoring detection probability (ignored here).
+        p_w and p_m are accepted for signature compatibility but are combined
+        independently in compute_detection_probability, not here.
 
         Returns:
             Catch probability in [0, 1].

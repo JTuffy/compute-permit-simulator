@@ -46,12 +46,12 @@ def StepInspector(
             # Compute effective detection = p_audit × p_catch (two-stage model)
             # p_catch = (1 - FNR) + FNR × backcheck
             if is_live:
-                bp = ui_config.base_prob.value
-                fnr = ui_config.false_negative_rate.value
-                bc = ui_config.backcheck_prob.value
+                bp = getattr(ui_config, "base_prob").value
+                fnr = getattr(ui_config, "false_negative_rate").value
+                bc = getattr(ui_config, "backcheck_prob").value
                 p_catch = (1.0 - fnr) + fnr * bc
                 p_eff = bp * p_catch
-                penalty = ui_config.penalty_amount.value
+                penalty = getattr(ui_config, "penalty_amount").value
             elif config:
                 a = config.audit
                 p_catch = (

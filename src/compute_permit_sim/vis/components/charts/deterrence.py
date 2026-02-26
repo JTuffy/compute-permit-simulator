@@ -25,6 +25,7 @@ def AuditTargetingPlot(agents_df: pd.DataFrame | None):
         solara.Markdown("No data for audit targeting plot.")
         return
 
+    assert agents_df is not None
     compliant_agents = agents_df[agents_df[ColumnNames.IS_COMPLIANT]]
     noncompliant_agents = agents_df[~agents_df[ColumnNames.IS_COMPLIANT]]
 
@@ -100,6 +101,7 @@ def LabDecisionPlot(agents_df: pd.DataFrame | None, audit_prob: float, penalty: 
         )
         return
 
+    assert agents_df is not None
     fig = Figure(figsize=(6, 5), dpi=100)
     ax = fig.subplots()
 

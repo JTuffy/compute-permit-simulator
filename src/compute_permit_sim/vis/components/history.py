@@ -8,7 +8,7 @@ from compute_permit_sim.vis.state.history import session_history
 
 
 @solara.component
-def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
+def RunHistoryItem(run: SimulationRun, is_selected: bool) -> None:
     """Individual item in the history list."""
 
     # Label generation
@@ -159,8 +159,10 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> solara.Element:
             from compute_permit_sim.vis.export import export_run_to_excel
 
             try:
-                output_path = export_run_to_excel(run)
-                print(f"Exported to: {output_path}")
+                result = export_run_to_excel(run)
+                print(
+                    f"Exported to: {result.decode() if isinstance(result, bytes) else result}"
+                )
             except Exception as e:
                 print(f"Export failed: {e}")
                 import traceback

@@ -23,7 +23,7 @@ def get_base_configs():
         backcheck_prob=0.0,
         whistleblower_prob=0.0,
     )
-    market = MarketConfig(token_cap=10, fixed_price=None)
+    market = MarketConfig(permit_cap=10, fixed_price=None)
     lab = LabConfig(
         economic_value_min=1.0,
         economic_value_max=1.0,

@@ -2,6 +2,7 @@
 
 import matplotlib
 import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from compute_permit_sim.schemas.columns import ColumnNames
@@ -11,7 +12,7 @@ from compute_permit_sim.vis.constants import CHART_COLOR_MAP
 matplotlib.use("Agg")
 
 
-def create_figure(figsize=(6, 4), dpi=100) -> tuple[Figure, any]:
+def create_figure(figsize=(6, 4), dpi=100) -> tuple[Figure, Axes]:
     """Create a standardized matplotlib figure and axis.
 
     Returns:
@@ -82,7 +83,7 @@ def plot_scatter(
     xlabel: str,
     ylabel: str,
     color_logic: str = "compliance",
-) -> Figure:
+) -> tuple[Figure, Axes]:
     """Create a standardized scatter plot with compliance coloring.
 
     Args:
@@ -124,7 +125,7 @@ def plot_scatter(
 def plot_deterrence_frontier(
     df: pd.DataFrame,
     title: str = "Deterrence Frontier",
-) -> tuple[Figure, any]:
+) -> tuple[Figure, Axes]:
     """Scatter plot of Economic Value vs Risk Profile, colored by outcome."""
     fig, ax = create_figure(figsize=(7, 5))
 
@@ -208,7 +209,7 @@ def plot_deterrence_frontier(
 def plot_payoff_distribution(
     df: pd.DataFrame,
     title: str = "Payoff by Strategy",
-) -> tuple[Figure, any]:
+) -> tuple[Figure, Axes]:
     """Bar chart of Average Step Profit for Compliant vs Non-Compliant/Caught."""
     fig, ax = create_figure(figsize=(6, 5))
 
@@ -218,7 +219,7 @@ def plot_payoff_distribution(
     # Strategies: Compliant, Cheated (Uncaught), Caught
     # We group by status and take mean economic value
 
-    groups = {"Compliant": [], "Uncaught": [], "Caught": []}
+    groups: dict[str, list[float]] = {"Compliant": [], "Uncaught": [], "Caught": []}
 
     if ColumnNames.IS_COMPLIANT in df.columns and ColumnNames.WAS_CAUGHT in df.columns:
         for _, row in df.iterrows():

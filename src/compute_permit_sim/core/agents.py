@@ -209,15 +209,15 @@ class Lab:
     def decay_audit_coefficient(self, decay_rate: float) -> None:
         """Decay escalated audit coefficient back toward base value.
 
-        Formula: coeff_t = base + (coeff_{t-1} - base) × decay_rate
+        Formula: coeff_t = base + (coeff_{t-1} - base) × (1 - decay_rate)
 
         Args:
-            decay_rate: Per-step decay factor (0.8 = 20% decay per step).
+            decay_rate: Fraction of excess that decays each step (0.1 = 10% decay per step).
         """
         if self.current_audit_coefficient > self.audit_coefficient:
             excess = self.current_audit_coefficient - self.audit_coefficient
-            self.current_audit_coefficient = (
-                self.audit_coefficient + excess * decay_rate
+            self.current_audit_coefficient = self.audit_coefficient + excess * (
+                1.0 - decay_rate
             )
 
     def update_racing_factor(self, mean_capability: float) -> None:

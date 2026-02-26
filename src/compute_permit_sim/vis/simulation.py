@@ -199,7 +199,7 @@ class SimulationEngine:
         )
 
         # Regulator metrics
-        
+
         # Build compact config for hashing and shareable URL
         # We use exclude_defaults=True to keep the URL short and avoid maintaining a separate UrlConfig DTO.
         run_state = final_config.model_dump(exclude_defaults=True, exclude_none=True)

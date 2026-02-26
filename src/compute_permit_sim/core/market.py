@@ -5,6 +5,7 @@ Tech spec section 4: "(1) Market Price Discovery -> (2) Permit Allocation"
 should be logically paired in the market module.
 """
 
+import random
 from typing import Protocol
 
 
@@ -47,7 +48,10 @@ class SimpleClearingMarket:
         self.fixed_price: float | None = None
 
     def set_fixed_price(self, price: float) -> None:
-        """Set a fixed price for the market (unlimited supply mode).
+        """Set a fixed price for the market.
+
+        All labs willing to pay at least this price qualify for permits.
+        If qualifying demand exceeds permit_cap, permits are randomly allocated.
 
         Args:
             price: The fixed price for permits.
@@ -98,9 +102,9 @@ class SimpleClearingMarket:
         5. The clearing price is the bid of the marginal (last allocated) unit.
            All winners pay this uniform price per permit.
 
-        Fixed-price mode: if ``fixed_price`` is set, every firm willing to
-        pay at least that price receives all requested permits (unlimited
-        supply).
+        Fixed-price mode: if ``fixed_price`` is set, qualifying firms (bid >=
+        fixed_price) receive permits at that price. If total qualifying units
+        exceed ``permit_cap``, permits are randomly allocated up to the cap.
 
         Args:
             bids: List of (lab_id, quantity_demanded, bid_per_permit).
@@ -118,12 +122,32 @@ class SimpleClearingMarket:
             self.current_price = 0.0
             return 0.0, allocations
 
-        # FIXED PRICE MODE — unlimited supply at fixed price
+        # FIXED PRICE MODE — all qualifying bidders pay fixed_price
+        # If total qualifying units <= permit_cap: all get their requested permits.
+        # If total qualifying units > permit_cap: randomly allocate up to cap.
         if self.fixed_price is not None:
             self.current_price = self.fixed_price
-            for lab_id, qty, bid_per in bids:
-                if bid_per >= self.fixed_price:
+            qualifying: list[tuple[int, int]] = [
+                (lab_id, qty)
+                for lab_id, qty, bid_per in bids
+                if bid_per >= self.fixed_price
+            ]
+            # Expand to individual permit-units tagged with lab_id
+            fp_units: list[int] = []
+            for lab_id, qty in qualifying:
+                fp_units.extend(lab_id for _ in range(qty))
+
+            available = int(self.max_supply)
+            if len(fp_units) <= available:
+                # Enough supply: every qualifying lab gets what they asked for
+                for lab_id, qty in qualifying:
                     allocations[lab_id] = qty
+            else:
+                # Over-subscribed: randomly sample up to permit_cap units
+                winners = random.sample(fp_units, available)
+                for lab_id in winners:
+                    allocations[lab_id] += 1
+
             return self.fixed_price, allocations
 
         # AUCTION MODE — expand bids to individual permit-units

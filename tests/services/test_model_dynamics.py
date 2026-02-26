@@ -15,7 +15,7 @@ def get_base_configs():
         false_negative_rate=0.0,
         penalty_amount=1.0,
     )
-    market = MarketConfig(token_cap=10, fixed_price=0.5)
+    market = MarketConfig(permit_cap=10, fixed_price=0.5)
     lab = LabConfig(
         economic_value_min=1.0,
         economic_value_max=1.0,
@@ -165,16 +165,17 @@ def test_per_firm_penalty_deters_individual():
         seed=42,
     )
     from compute_permit_sim.services.mesa_model import ComputePermitModel
+
     model = ComputePermitModel(config)
-    
+
     # Override penalty_amount on the domain agents directly
     # Firm 1: Gain=1.0, P=1.0, Penalty=0.0 -> E[P]=0.0. Will cheat.
     # Firm 2: Gain=1.0, P=1.0, Penalty=5.0 -> E[P]=5.0. Will comply.
     mesa_agents = [a for a in model.agents if hasattr(a, "domain_agent")]
     mesa_agents[0].domain_agent.penalty_amount = 0.0
     mesa_agents[1].domain_agent.penalty_amount = 5.0
-    
+
     model.step()
-    
+
     assert mesa_agents[0].domain_agent.is_compliant is False
     assert mesa_agents[1].domain_agent.is_compliant is True

@@ -178,8 +178,8 @@ def execute_step(
     # ------------------------------------------------------------------
     lab_by_id = {lab.lab_id: lab for lab in labs}
 
-    # Determine which labs trigger an audit
-    potential_audit_ids: list[int] = []
+    # Determine which labs trigger an audit, tracking signal for prioritisation
+    potential_audits: list[tuple[int, float]] = []  # (lab_id, signal)
     for lab in above:
         ao = outcome.agent_outcomes[lab.lab_id]
         signal = auditor.compute_signal(ao.realized_excess, flop_threshold)
@@ -188,14 +188,22 @@ def execute_step(
             audit_coefficient=lab.current_audit_coefficient,
         )
         if _rng.random() < p_audit:
-            potential_audit_ids.append(lab.lab_id)
+            potential_audits.append((lab.lab_id, signal))
 
-    # Apply audit capacity constraint (random sample from triggered labs)
+    # Apply audit capacity constraint
     max_audits = config.audit.max_audits_per_step
-    if max_audits is not None and len(potential_audit_ids) > max_audits:
-        actual_audit_ids = _rng.sample(potential_audit_ids, max_audits)
+    if max_audits is not None and len(potential_audits) > max_audits:
+        if config.audit.signal_dependent:
+            # Rational regulator: prioritise labs with the highest signals
+            potential_audits.sort(key=lambda x: x[1], reverse=True)
+            actual_audit_ids = [lab_id for lab_id, _ in potential_audits[:max_audits]]
+        else:
+            # Signal-blind: random sample among triggered labs
+            actual_audit_ids = [
+                lab_id for lab_id, _ in _rng.sample(potential_audits, max_audits)
+            ]
     else:
-        actual_audit_ids = potential_audit_ids
+        actual_audit_ids = [lab_id for lab_id, _ in potential_audits]
 
     actual_audit_set = set(actual_audit_ids)
 

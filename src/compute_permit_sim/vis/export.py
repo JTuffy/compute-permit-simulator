@@ -40,6 +40,7 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
         bytes if output_path was empty string.
     """
     return_bytes = False
+    output: io.BytesIO | str
 
     if output_path == "":
         # Special flag for in-memory
@@ -100,6 +101,7 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
 
     if return_bytes:
         # output is BytesIO
+        assert isinstance(output, io.BytesIO)
         output.seek(0)
         return output.read()
 
@@ -181,8 +183,13 @@ def _write_config_sheet(sheet, config, header_format, data_format):
             sub_config = getattr(config, name, None)
             if sub_config:
                 # Use the field name as section title (capitalized) or ui_group if available
-                extra = field_info.json_schema_extra or {}
-                section_title = extra.get("ui_group", name.replace("_", " ").title())
+                extra = field_info.json_schema_extra
+                default_title = name.replace("_", " ").title()
+                section_title: str = (
+                    str(extra.get("ui_group", default_title))
+                    if isinstance(extra, dict)
+                    else default_title
+                )
 
                 row = _write_config_section(
                     sheet,

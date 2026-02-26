@@ -1,0 +1,31 @@
+{
+    "name": "Dynamic Escalation (Time-Dependent)",
+    "description": "Demonstrates shifting deterrence via feedback loops: labs start non-compliant, get caught, and face escalating audit probabilities and reputation costs. Initial cheating gives way to compliance as enforcement ratchets up.",
+    "steps": 110,
+    "n_agents": 20,
+    "audit": {
+        "base_prob": 0.3,
+        "signal_dependent": false,
+        "false_negative_rate": 0.05,
+        "penalty_amount": 100.0,
+        "audit_escalation": 1.5,
+        "audit_decay_rate": 0.1
+    },
+    "lab": {
+        "compute_capacity_min": 1e26,
+        "compute_capacity_max": 1e26,
+        "economic_value_min": 40.0,
+        "economic_value_max": 60.0,
+        "capability_value": 0.0,
+        "racing_factor": 0.0,
+        "risk_profile_min": 1.0,
+        "risk_profile_max": 1.0,
+        "reputation_sensitivity": 10.0,
+        "reputation_escalation_factor": 1.0,
+        "audit_coefficient": 1.0
+    },
+    "market": {
+        "permit_cap": 5.0
+    },
+    "collateral_amount": 0.0
+}

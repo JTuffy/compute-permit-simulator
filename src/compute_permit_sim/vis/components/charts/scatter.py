@@ -24,6 +24,7 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
         solara.Markdown("No data for scatter plot.")
         return
 
+    assert agents_df is not None
     fig, ax = plot_scatter(
         agents_df,
         ColumnNames.REPORTED_TRAINING_FLOPS,
@@ -48,7 +49,6 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
     solara.FigureMatplotlib(fig)
 
 
-
 @solara.component
 def CapacityUtilizationPlot(agents_df: pd.DataFrame | None):
     """Scatter plot of Capacity vs Reported Compute.
@@ -67,6 +67,7 @@ def CapacityUtilizationPlot(agents_df: pd.DataFrame | None):
         solara.Markdown("Missing data for capacity plot.")
         return
 
+    assert agents_df is not None
     fig = Figure(figsize=(6, 5), dpi=100)
     ax = fig.subplots()
 
