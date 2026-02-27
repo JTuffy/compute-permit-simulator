@@ -1,30 +1,33 @@
 """Enforcement logic for the Auditor.
 
-Implements a two-stage audit model plus independent detection channels:
+Implements a two-stage audit model where all detection channels are nested
+within the audit event:
 
 Stage 1 — AUDIT OCCURRENCE: Will the firm be audited?
     signal = min(1.0, (excess_compute / flop_threshold) ^ signal_exponent)
-    p_audit = min(1.0, (base_prob + signal × (1.0 - base_prob)) × c(i))
 
-    When signal_dependent=False, signal is ignored (pure random auditing):
-    p_audit = min(1.0, base_prob × c(i))
+    When signal_dependent=True:
+        p_combined = base_prob + signal × (1.0 - base_prob)
+    When signal_dependent=False (pure random auditing):
+        p_combined = base_prob
+
+    p_audit = min(1.0, max(base_prob, c(i) × p_combined))
+
+    The max(base_prob, ...) floor ensures the regulatory minimum audit rate
+    is preserved even when c(i) < 1.
 
     Budget-capped mode (max_audits_per_step set):
       - signal_dependent=True:  rank triggered labs by signal desc, take top N
       - signal_dependent=False: random sample N from triggered labs
 
 Stage 2 — AUDIT OUTCOME: Given an audit, is the violation found?
-    p_stage2 = (1 - FNR) + FNR × backcheck_prob
+    All detection channels (audit pass, backcheck, whistleblower, monitoring)
+    are treated as nested within the audit event:
 
-Independent detection channels:
-    p_total = 1 - (1 - p_audit × p_stage2) × (1 - p_whistleblower) × (1 - p_monitoring)
-    whistleblower and monitoring are rolled independently of the audit.
+        miss = FNR × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
+        p_stage2 = 1 - miss
 
-Detection channel labels (used in AgentOutcome.caught_by):
-    "audit"        — caught on the audit's first pass (Stage 2a)
-    "backcheck"    — caught on the audit's historical review (Stage 2b)
-    "whistleblower"— caught via the independent whistleblower channel
-    "monitoring"   — caught via global hardware/electricity monitoring
+    p_total = p_audit × p_stage2
 """
 
 import random
@@ -85,9 +88,14 @@ class Auditor:
         """Compute the probability of an audit occurring for one firm.
 
         When signal_dependent=True:
-            p_audit = min(1.0, (base_prob + signal × (1.0 - base_prob)) × c(i))
+            p_combined = base_prob + signal × (1.0 - base_prob)
         When signal_dependent=False:
-            p_audit = min(1.0, base_prob × c(i))
+            p_combined = base_prob
+
+        p_audit = min(1.0, max(base_prob, c(i) × p_combined))
+
+        The max(base_prob, ...) floor preserves the regulatory minimum audit
+        rate even when c(i) < 1.
 
         Args:
             signal: Suspicion signal in [0, 1] from compute_signal().
@@ -97,10 +105,10 @@ class Auditor:
             Audit probability in [0, 1].
         """
         if self.config.signal_dependent:
-            p_base = self.config.base_prob + signal * (1.0 - self.config.base_prob)
+            p_combined = self.config.base_prob + signal * (1.0 - self.config.base_prob)
         else:
-            p_base = self.config.base_prob
-        return min(1.0, p_base * audit_coefficient)
+            p_combined = self.config.base_prob
+        return min(1.0, max(self.config.base_prob, audit_coefficient * p_combined))
 
     # ------------------------------------------------------------------
     # Stage 2: Audit Outcome
@@ -109,17 +117,21 @@ class Auditor:
     def compute_catch_probability(self, p_w: float = 0.0, p_m: float = 0.0) -> float:
         """Probability of catching a real violation once audited (Stage 2).
 
-        Formula: p_stage2 = (1 - FNR) + FNR × backcheck_prob
+        All detection channels are nested within the audit event:
+            miss = FNR × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
+            p_stage2 = 1 - miss
 
-        p_w and p_m are accepted for signature compatibility but are combined
-        independently in compute_detection_probability, not here.
+        Args:
+            p_w: Whistleblower detection probability (within the audit).
+            p_m: Monitoring detection probability (within the audit).
 
         Returns:
             Catch probability in [0, 1].
         """
         fnr = self.config.false_negative_rate
         backcheck = self.config.backcheck_prob
-        return (1.0 - fnr) + (fnr * backcheck)
+        miss = fnr * (1.0 - backcheck) * (1.0 - p_w) * (1.0 - p_m)
+        return 1.0 - miss
 
     def audit_detection_channel(
         self,
@@ -134,10 +146,10 @@ class Auditor:
 
         Sequential logic preserves the aggregate catch probability from
         compute_catch_probability(p_w, p_m):
-            1. Direct pass: P = 1 - FNR
-            2. Backcheck:   P = backcheck_prob  (only if direct missed)
-            3. Whistleblower: P = p_w  (independent of steps 1-2)
-            4. Monitoring:    P = p_m  (independent of steps 1-2)
+            1. Direct pass:   P = 1 - FNR
+            2. Backcheck:     P = backcheck_prob  (only if direct missed)
+            3. Whistleblower: P = p_w  (only if steps 1-2 both missed)
+            4. Monitoring:    P = p_m  (only if steps 1-3 all missed)
 
         Args:
             is_compliant: True if the firm has no real violation.
@@ -157,9 +169,8 @@ class Auditor:
             caught_backcheck = self._random() < self.config.backcheck_prob
             return caught_backcheck, caught_backcheck
 
-        # Steps 3-4: whistleblower and monitoring
-        # Even if audit misses, these fire independently outside. However, we're
-        # combining them in one return here for simplicity of outcome.
+        # Steps 3-4: whistleblower and monitoring fire within the audit event,
+        # catching violations the direct pass and backcheck missed.
         caught_wb = self._random() < p_w
         caught_mon = self._random() < p_m
 
@@ -193,28 +204,24 @@ class Auditor:
     ) -> float:
         """Compute total detection probability for a firm.
 
-        Combines Stage 1 (audit occurrence) with Stage 2 (catch if audited),
-        including whistleblower and monitoring contributions to the catch:
-            p_detection = p_audit × p_catch(p_w, p_m)
+        Combines Stage 1 (audit occurrence) with Stage 2 (catch if audited).
+        Whistleblower and monitoring are nested within the audit outcome:
+            p_detection = p_audit × p_stage2(p_w, p_m)
 
         Args:
             excess_compute: Unpermitted FLOPs above what permits cover.
             flop_threshold: Regulatory threshold requiring permits.
             audit_coefficient: Firm-specific scaling factor c(i).
-            p_w: Whistleblower detection probability.
-            p_m: Monitoring detection probability.
+            p_w: Whistleblower detection probability (within the audit).
+            p_m: Monitoring detection probability (within the audit).
 
         Returns:
             Total detection probability in [0, 1].
         """
         signal = self.compute_signal(excess_compute, flop_threshold)
         p_audit = self.compute_audit_probability(signal, audit_coefficient)
-        p_stage2 = self.compute_catch_probability()
-
-        p_audit_detection = p_audit * p_stage2
-
-        p_escape = (1.0 - p_audit_detection) * (1.0 - p_w) * (1.0 - p_m)
-        return 1.0 - p_escape
+        p_stage2 = self.compute_catch_probability(p_w=p_w, p_m=p_m)
+        return p_audit * p_stage2
 
     # ------------------------------------------------------------------
     # Penalty computation

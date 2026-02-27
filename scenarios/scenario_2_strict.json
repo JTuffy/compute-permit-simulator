@@ -12,8 +12,7 @@
     },
     "lab": {
         "capability_value": 40.0,
-        "racing_factor": 2.0,
-        "audit_coefficient": 0.1
+        "racing_factor": 2.0
     },
     "collateral_amount": 100.0,
     "market": {

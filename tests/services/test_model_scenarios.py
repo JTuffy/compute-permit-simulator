@@ -70,16 +70,18 @@ def test_whistleblower_increases_compliance():
     Condition:
     - Lab Value (1.0) < Price (2.0) -> Won't buy permit.
     - Gain from Cheating = 1.0.
-    - Penalty = 4.0.
-    - Base Audit Prob = 0.1 -> E[P] = 0.4 < Gain -> Cheat.
-    - Whistleblower adds detection probability, pushing E[P] > Gain.
+    - FNR=0.5 (audit has 50% miss rate), Penalty=15.0, Base Audit=0.1.
+    - Base: p_stage2 = 1 - 0.5 = 0.5, p_detect = 0.1*0.5 = 0.05. E[P]=0.75 < Gain -> Cheat.
+    - Whistleblower p_w=0.5: miss=0.5*(1-0.5)=0.25, p_stage2=0.75, p_detect=0.075.
+      E[P]=0.075*15=1.125 > Gain -> Comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={
-            "penalty_amount": 4.0,
+            "penalty_amount": 15.0,
             "base_prob": 0.1,
+            "false_negative_rate": 0.5,
         }
     )
 
@@ -412,22 +414,24 @@ def test_monitoring_zero_unchanged():
 def test_monitoring_full_detection():
     """Test that monitoring_prob=1.0 gives full detection (everyone complies).
 
-    With p_m=1.0, detection = 1 - (1-p_audit)*(1-p_w)*(1-1.0) = 1.0.
-    So expected penalty = 1.0 * B_total, which should deter cheating.
+    With FNR=0.5, p_m=1.0: miss=FNR*(1-p_b)*(1-p_w)*(1-p_m)=0.5*1*1*0=0 → p_stage2=1.0.
+    p_detect = p_audit * 1.0 = 0.1. E[P]=0.1*15=1.5 > Gain(1.0) → comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
-    # Low audit prob + low penalty — normally everyone cheats
+    # Low audit prob + moderate FNR — normally everyone cheats
     audit = audit.model_copy(
         update={
-            "penalty_amount": 4.0,
+            "penalty_amount": 15.0,
             "base_prob": 0.1,
+            "false_negative_rate": 0.5,
         }
     )
+    # Base: p_detect=0.1*0.5=0.05. E[P]=0.75 < Gain(1.0) → cheat
     comp_base = run_model_get_compliance(audit, market, lab)
     assert comp_base == 0.0
 
-    # With monitoring_prob=1.0 → detection=1.0 → E[P]=4.0 > Gain(1.0) → comply
+    # With monitoring_prob=1.0: miss=0 → p_stage2=1.0 → p_detect=0.1 → E[P]=1.5 → comply
     audit_full = audit.model_copy(update={"monitoring_prob": 1.0})
     comp_full = run_model_get_compliance(audit_full, market, lab)
     assert comp_full == 1.0
@@ -436,17 +440,18 @@ def test_monitoring_full_detection():
 def test_monitoring_increases_compliance():
     """Test that moderate monitoring_prob increases deterrence.
 
-    Setup: Low audit (0.1), penalty=4.0, Gain=1.0.
-    Without monitoring: E[P] = 0.1 * 4.0 = 0.4 < 1.0 → cheat.
-    With monitoring p_m=0.2: detection ≈ 1-(1-0.1)*(1-0.2) = 0.28,
-    E[P] ≈ 0.28 * 4.0 = 1.12 > 1.0 → comply.
+    Setup: FNR=0.5, audit=0.1, penalty=18.0, Gain=1.0.
+    Without monitoring: miss=0.5*1*1*1=0.5. p_stage2=0.5. p_detect=0.05. E[P]=0.9 < 1.0 → cheat.
+    With monitoring p_m=0.2: miss=0.5*1*1*0.8=0.4. p_stage2=0.6. p_detect=0.06.
+    E[P]=0.06*18=1.08 > 1.0 → comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
         update={
-            "penalty_amount": 4.0,
+            "penalty_amount": 18.0,
             "base_prob": 0.1,
+            "false_negative_rate": 0.5,
         }
     )
 

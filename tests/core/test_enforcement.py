@@ -57,6 +57,20 @@ def test_compute_audit_probability_coefficient() -> None:
     ) == pytest.approx(1.0)
 
 
+def test_compute_audit_probability_floor() -> None:
+    # c(i) < 1 should not push p_audit below base_prob (the regulatory floor)
+    auditor = Auditor(AuditConfig())
+    # base_prob=0.05, signal=0.0 → p_combined=0.05, c(i)×p_combined=0.025
+    # max(0.05, 0.025) = 0.05 (floor kicks in)
+    assert auditor.compute_audit_probability(
+        signal=0.0, audit_coefficient=0.5
+    ) == pytest.approx(0.05)
+    # c(i) > 1 still scales up normally
+    assert auditor.compute_audit_probability(
+        signal=0.0, audit_coefficient=1.5
+    ) == pytest.approx(min(1.0, 0.05 * 1.5))
+
+
 # ---------------------------------------------------------------------------
 # Stage 2: Catch probability (analytical)
 # ---------------------------------------------------------------------------
@@ -64,10 +78,11 @@ def test_compute_audit_probability_coefficient() -> None:
 
 def test_compute_catch_probability() -> None:
     auditor = Auditor(AuditConfig())
-    # FNR=0.40, backcheck=0.0 (default updated to 0)
-    # Stage 2 catch = (1 - 0.40) + (0.40 * 0.0) = 0.60
+    # FNR=0.40, backcheck=0.0, p_w=0, p_m=0
+    # miss = 0.40 * 1.0 * 1.0 * 1.0 = 0.40 → catch = 0.60
     assert auditor.compute_catch_probability() == pytest.approx(0.60)
-    assert auditor.compute_catch_probability(p_w=0.5, p_m=0.2) == pytest.approx(0.60)
+    # p_w=0.5, p_m=0.2: miss = 0.40 * 1.0 * 0.5 * 0.8 = 0.16 → catch = 0.84
+    assert auditor.compute_catch_probability(p_w=0.5, p_m=0.2) == pytest.approx(0.84)
 
 
 def test_compute_catch_probability_zero_fnr() -> None:
@@ -204,20 +219,17 @@ def test_audit_finds_violation() -> None:
 def test_compute_detection_probability() -> None:
     auditor = Auditor(AuditConfig())
     # signal_dependent=False, base_prob=0.05, FNR=0.40, backcheck=0.0
-    # p_audit=0.05, p_stage2=0.60
-    # p_audit_detection = 0.05 * 0.60 = 0.03
-    # p_escape = (1 - 0.03) * (1 - 0) * (1 - 0) = 0.97
-    # P_catch = 0.03
+    # p_audit=0.05, p_stage2 = 1 - 0.4*1*1*1 = 0.60
+    # p_detect = 0.05 * 0.60 = 0.03
     p = auditor.compute_detection_probability(excess_compute=1e25, flop_threshold=1e25)
     assert p == pytest.approx(0.03)
 
-    # p_w=0.5, p_m=0.2
-    # p_escape = (1 - 0.03) * 0.5 * 0.8 = 0.388
-    # P_catch = 1 - 0.388 = 0.612
+    # p_w=0.5, p_m=0.2: miss = 0.4 * 1.0 * 0.5 * 0.8 = 0.16 → p_stage2 = 0.84
+    # p_detect = 0.05 * 0.84 = 0.042
     p = auditor.compute_detection_probability(
         excess_compute=1e25, flop_threshold=1e25, p_w=0.5, p_m=0.2
     )
-    assert p == pytest.approx(0.612)
+    assert p == pytest.approx(0.042)
 
 
 # ---------------------------------------------------------------------------
