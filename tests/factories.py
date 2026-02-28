@@ -15,25 +15,23 @@ from compute_permit_sim.schemas import (
 def create_agent_snapshot(
     id: int = 1,
     is_compliant: bool = True,
-    wealth: float = 100.0,
     **kwargs: Any,
 ) -> AgentSnapshot:
     """Create a valid AgentSnapshot with overrideable defaults."""
     defaults = {
-        "capacity": 10.0,
+        "compute_capacity": 1e25,
+        "planned_training_flops": 1e25,
+        "used_training_flops": 1e25,
+        "reported_training_flops": 1e25,
         "has_permit": True,
-        "used_compute": 5.0,
-        "reported_compute": 5.0,
         "was_audited": False,
         "was_caught": False,
         "penalty_amount": 0.0,
-        "revenue": 10.0,
-        "economic_value": 2.0,
-        "risk_profile": 0.5,
-        "step_profit": 5.0,
+        "economic_value": 100.0,
+        "risk_profile": 1.0,
     }
     data = {**defaults, **kwargs}
-    return AgentSnapshot(id=id, is_compliant=is_compliant, wealth=wealth, **data)
+    return AgentSnapshot(id=id, is_compliant=is_compliant, **data)
 
 
 def create_market_snapshot(
@@ -51,7 +49,7 @@ def create_scenario_config(
         "n_agents": 5,
         "steps": 10,
         "audit": AuditConfig(),
-        "market": MarketConfig(token_cap=100),
+        "market": MarketConfig(permit_cap=100),
         "lab": LabConfig(),
     }
     data = {**defaults, **kwargs}

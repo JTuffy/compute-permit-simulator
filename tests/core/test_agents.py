@@ -10,7 +10,11 @@ def test_lab_initialization() -> None:
     """Verify that a Lab agent correctly initializes with provided values and defaults."""
     lab_config = LabConfig()
     lab = Lab(
-        lab_id=1, config=lab_config, economic_value=1.5, risk_profile=1.0, capacity=2.0
+        lab_id=1,
+        config=lab_config,
+        economic_value=1.5,
+        risk_profile=1.0,
+        planned_training_flops=1e25,
     )
     assert lab.lab_id == 1
     assert lab.economic_value == 1.5
@@ -27,7 +31,7 @@ def test_reputation_sensitivity_escalation() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
 
     base = lab.reputation_sensitivity
@@ -52,7 +56,7 @@ def test_reputation_sensitivity_static_when_zero() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
     base = lab.current_reputation_sensitivity
 
@@ -68,7 +72,7 @@ def test_audit_coefficient_escalation_and_decay() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
     base_coeff = lab.audit_coefficient
 
@@ -93,7 +97,7 @@ def test_audit_coefficient_no_decay_below_base() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
     # Coefficient at base — decay should do nothing
     lab.decay_audit_coefficient(decay_rate=0.8)
@@ -108,7 +112,7 @@ def test_racing_factor_update() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
     base_racing = lab.base_racing_factor
 
@@ -133,7 +137,7 @@ def test_racing_factor_static_when_zero() -> None:
         config=lab_config,
         economic_value=100.0,
         risk_profile=1.0,
-        capacity=2.0,
+        planned_training_flops=1e25,
     )
     original = lab.racing_factor
 

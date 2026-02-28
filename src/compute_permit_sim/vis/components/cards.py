@@ -2,9 +2,7 @@ import solara
 
 
 @solara.component
-def MetricCard(
-    label: str, value: str, color_variant: str = "primary"
-) -> solara.Element:
+def MetricCard(label: str, value: str, color_variant: str = "primary") -> None:
     """Display a primary metric with visual hierarchy."""
     # Custom compact styling via CSS classes or inline style
     style = "padding: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background-color: white;"
@@ -31,7 +29,7 @@ def MetricCard(
 
 
 @solara.component
-def ScenarioCard(title: str, children: list[solara.Element] = []) -> solara.Element:
+def ScenarioCard(title: str, children: list[solara.Element] = []) -> None:
     """Compact card for scenario configuration sections.
 
     Args:

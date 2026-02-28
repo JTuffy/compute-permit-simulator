@@ -5,40 +5,35 @@ from pydantic import BaseModel, ConfigDict, Field
 from compute_permit_sim.schemas.defaults import (
     DEFAULT_AUDIT_BACKCHECK_PROB,
     DEFAULT_AUDIT_BASE_PROB,
-    DEFAULT_AUDIT_COST,
     DEFAULT_AUDIT_DECAY_RATE,
     DEFAULT_AUDIT_ESCALATION,
     DEFAULT_AUDIT_FALSE_NEG_RATE,
     DEFAULT_AUDIT_FALSE_POS_RATE,
-    DEFAULT_AUDIT_HIGH_PROB,
+    DEFAULT_AUDIT_MONITORING_PROB,
     DEFAULT_AUDIT_PENALTY_AMOUNT,
-    DEFAULT_AUDIT_PENALTY_CEILING,
-    DEFAULT_AUDIT_PENALTY_FIXED,
-    DEFAULT_AUDIT_PENALTY_PERCENTAGE,
     DEFAULT_AUDIT_WHISTLEBLOWER_PROB,
     DEFAULT_CAPABILITY_SCALE,
     DEFAULT_COLLATERAL_AMOUNT,
     DEFAULT_FLOP_THRESHOLD,
+    DEFAULT_FLOPS_PER_PERMIT,
     DEFAULT_LAB_AUDIT_COEFFICIENT,
     DEFAULT_LAB_CAPABILITY_VALUE,
-    DEFAULT_LAB_CAPACITY_MAX,
-    DEFAULT_LAB_CAPACITY_MIN,
+    DEFAULT_LAB_COMPUTE_CAPACITY_MAX,
+    DEFAULT_LAB_COMPUTE_CAPACITY_MIN,
     DEFAULT_LAB_ECON_VALUE_MAX,
     DEFAULT_LAB_ECON_VALUE_MIN,
-    DEFAULT_LAB_FIRM_REVENUE_MAX,
-    DEFAULT_LAB_FIRM_REVENUE_MIN,
     DEFAULT_LAB_RACING_FACTOR,
     DEFAULT_LAB_REPUTATION_SENSITIVITY,
     DEFAULT_LAB_RISK_PROFILE_MAX,
     DEFAULT_LAB_RISK_PROFILE_MIN,
-    DEFAULT_LAB_TRAINING_FLOPS_MAX,
-    DEFAULT_LAB_TRAINING_FLOPS_MIN,
     DEFAULT_MARKET_FIXED_PRICE,
-    DEFAULT_MARKET_TOKEN_CAP,
+    DEFAULT_MARKET_PERMIT_CAP,
     DEFAULT_RACING_GAP_SENSITIVITY,
     DEFAULT_REPUTATION_ESCALATION_FACTOR,
     DEFAULT_SCENARIO_N_AGENTS,
     DEFAULT_SCENARIO_STEPS,
+    DEFAULT_SIGNAL_DEPENDENT,
+    DEFAULT_SIGNAL_EXPONENT,
 )
 
 # ---------------------------------------------------------------------------
@@ -66,14 +61,14 @@ class AuditConfig(BaseModel):
     Audit model has two stages:
     1. AUDIT OCCURRENCE: Whether an audit is initiated
        - base_prob (pi_0): baseline audit probability for all firms
-       - high_prob (pi_1): elevated audit probability given suspicious signal
-       - Signal strength for non-compliant firms scales with compute excess
+       - signal_dependent: whether excess compute affects audit rate
+       - When signal-dependent: p_audit = base_prob + signal × (1 - base_prob)
+       - Signal strength scales with excess compute via signal_exponent
 
     2. AUDIT OUTCOME: Whether an audit catches a violator (if one exists)
        - false_positive_rate (alpha): P(false alarm | compliant firm audited)
        - false_negative_rate (beta): P(miss | non-compliant firm audited)
-
-    Detection: p_eff = p_s + (1 - p_s) * backcheck_prob
+       - p_catch = (1 - beta) + beta × backcheck_prob
     """
 
     base_prob: float = Field(
@@ -83,12 +78,20 @@ class AuditConfig(BaseModel):
         description="Base audit probability (pi_0)",
         json_schema_extra=_ui("Audit Policy", "Base π₀", "percent"),
     )
-    high_prob: float = Field(
-        DEFAULT_AUDIT_HIGH_PROB,
-        ge=0,
-        le=1,
-        description="High suspicion audit probability (pi_1)",
-        json_schema_extra=_ui("Audit Policy", "High π₁", "percent"),
+    signal_dependent: bool = Field(
+        DEFAULT_SIGNAL_DEPENDENT,
+        description="Enable signal-dependent auditing (excess compute affects audit rate)",
+        json_schema_extra=_ui("Audit Policy", "Signal Dependent", "bool"),
+    )
+    signal_exponent: float = Field(
+        DEFAULT_SIGNAL_EXPONENT,
+        gt=0,
+        description=(
+            "Shape of excess→signal curve: "
+            "1.0=linear, <1=concave (small excess detectable), "
+            ">1=convex (only large excess visible)"
+        ),
+        json_schema_extra=_ui("Audit Policy", "Signal Exponent", "float"),
     )
     false_positive_rate: float = Field(
         DEFAULT_AUDIT_FALSE_POS_RATE,
@@ -107,27 +110,8 @@ class AuditConfig(BaseModel):
     penalty_amount: float = Field(
         DEFAULT_AUDIT_PENALTY_AMOUNT,
         ge=0,
-        description="Legacy flat penalty amount (used when penalty_fixed is not set)",
+        description="Amount applied as penalty if caught (M$)",
         json_schema_extra=_ui("Audit Policy", "Penalty (M$)", "currency"),
-    )
-    penalty_fixed: float = Field(
-        DEFAULT_AUDIT_PENALTY_FIXED,
-        ge=0,
-        description="Fixed penalty floor (M$) — like EU AI Act €35M",
-        json_schema_extra=_ui("Audit Policy", "Penalty Fixed (M$)", "currency"),
-    )
-    penalty_percentage: float = Field(
-        DEFAULT_AUDIT_PENALTY_PERCENTAGE,
-        ge=0,
-        le=1.0,
-        description="Percentage of firm value — like EU AI Act 7% turnover",
-        json_schema_extra=_ui("Audit Policy", "Penalty % Revenue", "percent"),
-    )
-    penalty_ceiling: float | None = Field(
-        DEFAULT_AUDIT_PENALTY_CEILING,
-        ge=0,
-        description="Optional cap on total penalty (M$) — None means no cap",
-        json_schema_extra=_ui("Audit Policy", "Penalty Ceiling (M$)", "currency"),
     )
     backcheck_prob: float = Field(
         DEFAULT_AUDIT_BACKCHECK_PROB,
@@ -143,11 +127,12 @@ class AuditConfig(BaseModel):
         description="Probability of detection by whistleblower (p_w)",
         json_schema_extra=_ui("Audit Policy", "Whistleblower Prob", "percent"),
     )
-    cost: float = Field(
-        DEFAULT_AUDIT_COST,
+    monitoring_prob: float = Field(
+        DEFAULT_AUDIT_MONITORING_PROB,
         ge=0,
-        description="Cost per audit for the regulator",
-        json_schema_extra=_ui("Audit Policy", "Audit Cost (M$)", "currency"),
+        le=1,
+        description="Global monitoring detection rate (p_m): hardware/electricity metering",
+        json_schema_extra=_ui("Audit Policy", "Monitoring p_m", "percent"),
     )
     max_audits_per_step: int | None = Field(
         None,
@@ -166,7 +151,7 @@ class AuditConfig(BaseModel):
         DEFAULT_AUDIT_DECAY_RATE,
         ge=0,
         le=1,
-        description="Per-step decay factor for escalated audit coefficient",
+        description="Fraction of excess audit coefficient that decays each step (0.1 = 10% per step)",
         json_schema_extra=_ui("Dynamic Factors", "Audit Decay Rate", "percent"),
     )
 
@@ -176,17 +161,23 @@ class AuditConfig(BaseModel):
 class MarketConfig(BaseModel):
     """Configuration for the Permit Market."""
 
-    token_cap: float = Field(
-        DEFAULT_MARKET_TOKEN_CAP,
+    permit_cap: float = Field(
+        DEFAULT_MARKET_PERMIT_CAP,
         gt=0,
         description="Total permits available (Q)",
-        json_schema_extra=_ui("General", "Token Cap (Q)", "float"),
+        json_schema_extra=_ui("General", "Permit Cap (Q)", "float"),
     )
     fixed_price: float | None = Field(
         DEFAULT_MARKET_FIXED_PRICE,
         ge=0,
         description="Fixed price for unlimited permits (optional)",
         json_schema_extra=_ui("General", "Fixed Price (M$)", "currency"),
+    )
+    flops_per_permit: float | None = Field(
+        DEFAULT_FLOPS_PER_PERMIT,
+        gt=0,
+        description="FLOPs covered by one permit. None = binary (0/1 per firm).",
+        json_schema_extra=_ui("General", "FLOPs/Permit", "scientific"),
     )
 
 
@@ -225,18 +216,6 @@ class LabConfig(BaseModel):
             "Lab Generation", "Risk Profile Max", "float", "range_max"
         ),
     )
-    capacity_min: float = Field(
-        DEFAULT_LAB_CAPACITY_MIN,
-        ge=0,
-        description="Min compute capacity (q_max) for agent generation",
-        json_schema_extra=_ui("Lab Generation", "Capacity Min", "float", "range_min"),
-    )
-    capacity_max: float = Field(
-        DEFAULT_LAB_CAPACITY_MAX,
-        ge=0,
-        description="Max compute capacity (q_max) for agent generation",
-        json_schema_extra=_ui("Lab Generation", "Capacity Max", "float", "range_max"),
-    )
     capability_value: float = Field(
         DEFAULT_LAB_CAPABILITY_VALUE,
         ge=0,
@@ -261,36 +240,20 @@ class LabConfig(BaseModel):
         description="c(i): firm-specific audit rate scaling",
         json_schema_extra=_ui("Lab Generation", "Audit Coeff c(i)", "float"),
     )
-    firm_revenue_min: float = Field(
-        DEFAULT_LAB_FIRM_REVENUE_MIN,
-        ge=0,
-        description="Min annual revenue/turnover (M$) for penalty calculation",
-        json_schema_extra=_ui(
-            "Lab Generation", "Firm Revenue Min (M$)", "currency", "range_min"
-        ),
-    )
-    firm_revenue_max: float = Field(
-        DEFAULT_LAB_FIRM_REVENUE_MAX,
-        ge=0,
-        description="Max annual revenue/turnover (M$) for penalty calculation",
-        json_schema_extra=_ui(
-            "Lab Generation", "Firm Revenue Max (M$)", "currency", "range_max"
-        ),
-    )
-    training_flops_min: float = Field(
-        DEFAULT_LAB_TRAINING_FLOPS_MIN,
+    compute_capacity_min: float = Field(
+        DEFAULT_LAB_COMPUTE_CAPACITY_MIN,
         ge=0,
         description="Min planned training run size (FLOP)",
         json_schema_extra=_ui(
-            "Lab Generation", "Training FLOP Min", "scientific", "range_min"
+            "Lab Generation", "Compute Cap Min", "scientific", "range_min"
         ),
     )
-    training_flops_max: float = Field(
-        DEFAULT_LAB_TRAINING_FLOPS_MAX,
+    compute_capacity_max: float = Field(
+        DEFAULT_LAB_COMPUTE_CAPACITY_MAX,
         ge=0,
         description="Max planned training run size (FLOP)",
         json_schema_extra=_ui(
-            "Lab Generation", "Training FLOP Max", "scientific", "range_max"
+            "Lab Generation", "Compute Cap Max", "scientific", "range_max"
         ),
     )
     # Dynamic factor params (active when dynamic_factors=True on ScenarioConfig)
@@ -312,7 +275,6 @@ class LabConfig(BaseModel):
         description="Normalization factor for capability gap",
         json_schema_extra=_ui("Dynamic Factors", "Capability Scale", "float"),
     )
-
     model_config = ConfigDict(frozen=True)
 
 
@@ -353,8 +315,8 @@ class ScenarioConfig(BaseModel):
     )
 
     # Sub-configs
-    audit: AuditConfig = Field(default_factory=AuditConfig)
-    market: MarketConfig = Field(default_factory=MarketConfig)
-    lab: LabConfig = Field(default_factory=LabConfig)
+    audit: AuditConfig = Field(default_factory=lambda: AuditConfig())
+    market: MarketConfig = Field(default_factory=lambda: MarketConfig())
+    lab: LabConfig = Field(default_factory=lambda: LabConfig())
 
     seed: int | None = None

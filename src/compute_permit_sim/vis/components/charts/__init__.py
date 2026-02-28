@@ -11,11 +11,9 @@ from compute_permit_sim.vis.components.charts.deterrence import (
 )
 from compute_permit_sim.vis.components.charts.payoff import (
     PayoffByStrategyPlot,
-    WealthDivergencePlot,
 )
 from compute_permit_sim.vis.components.charts.scatter import (
     CapacityUtilizationPlot,
-    CheatingGainPlot,
     QuantitativeScatterPlot,
 )
 
@@ -26,12 +24,10 @@ __all__ = [
     "apply_standard_styling",
     # Scatter plots
     "QuantitativeScatterPlot",
-    "CheatingGainPlot",
     "CapacityUtilizationPlot",
     # Audit & Deterrence
     "AuditTargetingPlot",
     "LabDecisionPlot",
-    # Payoff & Wealth
+    # Payoff
     "PayoffByStrategyPlot",
-    "WealthDivergencePlot",
 ]

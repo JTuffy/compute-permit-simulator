@@ -1,14 +1,16 @@
 {
-    "name": "Maxwell World (Smart Enforcement)",
+    "name": "Smart Enforcement",
     "description": "Smart targeting (monitoring=0.2), efficient pricing ($2M), moderate audit (10%).",
     "steps": 10,
     "n_agents": 20,
     "audit": {
-        "base_prob": 0.2
+        "base_prob": 0.2,
+        "monitoring_prob": 0.2,
+        "signal_dependent": true
     },
     "collateral_amount": 15.75,
     "market": {
         "fixed_price": 2.0,
-        "token_cap": 20.0
+        "permit_cap": 20.0
     }
 }

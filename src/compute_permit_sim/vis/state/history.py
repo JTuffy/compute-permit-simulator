@@ -14,8 +14,8 @@ class SessionHistory:
 
     def __init__(self):
         # --- Run History ---
-        self.run_history = solara.reactive([])  # List[SimulationRun]
-        self.selected_run = solara.reactive(None)  # SimulationRun | None
+        self.run_history: solara.Reactive[list[SimulationRun]] = solara.reactive([])
+        self.selected_run: solara.Reactive[SimulationRun | None] = solara.reactive(None)
 
         # --- Available Scenarios ---
         # --- Available Scenarios ---

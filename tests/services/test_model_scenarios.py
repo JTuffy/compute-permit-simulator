@@ -17,14 +17,13 @@ def get_base_configs():
     """
     audit = AuditConfig(
         base_prob=0.1,
-        high_prob=0.1,
         false_positive_rate=0.0,
         false_negative_rate=0.0,
         penalty_amount=1.0,
         backcheck_prob=0.0,
         whistleblower_prob=0.0,
     )
-    market = MarketConfig(token_cap=10, fixed_price=None)
+    market = MarketConfig(permit_cap=10, fixed_price=None)
     lab = LabConfig(
         economic_value_min=1.0,
         economic_value_max=1.0,
@@ -71,14 +70,19 @@ def test_whistleblower_increases_compliance():
     Condition:
     - Lab Value (1.0) < Price (2.0) -> Won't buy permit.
     - Gain from Cheating = 1.0.
-    - Penalty = 4.0.
-    - Base Audit Prob = 0.1 -> E[P] = 0.4 < Gain -> Cheat.
-    - Whistleblower adds detection probability, pushing E[P] > Gain.
+    - FNR=0.5 (audit has 50% miss rate), Penalty=15.0, Base Audit=0.1.
+    - Base: p_stage2 = 1 - 0.5 = 0.5, p_detect = 0.1*0.5 = 0.05. E[P]=0.75 < Gain -> Cheat.
+    - Whistleblower p_w=0.5: miss=0.5*(1-0.5)=0.25, p_stage2=0.75, p_detect=0.075.
+      E[P]=0.075*15=1.125 > Gain -> Comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
-        update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
+        update={
+            "penalty_amount": 15.0,
+            "base_prob": 0.1,
+            "false_negative_rate": 0.5,
+        }
     )
 
     # Baseline: Low detection -> Cheat (0% Compliance)
@@ -103,7 +107,11 @@ def test_higher_backcheck_reduces_false_compliance():
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
-        update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
+        update={
+            "penalty_amount": 15.0,
+            "base_prob": 0.1,
+            "false_negative_rate": 0.8,
+        }
     )
 
     # Case 1: Low Backcheck (0.1). E[P] insufficient -> All Cheat.
@@ -128,7 +136,6 @@ def test_audit_capacity_constraint():
     audit = audit.model_copy(
         update={
             "base_prob": 1.0,
-            "high_prob": 1.0,
             "max_audits_per_step": 2,
             "penalty_amount": 0.5,
         }
@@ -162,7 +169,10 @@ def test_collateral_increases_deterrence():
     market = market.model_copy(update={"fixed_price": 2.0})
     # Low penalty + low audit = everyone cheats
     audit = audit.model_copy(
-        update={"penalty_amount": 1.5, "base_prob": 0.2, "high_prob": 0.2}
+        update={
+            "penalty_amount": 1.5,
+            "base_prob": 0.2,
+        }
     )
     # E[P] = 0.2 * 1.5 = 0.3 < Gain(1.0) → cheat
     comp_no_collateral = run_model_get_compliance(audit, market, lab)
@@ -201,7 +211,6 @@ def test_collateral_seized_on_violation():
         update={
             "penalty_amount": 0.01,
             "base_prob": 1.0,
-            "high_prob": 1.0,
         }
     )
     config = ScenarioConfig(
@@ -234,9 +243,7 @@ def test_collateral_refunded_when_compliant():
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
-    audit = audit.model_copy(
-        update={"penalty_amount": 100.0, "base_prob": 1.0, "high_prob": 1.0}
-    )
+    audit = audit.model_copy(update={"penalty_amount": 100.0, "base_prob": 1.0})
     config = ScenarioConfig(
         name="Test Collateral Refund",
         n_agents=10,
@@ -264,7 +271,10 @@ def test_zero_collateral_unchanged():
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 2.0})
     audit = audit.model_copy(
-        update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
+        update={
+            "penalty_amount": 4.0,
+            "base_prob": 0.1,
+        }
     )
     # Run with explicit collateral_amount=0
     config = ScenarioConfig(
@@ -287,16 +297,15 @@ def test_zero_collateral_unchanged():
 
 
 def test_flop_threshold_signal_scales_with_excess():
-    """Test that FLOP-based signal strength scales with FLOP excess.
+    """Test that signal strength scales with excess compute above threshold.
 
-    When flop_threshold > 0, signal generation uses planned_training_flops
-    instead of capacity. Larger training runs produce stronger signals.
+    New formula: signal = min(1.0, (excess / threshold) ^ signal_exponent)
+    With default exponent=1.0 (linear), excess = used - threshold.
     """
     from compute_permit_sim.core.enforcement import Auditor
 
     audit_config = AuditConfig(
         base_prob=0.05,
-        high_prob=0.5,
         false_positive_rate=0.0,
         false_negative_rate=0.0,
         penalty_amount=1.0,
@@ -305,54 +314,55 @@ def test_flop_threshold_signal_scales_with_excess():
     auditor = Auditor(audit_config)
     flop_threshold = 1e25
 
-    # Below threshold: minimal signal
-    signal_below = auditor.compute_signal_strength(
-        used_compute=5e24, flop_threshold=flop_threshold, is_compliant=False
+    # No excess compute: signal = 0
+    signal_zero = auditor.compute_signal(
+        excess_compute=0.0, flop_threshold=flop_threshold
     )
-    assert signal_below == 0.1  # below threshold
+    assert signal_zero == 0.0
 
-    # At 1.5x threshold: moderate signal
-    signal_mid = auditor.compute_signal_strength(
-        used_compute=1.5e25, flop_threshold=flop_threshold, is_compliant=False
+    # 50% excess: signal = 0.5e25 / 1e25 = 0.5
+    signal_mid = auditor.compute_signal(
+        excess_compute=0.5e25, flop_threshold=flop_threshold
     )
-    assert 0.5 < signal_mid < 1.0
+    assert signal_mid == 0.5
 
-    # At 2x threshold: maximum signal
-    signal_max = auditor.compute_signal_strength(
-        used_compute=2e25, flop_threshold=flop_threshold, is_compliant=False
+    # 100% excess: signal = 1e25 / 1e25 = 1.0 (capped)
+    signal_full = auditor.compute_signal(
+        excess_compute=1e25, flop_threshold=flop_threshold
     )
-    assert signal_max == 1.0
+    assert signal_full == 1.0
 
-    # Ordering: below < mid < max
-    assert signal_below < signal_mid < signal_max
+    # 200% excess: still capped at 1.0
+    signal_over = auditor.compute_signal(
+        excess_compute=2e25, flop_threshold=flop_threshold
+    )
+    assert signal_over == 1.0
+
+    # Ordering: zero < mid < full
+    assert signal_zero < signal_mid < signal_full
 
 
-def test_flop_threshold_below_threshold_low_signal():
-    """Test that labs below the FLOP threshold generate minimal signal."""
+def test_flop_threshold_below_threshold_no_signal():
+    """Test that zero excess compute produces zero signal."""
     from compute_permit_sim.core.enforcement import Auditor
 
     audit_config = AuditConfig(
         base_prob=0.05,
-        high_prob=0.5,
         false_positive_rate=0.0,
         false_negative_rate=0.0,
         penalty_amount=1.0,
         backcheck_prob=0.0,
     )
     auditor = Auditor(audit_config)
-    # Lab's training FLOPs below threshold → minimal signal
-    signal = auditor.compute_signal_strength(
-        used_compute=5e24, flop_threshold=1e25, is_compliant=False
-    )
-    assert signal == 0.1  # below threshold = minimal
+    # No excess → zero signal
+    signal = auditor.compute_signal(excess_compute=0.0, flop_threshold=1e25)
+    assert signal == 0.0
 
 
 def test_flop_threshold_integration():
     """Test full simulation with FLOP-based threshold enabled."""
     audit, market, lab = get_base_configs()
-    audit = audit.model_copy(
-        update={"penalty_amount": 100.0, "base_prob": 0.5, "high_prob": 0.9}
-    )
+    audit = audit.model_copy(update={"penalty_amount": 100.0, "base_prob": 0.5})
     # Set training FLOP range — all labs above threshold → need permits
     lab = lab.model_copy(
         update={"training_flops_min": 2e25, "training_flops_max": 5e25}
@@ -376,36 +386,117 @@ def test_flop_threshold_integration():
     assert df["Compliance_Rate"].iloc[-1] == 1.0
 
 
+def test_monitoring_zero_unchanged():
+    """Test that monitoring_prob=0 preserves existing detection behavior.
+
+    p_m=0 means no global monitoring — detection relies only on audits + whistleblower.
+    Should match baseline behavior exactly.
+    """
+    audit, market, lab = get_base_configs()
+    market = market.model_copy(update={"fixed_price": 2.0})
+    audit = audit.model_copy(
+        update={
+            "penalty_amount": 4.0,
+            "base_prob": 0.1,
+        }
+    )
+
+    # Baseline: no monitoring (default)
+    comp_base = run_model_get_compliance(audit, market, lab)
+
+    # Explicit monitoring_prob=0
+    audit_m0 = audit.model_copy(update={"monitoring_prob": 0.0})
+    comp_m0 = run_model_get_compliance(audit_m0, market, lab)
+
+    assert comp_base == comp_m0
+
+
+def test_monitoring_full_detection():
+    """Test that monitoring_prob=1.0 gives full detection (everyone complies).
+
+    With FNR=0.5, p_m=1.0: miss=FNR*(1-p_b)*(1-p_w)*(1-p_m)=0.5*1*1*0=0 → p_stage2=1.0.
+    p_detect = p_audit * 1.0 = 0.1. E[P]=0.1*15=1.5 > Gain(1.0) → comply.
+    """
+    audit, market, lab = get_base_configs()
+    market = market.model_copy(update={"fixed_price": 2.0})
+    # Low audit prob + moderate FNR — normally everyone cheats
+    audit = audit.model_copy(
+        update={
+            "penalty_amount": 15.0,
+            "base_prob": 0.1,
+            "false_negative_rate": 0.5,
+        }
+    )
+    # Base: p_detect=0.1*0.5=0.05. E[P]=0.75 < Gain(1.0) → cheat
+    comp_base = run_model_get_compliance(audit, market, lab)
+    assert comp_base == 0.0
+
+    # With monitoring_prob=1.0: miss=0 → p_stage2=1.0 → p_detect=0.1 → E[P]=1.5 → comply
+    audit_full = audit.model_copy(update={"monitoring_prob": 1.0})
+    comp_full = run_model_get_compliance(audit_full, market, lab)
+    assert comp_full == 1.0
+
+
+def test_monitoring_increases_compliance():
+    """Test that moderate monitoring_prob increases deterrence.
+
+    Setup: FNR=0.5, audit=0.1, penalty=18.0, Gain=1.0.
+    Without monitoring: miss=0.5*1*1*1=0.5. p_stage2=0.5. p_detect=0.05. E[P]=0.9 < 1.0 → cheat.
+    With monitoring p_m=0.2: miss=0.5*1*1*0.8=0.4. p_stage2=0.6. p_detect=0.06.
+    E[P]=0.06*18=1.08 > 1.0 → comply.
+    """
+    audit, market, lab = get_base_configs()
+    market = market.model_copy(update={"fixed_price": 2.0})
+    audit = audit.model_copy(
+        update={
+            "penalty_amount": 18.0,
+            "base_prob": 0.1,
+            "false_negative_rate": 0.5,
+        }
+    )
+
+    comp_base = run_model_get_compliance(audit, market, lab)
+    assert comp_base == 0.0
+
+    audit_monitor = audit.model_copy(update={"monitoring_prob": 0.2})
+    comp_monitor = run_model_get_compliance(audit_monitor, market, lab)
+    assert comp_monitor > comp_base
+    assert comp_monitor == 1.0
+
+
 def test_audit_targeting_efficiency():
-    """Test that higher audit coefficient improves compliance.
+    """Test that higher audit coefficient improves compliance in signal-dependent mode.
 
     Scenario:
-    - Agent values in range [0.8, 2.0].
-    - Base audit parameters insufficient to deter high-value agents.
+    - signal_dependent=True: c(i) scales the signal boost above base_prob.
+    - Labs above threshold, no permits (price > value), all cheat → signal=1.0.
+    - Agent values in range [0.8, 2.0], penalty=4.0, base_prob=0.1.
+
+    Case 1 (c=0.1): p_audit = 0.1 + 0.1*1.0*0.9 = 0.19. E[P]=0.76 < min_gain=0.8 → cheat.
+    Case 2 (c=1.0): p_audit = 0.1 + 1.0*1.0*0.9 = 1.0.  E[P]=4.0  > max_gain=2.0 → comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 3.0})
     audit = audit.model_copy(
-        update={"penalty_amount": 4.0, "base_prob": 0.1, "high_prob": 0.1}
+        update={
+            "penalty_amount": 4.0,
+            "base_prob": 0.1,
+            "signal_dependent": True,
+        }
     )
 
-    # Case 1: Uniform Audit (coeff=1.0).
-    # E[P] = 0.4. Insufficient for Value > 0.4.
-    # Since Value range is [0.8, 2.0], everyone cheats.
-    lab_uniform = lab.model_copy(
+    # Case 1: Low coefficient (coeff=0.1) — audit rate barely above base → all cheat.
+    lab_low = lab.model_copy(
         update={
             "economic_value_min": 0.8,
             "economic_value_max": 2.0,
-            "audit_coefficient": 1.0,
+            "audit_coefficient": 0.1,
         }
     )
-    comp_uniform = run_model_get_compliance(audit, market, lab_uniform)
-    assert comp_uniform == 0.0
+    comp_low = run_model_get_compliance(audit, market, lab_low)
+    assert comp_low == 0.0
 
-    # Case 2: Targeted Audit (coeff=6.0).
-    # p_eff scales by 6.0 -> E[P] increases dramatically.
-    # Should deter even High Value agents (2.0).
-    lab_targeted = lab_uniform.model_copy(update={"audit_coefficient": 6.0})
-    comp_targeted = run_model_get_compliance(audit, market, lab_targeted)
-
-    assert comp_targeted == 1.0
+    # Case 2: Default coefficient (coeff=1.0) — full signal boost → all comply.
+    lab_high = lab_low.model_copy(update={"audit_coefficient": 1.0})
+    comp_high = run_model_get_compliance(audit, market, lab_high)
+    assert comp_high == 1.0

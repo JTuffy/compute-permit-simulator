@@ -7,11 +7,9 @@ from compute_permit_sim.vis.components.cards import MetricCard
 from compute_permit_sim.vis.components.charts import (
     AuditTargetingPlot,
     CapacityUtilizationPlot,
-    CheatingGainPlot,
     LabDecisionPlot,
     PayoffByStrategyPlot,
     QuantitativeScatterPlot,
-    WealthDivergencePlot,
 )
 
 
@@ -51,16 +49,6 @@ class ChartFactory:
                 LabDecisionPlot(agents_df, audit_prob, penalty)
             with solara.Column():
                 PayoffByStrategyPlot(agents_df)
-            with solara.Column():
-                CheatingGainPlot(agents_df)
-
-    @staticmethod
-    def render_wealth_analysis(
-        compliant_history: list[float], non_compliant_history: list[float]
-    ):
-        """Render wealth divergence chart."""
-        with solara.Column():
-            WealthDivergencePlot(compliant_history, non_compliant_history)
 
 
 class MetricCardFactory:
