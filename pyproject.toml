@@ -50,3 +50,4 @@ python_files = ["test_*.py"]
 [tool.mypy]
 ignore_missing_imports = true
 check_untyped_defs = true
+plugins = ["pydantic.mypy"]

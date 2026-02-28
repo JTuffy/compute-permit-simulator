@@ -11,13 +11,12 @@ def test_simulation_integration() -> None:
     """Run a minimal simulation for a few steps to check for crashes and basic logic."""
     audit_config = AuditConfig(
         base_prob=0.1,
-        high_prob=0.5,
         false_positive_rate=0.05,
         false_negative_rate=0.1,
         penalty_amount=0.5,
         backcheck_prob=0.0,
     )
-    market_config = MarketConfig(token_cap=5)
+    market_config = MarketConfig(permit_cap=5)
     lab_config = LabConfig()
 
     config = ScenarioConfig(
@@ -46,23 +45,24 @@ def test_fixed_price_integration() -> None:
     """Run a simulation with fixed price market."""
     audit_config = AuditConfig(
         base_prob=0.1,
-        high_prob=0.5,
         false_positive_rate=0.05,
         false_negative_rate=0.1,
         penalty_amount=0.5,
         backcheck_prob=0.0,
     )
     # Fixed price 1.0, effectively unlimited cap.
-    market_config = MarketConfig(token_cap=100, fixed_price=1.0)
+    market_config = MarketConfig(permit_cap=100, fixed_price=1.0)
     lab_config = LabConfig()
 
     config = ScenarioConfig(
         name="Fixed Price Test",
         n_agents=5,
         steps=3,
+        flop_threshold=0,  # All labs above threshold → all must hold permits
         audit=audit_config,
         market=market_config,
         lab=lab_config,
+        seed=42,
     )
 
     model = ComputePermitModel(config)

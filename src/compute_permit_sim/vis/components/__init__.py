@@ -5,11 +5,9 @@ from .cards import MetricCard, ScenarioCard
 from .charts import (
     AuditTargetingPlot,
     CapacityUtilizationPlot,
-    CheatingGainPlot,
     LabDecisionPlot,
     PayoffByStrategyPlot,
     QuantitativeScatterPlot,
-    WealthDivergencePlot,
 )
 from .controls import RangeController, RangeView
 
@@ -18,11 +16,9 @@ __all__ = [
     "ScenarioCard",
     "AuditTargetingPlot",
     "CapacityUtilizationPlot",
-    "CheatingGainPlot",
     "LabDecisionPlot",
     "PayoffByStrategyPlot",
     "QuantitativeScatterPlot",
-    "WealthDivergencePlot",
     "AutoConfigView",
     "RangeController",
     "RangeView",

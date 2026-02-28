@@ -5,6 +5,7 @@ Tech spec section 4: "(1) Market Price Discovery -> (2) Permit Allocation"
 should be logically paired in the market module.
 """
 
+import random
 from typing import Protocol
 
 
@@ -36,18 +37,21 @@ class SimpleClearingMarket:
         current_price: The most recent clearing price.
     """
 
-    def __init__(self, token_cap: float, fixed_price: float | None = None) -> None:
+    def __init__(self, permit_cap: float, fixed_price: float | None = None) -> None:
         """Initialize the market.
 
         Args:
-            token_cap: The total number of permits available (Q).
+            permit_cap: The total number of permits available (Q).
         """
-        self.max_supply: float = token_cap
+        self.max_supply: float = permit_cap
         self.current_price: float = 0.0
         self.fixed_price: float | None = None
 
     def set_fixed_price(self, price: float) -> None:
-        """Set a fixed price for the market (unlimited supply mode).
+        """Set a fixed price for the market.
+
+        All labs willing to pay at least this price qualify for permits.
+        If qualifying demand exceeds permit_cap, permits are randomly allocated.
 
         Args:
             price: The fixed price for permits.
@@ -81,51 +85,99 @@ class SimpleClearingMarket:
         self.current_price = clearing_price
         return clearing_price
 
-    def allocate(self, bids: list[tuple[int, float]]) -> tuple[float, list[int]]:
-        """Resolve price and allocate permits to the highest bidders.
+    def allocate(
+        self, bids: list[tuple[int, int, float]]
+    ) -> tuple[float, dict[int, int]]:
+        """Resolve price and allocate permits via uniform-price auction.
 
-        Combines price discovery and allocation into a single call
-        (tech spec section 4 turn sequence phases 1-2).
+        Supports both binary (quantity=1) and multi-unit (FLOP-denominated)
+        permits through the same mechanism:
+
+        1. Each firm submits (lab_id, quantity_demanded, bid_per_permit).
+           For binary permits, every firm submits quantity=1.
+        2. Bids are expanded into individual permit-units, each tagged with
+           the firm's per-permit bid.
+        3. Units are sorted by bid descending (ties broken by lab_id asc).
+        4. The top ``permit_cap`` units are allocated.
+        5. The clearing price is the bid of the marginal (last allocated) unit.
+           All winners pay this uniform price per permit.
+
+        Fixed-price mode: if ``fixed_price`` is set, qualifying firms (bid >=
+        fixed_price) receive permits at that price. If total qualifying units
+        exceed ``permit_cap``, permits are randomly allocated up to the cap.
 
         Args:
-            bids: List of (lab_id, bid_value) pairs.
+            bids: List of (lab_id, quantity_demanded, bid_per_permit).
+                ``quantity_demanded``: how many permits the firm wants (>=0).
+                ``bid_per_permit``: willingness to pay per single permit.
 
         Returns:
-            Tuple of (clearing_price, list of winning lab_ids).
-            Winners are the top Q bidders whose bid >= clearing price.
+            Tuple of (clearing_price, allocations):
+                ``clearing_price``: uniform price per permit.
+                ``allocations``: {lab_id: number_of_permits_allocated}.
         """
+        allocations: dict[int, int] = {lab_id: 0 for lab_id, _, _ in bids}
+
         if not bids:
             self.current_price = 0.0
-            return 0.0, []
+            return 0.0, allocations
 
-        # FIXED PRICE MODE
+        # FIXED PRICE MODE — all qualifying bidders pay fixed_price
+        # If total qualifying units <= permit_cap: all get their requested permits.
+        # If total qualifying units > permit_cap: randomly allocate up to cap.
         if self.fixed_price is not None:
             self.current_price = self.fixed_price
-            # Everyone willing to pay the fixed price gets a permit (unlimited supply)
-            winners = [
-                lab_id for lab_id, bid_value in bids if bid_value >= self.fixed_price
+            qualifying: list[tuple[int, int]] = [
+                (lab_id, qty)
+                for lab_id, qty, bid_per in bids
+                if bid_per >= self.fixed_price
             ]
-            return self.fixed_price, winners
+            # Expand to individual permit-units tagged with lab_id
+            fp_units: list[int] = []
+            for lab_id, qty in qualifying:
+                fp_units.extend(lab_id for _ in range(qty))
 
-        available_permits = int(self.max_supply)
+            available = int(self.max_supply)
+            if len(fp_units) <= available:
+                # Enough supply: every qualifying lab gets what they asked for
+                for lab_id, qty in qualifying:
+                    allocations[lab_id] = qty
+            else:
+                # Over-subscribed: randomly sample up to permit_cap units
+                winners = random.sample(fp_units, available)
+                for lab_id in winners:
+                    allocations[lab_id] += 1
 
-        # Sort by bid value descending, then by lab_id ascending for deterministic ties
-        sorted_bids = sorted(bids, key=lambda x: (-x[1], x[0]))
+            return self.fixed_price, allocations
 
-        if available_permits >= len(sorted_bids):
-            # Surplus supply: everyone gets a permit, price = 0
+        # AUCTION MODE — expand bids to individual permit-units
+        units: list[tuple[int, float]] = []
+        for lab_id, qty, bid_per in bids:
+            units.extend((lab_id, bid_per) for _ in range(qty))
+
+        if not units:
             self.current_price = 0.0
-            return 0.0, [lab_id for lab_id, _ in sorted_bids]
+            return 0.0, allocations
 
-        # Clearing price = Qth highest bid (lowest winning bid)
-        clearing_price = sorted_bids[available_permits - 1][1]
+        # Sort: highest bid first, then lowest lab_id for deterministic ties
+        units.sort(key=lambda x: (-x[1], x[0]))
+
+        available = int(self.max_supply)
+
+        if available >= len(units):
+            # Surplus supply: everyone gets what they asked for, price = 0
+            self.current_price = 0.0
+            for lab_id, qty, _ in bids:
+                allocations[lab_id] = qty
+            return 0.0, allocations
+
+        # Clearing price = bid of the Qth highest unit (marginal winner)
+        clearing_price = units[available - 1][1]
         self.current_price = clearing_price
 
-        # Winners: top Q bidders whose bid >= clearing price
-        winners = [
-            lab_id
-            for lab_id, bid_value in sorted_bids[:available_permits]
-            if bid_value >= clearing_price
-        ]
+        # Allocate the top `available` units whose bid >= clearing price
+        for lab_id, bid_per in units[:available]:
+            if bid_per >= clearing_price:
+                allocations[lab_id] += 1
 
-        return clearing_price, winners
+        return clearing_price, allocations

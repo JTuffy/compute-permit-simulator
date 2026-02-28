@@ -29,7 +29,7 @@ def sample_run(agent_snapshot_factory) -> SimulationRun:
         name="Test Run",
         steps=10,
         n_agents=5,
-        market=MarketConfig(token_cap=1000),
+        market=MarketConfig(permit_cap=1000),
         audit=AuditConfig(),
         lab=LabConfig(),
     )
@@ -41,8 +41,8 @@ def sample_run(agent_snapshot_factory) -> SimulationRun:
                 step=i + 1,
                 market=MarketSnapshot(price=10.0, supply=100.0),
                 agents=[
-                    agent_snapshot_factory(id=1, is_compliant=True, wealth=100.0),
-                    agent_snapshot_factory(id=2, is_compliant=False, wealth=120.0),
+                    agent_snapshot_factory(id=1, is_compliant=True),
+                    agent_snapshot_factory(id=2, is_compliant=False),
                 ],
                 audit=[],
             )
@@ -55,7 +55,6 @@ def sample_run(agent_snapshot_factory) -> SimulationRun:
         metrics=RunMetrics(
             final_compliance=0.5,
             final_price=10.0,
-            total_enforcement_cost=0.0,
             deterrence_success_rate=0.5,
         ),
     )
@@ -88,4 +87,4 @@ def test_export_run_to_excel_creates_file(sample_run: SimulationRun) -> None:
         df_agents = pd.read_excel(result_path, sheet_name="Agent Details")
         # Header row is parsed, we expect 2 agents
         assert len(df_agents) == 2
-        assert "Gross economic value generated" in df_agents.columns
+        assert "Agent's base economic value (v_i)" in df_agents.columns

@@ -1,9 +1,11 @@
 """Active simulation state - the currently running model and its live data."""
 
+import pandas as pd
 import solara
 from pydantic import BaseModel, ConfigDict, Field
 
 from compute_permit_sim.schemas import StepResult
+from compute_permit_sim.services.mesa_model import ComputePermitModel
 
 
 class SimulationState(BaseModel):
@@ -13,7 +15,9 @@ class SimulationState(BaseModel):
     cascading re-renders during updates.
     """
 
-    model: object | None = Field(default=None, description="The active Mesa model")
+    model: ComputePermitModel | None = Field(
+        default=None, description="The active Mesa model"
+    )
     step_count: int = 0
     is_playing: bool = False
     actual_seed: int | None = None
@@ -21,7 +25,7 @@ class SimulationState(BaseModel):
     price_history: list[float] = Field(default_factory=list)
     wealth_history_compliant: list[float] = Field(default_factory=list)
     wealth_history_non_compliant: list[float] = Field(default_factory=list)
-    agents_df: object | None = Field(default=None, description="Pandas DataFrame")
+    agents_df: pd.DataFrame | None = Field(default=None, description="Pandas DataFrame")
     current_run_steps: list[StepResult] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

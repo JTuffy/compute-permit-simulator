@@ -1,9 +1,9 @@
 import pandas as pd
 import solara
 
+from compute_permit_sim.schemas import ScenarioConfig
 from compute_permit_sim.services.metrics import (
     calculate_compliance,
-    calculate_wealth_stats,
 )
 from compute_permit_sim.vis.components.analysis.graphs import RunGraphs
 from compute_permit_sim.vis.components.analysis.inspector import StepInspector
@@ -37,35 +37,26 @@ def AnalysisPanel():
             return (
                 active_sim.state.value.compliance_history,
                 active_sim.state.value.price_history,
-                (
-                    active_sim.state.value.wealth_history_compliant,
-                    active_sim.state.value.wealth_history_non_compliant,
-                ),
             )
         elif run and run.steps:
             compliance = []
             prices = []
-            w_comp = []
-            w_non = []
             for s in run.steps:
                 # Compliance & Price
                 compliance.append(calculate_compliance(s.agents))
                 prices.append(s.market.price)
 
-                # Wealth
-                w_c, w_nc = calculate_wealth_stats(s.agents)
-                w_comp.append(w_c)
-                w_non.append(w_nc)
+            return compliance, prices
+        return [], []
 
-            return compliance, prices, (w_comp, w_non)
-        return [], [], ([], [])
-
-    compliance_series, price_series, wealth_series = solara.use_memo(
+    compliance_series, price_series = solara.use_memo(
         compute_time_series,
         dependencies=[run_id, active_sim.state.value if is_live else 0],
     )
 
     # --- Extract step-specific data ---
+    config: ScenarioConfig | None = None
+    agents_df: pd.DataFrame | None = None
     if is_live:
         step_count = active_sim.state.value.step_count
         agents_df = active_sim.state.value.agents_df
@@ -134,7 +125,6 @@ def AnalysisPanel():
                     metrics = RunMetrics(
                         final_compliance=final_compliance,
                         final_price=final_price,
-                        total_enforcement_cost=0.0,  # Not tracked in live state yet
                         deterrence_success_rate=avg_compliance,
                     )
                 except Exception:
@@ -151,7 +141,7 @@ def AnalysisPanel():
         )
 
         # SECTION 2: Time Series Graphs
-        RunGraphs(compliance_series, price_series, wealth_series)
+        RunGraphs(compliance_series, price_series)
 
         # SECTION 3-6: Step Inspector & Analysis
         StepInspector(

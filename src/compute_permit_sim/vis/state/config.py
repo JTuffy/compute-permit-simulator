@@ -24,7 +24,7 @@ class UIConfig:
         from compute_permit_sim.schemas import AuditConfig, LabConfig, MarketConfig
 
         default = ScenarioConfig(
-            market=MarketConfig(token_cap=10.0),
+            market=MarketConfig(permit_cap=20.0),
             audit=AuditConfig(),
             lab=LabConfig(),
         )

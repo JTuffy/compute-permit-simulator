@@ -37,11 +37,9 @@ def basic_config() -> ScenarioConfig:
     return ScenarioConfig(
         steps=10,
         n_agents=5,
-        market=MarketConfig(token_cap=100.0),
+        market=MarketConfig(permit_cap=100.0),
         audit=AuditConfig(
-            audit_cost=1.0,
             base_prob=0.1,
-            high_prob=0.5,
             penalty_amount=10.0,
         ),
         lab=LabConfig(

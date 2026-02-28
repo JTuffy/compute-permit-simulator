@@ -52,8 +52,7 @@ def test_uiconfig_has_all_scenario_fields():
 
         # Special name mappings in UIConfig
         # Most fields match 1:1 with the domain model leaf name.
-        # token_cap: market.token_cap -> token_cap (matches split)
-        name_map = {}
+        name_map: dict[str, str] = {}
         attr_name = name_map.get(attr_name, attr_name)
 
         if not hasattr(ui, attr_name):
@@ -70,18 +69,16 @@ def test_to_from_scenario_config_roundtrip():
     ui = UIConfig()
 
     # Set distinctive values
-    ui.n_agents.value = 42
-    ui.steps.value = 77
-    ui.penalty_amount.value = 999.0
-    ui.flop_threshold.value = 1e23
-    ui.collateral_amount.value = 50.0
-    ui.whistleblower_prob.value = 0.15
-    ui.penalty_fixed.value = 35.0
-    ui.penalty_percentage.value = 0.07
-    ui.firm_revenue_min.value = 100.0
-    ui.firm_revenue_max.value = 10000.0
-    ui.racing_gap_sensitivity.value = 0.5
-    ui.capability_scale.value = 500.0
+    # UIConfig attributes are created dynamically via setattr in __init__;
+    # mypy can't resolve them statically, so we suppress attr-defined here.
+    ui.n_agents.value = 42  # type: ignore[attr-defined]
+    ui.steps.value = 77  # type: ignore[attr-defined]
+    ui.penalty_amount.value = 999.0  # type: ignore[attr-defined]
+    ui.flop_threshold.value = 1e23  # type: ignore[attr-defined]
+    ui.collateral_amount.value = 50.0  # type: ignore[attr-defined]
+    ui.whistleblower_prob.value = 0.15  # type: ignore[attr-defined]
+    ui.racing_gap_sensitivity.value = 0.5  # type: ignore[attr-defined]
+    ui.capability_scale.value = 500.0  # type: ignore[attr-defined]
 
     config = ui.to_scenario_config()
 

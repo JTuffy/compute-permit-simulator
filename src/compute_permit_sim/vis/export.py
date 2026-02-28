@@ -40,6 +40,7 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
         bytes if output_path was empty string.
     """
     return_bytes = False
+    output: io.BytesIO | str
 
     if output_path == "":
         # Special flag for in-memory
@@ -100,6 +101,7 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
 
     if return_bytes:
         # output is BytesIO
+        assert isinstance(output, io.BytesIO)
         output.seek(0)
         return output.read()
 
@@ -181,8 +183,13 @@ def _write_config_sheet(sheet, config, header_format, data_format):
             sub_config = getattr(config, name, None)
             if sub_config:
                 # Use the field name as section title (capitalized) or ui_group if available
-                extra = field_info.json_schema_extra or {}
-                section_title = extra.get("ui_group", name.replace("_", " ").title())
+                extra = field_info.json_schema_extra
+                default_title = name.replace("_", " ").title()
+                section_title: str = (
+                    str(extra.get("ui_group", default_title))
+                    if isinstance(extra, dict)
+                    else default_title
+                )
 
                 row = _write_config_section(
                     sheet,
@@ -341,23 +348,23 @@ def _write_graphs_sheet(sheet, run, workbook):
         # Plot 1: Scatter (Reported vs Used)
         # Check if columns exist (using string literals for safety if keys changed, dynamic is better but risky for logic)
         if (
-            ColumnNames.USED_COMPUTE in agents_df.columns
-            and ColumnNames.REPORTED_COMPUTE in agents_df.columns
+            ColumnNames.USED_TRAINING_FLOPS in agents_df.columns
+            and ColumnNames.REPORTED_TRAINING_FLOPS in agents_df.columns
         ):
-            sheet.write(row_offset, 0, "True vs Reported Compute (Last Step)")
+            sheet.write(row_offset, 0, "True vs Reported FLOPs (Last Step)")
             fig, ax = plot_scatter(
                 agents_df,
-                ColumnNames.REPORTED_COMPUTE,
-                ColumnNames.USED_COMPUTE,
-                "True vs Reported Compute",
+                ColumnNames.REPORTED_TRAINING_FLOPS,
+                ColumnNames.USED_TRAINING_FLOPS,
+                "True vs Reported FLOPs",
                 "Reported",
                 "True",
                 color_logic="compliance",
             )
             # Add y=x line
             max_val = max(
-                agents_df[ColumnNames.USED_COMPUTE].max(),
-                agents_df[ColumnNames.REPORTED_COMPUTE].max(),
+                agents_df[ColumnNames.USED_TRAINING_FLOPS].max(),
+                agents_df[ColumnNames.REPORTED_TRAINING_FLOPS].max(),
             )
             ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5)
             ax.legend()
