@@ -129,13 +129,16 @@ signal = min(1.0, (used_compute / flop_threshold)^signal_exponent)
 
 **Effective Detection Probability**:
 ```
-p_combined = base_prob + signal × (1.0 - base_prob)   # if signal_dependent; else base_prob
-p_audit    = min(1.0, max(base_prob, c(i) × p_combined))
-miss       = false_negative_rate × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
-p_catch    = 1 - miss
-p_eff      = p_audit × p_catch
+# if signal_dependent=True:
+p_audit = min(1.0, base_prob + c(i) × signal × (1.0 - base_prob))
+# if signal_dependent=False:
+p_audit = base_prob
+
+miss    = false_negative_rate × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
+p_catch = 1 - miss
+p_eff   = p_audit × p_catch
 ```
-`p_w` (whistleblower) and `p_m` (monitoring) are nested within `p_catch`: they provide additional detection when the direct audit pass and backcheck both miss. `max(base_prob, ...)` ensures the regulatory minimum audit rate is preserved even when `c(i) < 1`.
+`base_prob` is a uniform floor applied equally to all firms (random audits). `c(i)` only scales the signal-dependent component, so firm-specific audit rate differences arise from violation visibility, not the random baseline. When `signal_dependent=False`, `c(i)` has no effect. `p_w` (whistleblower) and `p_m` (monitoring) are nested within `p_catch`: they provide additional detection when the direct audit pass and backcheck both miss.
 
 ## Simulation Loop
 
@@ -200,7 +203,7 @@ sequenceDiagram
 
 **Phase 2 - Compliance Decision**: Per-agent detection probability calculated via `compute_detection_probability()` using expected signal from `planned_training_flops` vs `flop_threshold` → labs with unpermitted excess call `decide_compliance()` → deterrence condition: `p_eff × B_total >= gain` where `B_total = (penalty + collateral + reputation_sensitivity) × risk_profile`
 
-**Phase 3–4 - Signal, Audit & Enforcement**: Actual training FLOP excess generates signal → `compute_audit_probability()` applies `base_prob`, `signal_dependent`, `audit_coefficient`, and floor guard → `audit_detection_channel()` uses FNR/backcheck for two-stage outcome, with whistleblower (`p_w`) and monitoring (`p_m`) as nested fallback channels within the audit event → flat `penalty_amount` applied if caught → collateral seized on violation → `on_audit_failure()` escalates reputation sensitivity and audit coefficient
+**Phase 3–4 - Signal, Audit & Enforcement**: Actual training FLOP excess generates signal → `compute_audit_probability()` applies `base_prob` as a uniform floor; when `signal_dependent=True`, `audit_coefficient` scales the signal boost above that floor → `audit_detection_channel()` uses FNR/backcheck for two-stage outcome, with whistleblower (`p_w`) and monitoring (`p_m`) as nested fallback channels within the audit event → flat `penalty_amount` applied if caught → collateral seized on violation → `on_audit_failure()` escalates reputation sensitivity and audit coefficient
 
 **Phase 5 - Value Realization**: Labs that ran realize `economic_value`
 

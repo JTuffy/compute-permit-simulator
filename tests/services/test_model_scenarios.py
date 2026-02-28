@@ -465,11 +465,15 @@ def test_monitoring_increases_compliance():
 
 
 def test_audit_targeting_efficiency():
-    """Test that higher audit coefficient improves compliance.
+    """Test that higher audit coefficient improves compliance in signal-dependent mode.
 
     Scenario:
-    - Agent values in range [0.8, 2.0].
-    - Base audit parameters insufficient to deter high-value agents.
+    - signal_dependent=True: c(i) scales the signal boost above base_prob.
+    - Labs above threshold, no permits (price > value), all cheat → signal=1.0.
+    - Agent values in range [0.8, 2.0], penalty=4.0, base_prob=0.1.
+
+    Case 1 (c=0.1): p_audit = 0.1 + 0.1*1.0*0.9 = 0.19. E[P]=0.76 < min_gain=0.8 → cheat.
+    Case 2 (c=1.0): p_audit = 0.1 + 1.0*1.0*0.9 = 1.0.  E[P]=4.0  > max_gain=2.0 → comply.
     """
     audit, market, lab = get_base_configs()
     market = market.model_copy(update={"fixed_price": 3.0})
@@ -477,26 +481,22 @@ def test_audit_targeting_efficiency():
         update={
             "penalty_amount": 4.0,
             "base_prob": 0.1,
+            "signal_dependent": True,
         }
     )
 
-    # Case 1: Uniform Audit (coeff=1.0).
-    # E[P] = 0.4. Insufficient for Value > 0.4.
-    # Since Value range is [0.8, 2.0], everyone cheats.
-    lab_uniform = lab.model_copy(
+    # Case 1: Low coefficient (coeff=0.1) — audit rate barely above base → all cheat.
+    lab_low = lab.model_copy(
         update={
             "economic_value_min": 0.8,
             "economic_value_max": 2.0,
-            "audit_coefficient": 1.0,
+            "audit_coefficient": 0.1,
         }
     )
-    comp_uniform = run_model_get_compliance(audit, market, lab_uniform)
-    assert comp_uniform == 0.0
+    comp_low = run_model_get_compliance(audit, market, lab_low)
+    assert comp_low == 0.0
 
-    # Case 2: Targeted Audit (coeff=6.0).
-    # p_eff scales by 6.0 -> E[P] increases dramatically.
-    # Should deter even High Value agents (2.0).
-    lab_targeted = lab_uniform.model_copy(update={"audit_coefficient": 6.0})
-    comp_targeted = run_model_get_compliance(audit, market, lab_targeted)
-
-    assert comp_targeted == 1.0
+    # Case 2: Default coefficient (coeff=1.0) — full signal boost → all comply.
+    lab_high = lab_low.model_copy(update={"audit_coefficient": 1.0})
+    comp_high = run_model_get_compliance(audit, market, lab_high)
+    assert comp_high == 1.0

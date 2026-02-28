@@ -47,28 +47,40 @@ def test_compute_audit_probability_signal_dependent() -> None:
 
 
 def test_compute_audit_probability_coefficient() -> None:
-    auditor = Auditor(AuditConfig())
+    # c(i) only scales the signal component in signal-dependent mode
+    auditor = Auditor(AuditConfig(signal_dependent=True))
+    # base=0.05, signal=0.5, c(i)=2.0: 0.05 + 2.0*0.5*0.95 = 1.0
     assert auditor.compute_audit_probability(
-        signal=0.0, audit_coefficient=2.0
-    ) == pytest.approx(0.10)
-    # large coefficient capped at 1.0
+        signal=0.5, audit_coefficient=2.0
+    ) == pytest.approx(1.0)
+    # base=0.05, signal=0.5, c(i)=0.5: 0.05 + 0.5*0.5*0.95 = 0.2875
     assert auditor.compute_audit_probability(
-        signal=0.0, audit_coefficient=100.0
+        signal=0.5, audit_coefficient=0.5
+    ) == pytest.approx(0.2875)
+    # large coefficient still capped at 1.0
+    assert auditor.compute_audit_probability(
+        signal=1.0, audit_coefficient=100.0
     ) == pytest.approx(1.0)
 
 
 def test_compute_audit_probability_floor() -> None:
-    # c(i) < 1 should not push p_audit below base_prob (the regulatory floor)
+    # In random mode, c(i) has no effect — everyone gets exactly base_prob
     auditor = Auditor(AuditConfig())
-    # base_prob=0.05, signal=0.0 → p_combined=0.05, c(i)×p_combined=0.025
-    # max(0.05, 0.025) = 0.05 (floor kicks in)
     assert auditor.compute_audit_probability(
         signal=0.0, audit_coefficient=0.5
     ) == pytest.approx(0.05)
-    # c(i) > 1 still scales up normally
     assert auditor.compute_audit_probability(
-        signal=0.0, audit_coefficient=1.5
-    ) == pytest.approx(min(1.0, 0.05 * 1.5))
+        signal=0.0, audit_coefficient=2.0
+    ) == pytest.approx(0.05)
+    assert auditor.compute_audit_probability(
+        signal=1.0, audit_coefficient=2.0
+    ) == pytest.approx(0.05)
+    # In signal mode, base_prob is always present regardless of c(i) or signal
+    auditor_sd = Auditor(AuditConfig(signal_dependent=True))
+    # c(i)=0.0: p_audit = 0.05 + 0.0*signal*0.95 = 0.05 (just base_prob)
+    assert auditor_sd.compute_audit_probability(
+        signal=1.0, audit_coefficient=0.0
+    ) == pytest.approx(0.05)
 
 
 # ---------------------------------------------------------------------------

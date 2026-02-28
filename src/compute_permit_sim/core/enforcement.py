@@ -7,14 +7,13 @@ Stage 1 — AUDIT OCCURRENCE: Will the firm be audited?
     signal = min(1.0, (excess_compute / flop_threshold) ^ signal_exponent)
 
     When signal_dependent=True:
-        p_combined = base_prob + signal × (1.0 - base_prob)
+        p_audit = min(1.0, base_prob + c(i) × signal × (1.0 - base_prob))
     When signal_dependent=False (pure random auditing):
-        p_combined = base_prob
+        p_audit = base_prob
 
-    p_audit = min(1.0, max(base_prob, c(i) × p_combined))
-
-    The max(base_prob, ...) floor ensures the regulatory minimum audit rate
-    is preserved even when c(i) < 1.
+    base_prob is a true floor applied equally to all firms (random audits).
+    c(i) only scales the signal-dependent component, so firm-specific audit
+    rate differences arise from violation visibility, not the random baseline.
 
     Budget-capped mode (max_audits_per_step set):
       - signal_dependent=True:  rank triggered labs by signal desc, take top N
@@ -88,14 +87,13 @@ class Auditor:
         """Compute the probability of an audit occurring for one firm.
 
         When signal_dependent=True:
-            p_combined = base_prob + signal × (1.0 - base_prob)
+            p_audit = min(1.0, base_prob + c(i) × signal × (1.0 - base_prob))
         When signal_dependent=False:
-            p_combined = base_prob
+            p_audit = base_prob
 
-        p_audit = min(1.0, max(base_prob, c(i) × p_combined))
-
-        The max(base_prob, ...) floor preserves the regulatory minimum audit
-        rate even when c(i) < 1.
+        base_prob is a uniform floor for all firms (random audits). c(i) only
+        scales the signal component, so firm-specific differences arise from
+        violation visibility. When signal_dependent=False, c(i) has no effect.
 
         Args:
             signal: Suspicion signal in [0, 1] from compute_signal().
@@ -105,10 +103,12 @@ class Auditor:
             Audit probability in [0, 1].
         """
         if self.config.signal_dependent:
-            p_combined = self.config.base_prob + signal * (1.0 - self.config.base_prob)
-        else:
-            p_combined = self.config.base_prob
-        return min(1.0, max(self.config.base_prob, audit_coefficient * p_combined))
+            return min(
+                1.0,
+                self.config.base_prob
+                + audit_coefficient * signal * (1.0 - self.config.base_prob),
+            )
+        return self.config.base_prob
 
     # ------------------------------------------------------------------
     # Stage 2: Audit Outcome
