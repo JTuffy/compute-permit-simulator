@@ -1,6 +1,6 @@
 """Mesa model integration for the Compute Permit Simulator."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import mesa
 
@@ -36,12 +36,17 @@ class MesaLab(mesa.Agent):
             planned_training_flops=planned_training_flops,
             penalty_amount=penalty_amount,
         )
-        self.last_audit_status = {
+        self.last_audit_status: dict[str, Any] = {
             "audited": False,
             "caught": False,
+            "caught_source": None,
             "penalty": 0.0,
             "collateral_seized": False,
             "ran": False,
+            "audit_coefficient": 1.0,
+            "cumulative_capability": 0.0,
+            "bid_price": 0.0,
+            "permits_wanted": 0,
         }
 
     def step(self) -> None:
@@ -134,9 +139,14 @@ class ComputePermitModel(mesa.Model):
             agent.last_audit_status = {
                 "audited": ao.audited,
                 "caught": ao.caught,
+                "caught_source": ao.caught_source,
                 "penalty": ao.penalty,
                 "collateral_seized": ao.collateral_seized,
                 "ran": ao.ran,
+                "audit_coefficient": ao.audit_coefficient,
+                "cumulative_capability": ao.cumulative_capability,
+                "bid_price": ao.bid_price,
+                "permits_wanted": ao.permits_wanted,
             }
 
         self.datacollector.collect(self)
@@ -172,9 +182,16 @@ class ComputePermitModel(mesa.Model):
                         is_compliant=d.is_compliant,
                         was_audited=agent.last_audit_status["audited"],
                         was_caught=agent.last_audit_status["caught"],
+                        caught_source=agent.last_audit_status["caught_source"],
                         penalty_amount=agent.last_audit_status["penalty"],
                         economic_value=d.economic_value,
                         risk_profile=d.risk_profile,
+                        audit_coefficient=agent.last_audit_status["audit_coefficient"],
+                        cumulative_capability=agent.last_audit_status[
+                            "cumulative_capability"
+                        ],
+                        bid_price=agent.last_audit_status["bid_price"],
+                        permits_wanted=agent.last_audit_status["permits_wanted"],
                     )
                 )
         return snapshots

@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import ScenarioConfig
+from .enums import AuditSource
 
 
 class AgentSnapshot(BaseModel):
@@ -23,9 +24,20 @@ class AgentSnapshot(BaseModel):
     is_compliant: bool = Field(..., description="Compliance status")
     was_audited: bool = Field(..., description="Audit status this step")
     was_caught: bool = Field(..., description="Caught cheating this step")
+    caught_source: AuditSource | None = Field(
+        None, description="Detection channel (e.g., backcheck, whistleblower)"
+    )
     penalty_amount: float = Field(..., description="Penalty applied this step")
     economic_value: float = Field(..., description="Agent's base economic value (v_i)")
     risk_profile: float = Field(..., description="Agent's risk profile")
+    audit_coefficient: float = Field(
+        ..., description="Multiplier for signal-driven auditing"
+    )
+    cumulative_capability: float = Field(
+        ..., description="Accumulated training capability"
+    )
+    bid_price: float = Field(..., description="Willingness to pay per permit this step")
+    permits_wanted: int = Field(..., description="Permits requested at this step")
 
     model_config = ConfigDict(frozen=True)
 

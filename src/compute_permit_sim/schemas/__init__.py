@@ -17,6 +17,7 @@ from .data import (
     SimulationRun,
     StepResult,
 )
+from .enums import AuditSource
 
 __all__ = [
     "AuditConfig",
@@ -28,4 +29,5 @@ __all__ = [
     "StepResult",
     "RunMetrics",
     "SimulationRun",
+    "AuditSource",
 ]

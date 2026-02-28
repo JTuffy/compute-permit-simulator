@@ -4,6 +4,7 @@ import pytest
 
 from compute_permit_sim.core.enforcement import Auditor
 from compute_permit_sim.schemas import AuditConfig
+from compute_permit_sim.schemas.enums import AuditSource
 
 # ---------------------------------------------------------------------------
 # Stage 1: Signal computation
@@ -110,17 +111,17 @@ def test_compute_catch_probability_zero_fnr() -> None:
 def test_audit_detection_channel_compliant_no_fp_no_backcheck() -> None:
     # FPR=0.0, backcheck=0.0 → never caught
     auditor = Auditor(AuditConfig(false_positive_rate=0.0, backcheck_prob=0.0))
-    caught, caught_backcheck = auditor.audit_detection_channel(is_compliant=True)
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=True)
     assert caught is False
-    assert caught_backcheck is False
+    assert caught_source is None
 
 
 def test_audit_detection_channel_compliant_direct_fp() -> None:
     # FPR=1.0, backcheck=0.0 → always caught on direct; backcheck not reached
     auditor = Auditor(AuditConfig(false_positive_rate=1.0, backcheck_prob=0.0))
-    caught, caught_backcheck = auditor.audit_detection_channel(is_compliant=True)
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=True)
     assert caught is True
-    assert caught_backcheck is False
+    assert caught_source == AuditSource.DIRECT
 
 
 def test_audit_detection_channel_compliant_backcheck_fp() -> None:
@@ -133,17 +134,17 @@ def test_audit_detection_channel_compliant_backcheck_fp() -> None:
             monitoring_prob=0.0,
         )
     )
-    caught, caught_backcheck = auditor.audit_detection_channel(is_compliant=True)
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=True)
     assert caught is True
-    assert caught_backcheck is True
+    assert caught_source == AuditSource.BACKCHECK
 
 
 def test_audit_detection_channel_non_compliant_direct_catch() -> None:
     # FNR=0.0 → direct pass always fires
     auditor = Auditor(AuditConfig(false_negative_rate=0.0))
-    caught, caught_backcheck = auditor.audit_detection_channel(is_compliant=False)
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=False)
     assert caught is True
-    assert caught_backcheck is False
+    assert caught_source == AuditSource.DIRECT
 
 
 def test_audit_detection_channel_non_compliant_guaranteed_miss() -> None:
@@ -156,11 +157,11 @@ def test_audit_detection_channel_non_compliant_guaranteed_miss() -> None:
             monitoring_prob=0.0,
         )
     )
-    caught, caught_backcheck = auditor.audit_detection_channel(
+    caught, caught_source = auditor.audit_detection_channel(
         is_compliant=False, p_w=0.0, p_m=0.0
     )
     assert caught is False
-    assert caught_backcheck is False
+    assert caught_source is None
 
 
 def test_audit_detection_channel_caught_via_backcheck() -> None:
@@ -173,9 +174,9 @@ def test_audit_detection_channel_caught_via_backcheck() -> None:
             monitoring_prob=0.0,
         )
     )
-    caught, caught_backcheck = auditor.audit_detection_channel(is_compliant=False)
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=False)
     assert caught is True
-    assert caught_backcheck is True
+    assert caught_source == AuditSource.BACKCHECK
 
 
 def test_audit_detection_channel_caught_via_monitoring() -> None:
@@ -188,11 +189,9 @@ def test_audit_detection_channel_caught_via_monitoring() -> None:
             monitoring_prob=0.0,
         )
     )
-    caught, caught_backcheck = auditor.audit_detection_channel(
-        is_compliant=False, p_m=1.0
-    )
+    caught, caught_source = auditor.audit_detection_channel(is_compliant=False, p_m=1.0)
     assert caught is True
-    assert caught_backcheck is False
+    assert caught_source == AuditSource.MONITORING
 
 
 def test_audit_detection_channel_returns_two_bools() -> None:
@@ -200,7 +199,7 @@ def test_audit_detection_channel_returns_two_bools() -> None:
     result = auditor.audit_detection_channel(is_compliant=False)
     assert isinstance(result, tuple)
     assert len(result) == 2
-    assert all(isinstance(v, bool) for v in result)
+    assert isinstance(result[0], bool)
 
 
 # ---------------------------------------------------------------------------
