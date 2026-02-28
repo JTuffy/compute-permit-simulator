@@ -154,28 +154,27 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> None:
                     )
                     solara.Button("Save", on_click=perform_save, color="primary")
 
-        # Excel Export
-        def export_excel():
-            from compute_permit_sim.vis.export import export_run_to_excel
+        # Export Actions
+        from compute_permit_sim.vis.export import export_run_to_csv, export_run_to_excel
 
-            try:
-                result = export_run_to_excel(run)
-                print(
-                    f"Exported to: {result.decode() if isinstance(result, bytes) else result}"
-                )
-            except Exception as e:
-                print(f"Export failed: {e}")
-                import traceback
-
-                traceback.print_exc()
+        excel_fname = f"{run.id}.xlsx"
+        csv_fname = f"{run.id}.csv"
 
         with solara.Tooltip("Export to Excel"):
-            solara.Button(
-                icon_name="mdi-file-excel",
-                on_click=export_excel,
-                icon=True,
-                small=True,
-            )
+            with solara.FileDownload(
+                filename=excel_fname,
+                data=lambda: export_run_to_excel(run, output_path=""),
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ):
+                solara.Button(icon_name="mdi-file-excel", icon=True, small=True)
+
+        with solara.Tooltip("Export to CSV (Step Data)"):
+            with solara.FileDownload(
+                filename=csv_fname,
+                data=lambda: export_run_to_csv(run, output_path=""),
+                mime_type="text/csv",
+            ):
+                solara.Button(icon_name="mdi-file-delimited", icon=True, small=True)
 
             # Pure HTML/JS Button: "Just copy the ID"
             # This bypasses Solara's event loop and works directly in the browser.

@@ -1,10 +1,8 @@
-"""Excel export functionality for simulation runs.
+"""Export functionality for simulation runs (Excel and CSV).
 
-Exports run data to Excel with multiple sheets:
-- Config: All simulation parameters (auto-generated from schema)
-- Summary: Key metrics and time series data
-- Agent Details: Full agent snapshot from last step
-- Graphs: Embedded matplotlib figures
+Exports run data to:
+1. Excel with multiple sheets (Config, Summary, Agent Details, Graphs)
+2. CSV with flattened step-by-step agent data and full configuration context.
 """
 
 import io
@@ -106,6 +104,46 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
         return output.read()
 
     assert output_path is not None
+    return output_path
+
+
+def export_run_to_csv(run, output_path: str | None = None) -> str | bytes:
+    """Export a simulation run to a CSV file with step-wise agent data.
+
+    Each row represents one agent at one simulation step.
+    Config parameters are NOT included — use the Excel export for full config.
+
+    Args:
+        run: The simulation run to export.
+        output_path: File path to write to (None=auto, ""=bytes).
+
+    Returns:
+        str (path) if written to file, bytes if output_path was "".
+    """
+    rows = []
+    for step_res in run.steps:
+        market_data = {
+            "run_id": run.id,
+            "step": step_res.step,
+            "market_price": step_res.market.price,
+            "market_supply": step_res.market.supply,
+        }
+        for agent in step_res.agents:
+            row = market_data.copy()
+            row.update({f"agent_{k}": v for k, v in agent.model_dump().items()})
+            rows.append(row)
+
+    df = pd.DataFrame(rows) if rows else pd.DataFrame()
+
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+
+    if output_path is None:
+        os.makedirs("outputs", exist_ok=True)
+        fname = run.sim_id if run.sim_id else run.id
+        output_path = f"outputs/simulation_run_{fname}.csv"
+
+    df.to_csv(output_path, index=False)
     return output_path
 
 
@@ -366,7 +404,13 @@ def _write_graphs_sheet(sheet, run, workbook):
                 agents_df[ColumnNames.USED_TRAINING_FLOPS].max(),
                 agents_df[ColumnNames.REPORTED_TRAINING_FLOPS].max(),
             )
-            ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5)
+            ax.plot(
+                [0, max_val],
+                [0, max_val],
+                "k--",
+                alpha=0.5,
+                label="y=x (perfect reporting)",
+            )
             ax.legend()
             sheet.insert_image(
                 row_offset + 1, 0, "scatter.png", {"image_data": _fig_to_bytes(fig)}
