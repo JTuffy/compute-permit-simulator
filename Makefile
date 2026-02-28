@@ -1,21 +1,25 @@
 # Makefile for Compute Permit Simulator
 
-.PHONY: run viz heatmap solara lint format clean help
+.PHONY: run viz app heatmap solara lint format test check clean help
 
 help:
 	@echo "Available commands:"
 	@echo "  make run       - Run the simulation (CLI)"
-	@echo "  make viz       - Run the Solara interactive dashboard"
-	@echo "  make heatmap   - Generate the Deterrence Heatmap"
-	@echo "  make lint      - Run linters (ruff)"
+	@echo "  make app       - Run the Solara interactive dashboard (alias: viz)"
+	@echo "  make lint      - Run linters (ruff check)"
+	@echo "  make format    - Format code (ruff format)"
+	@echo "  make ruff      - Run both ruff check and ruff format"
 	@echo "  make mypy      - Run type checker (mypy)"
-	@echo "  make format    - Format code (ruff)"
+	@echo "  make test      - Run tests (pytest)"
+	@echo "  make check     - Run all checks (lint, format, mypy, test)"
 	@echo "  make clean     - Remove artifacts (__pycache__, etc.)"
 
 run:
 	uv run main.py
 
 viz: solara
+
+app: solara
 
 solara:
 	uv run solara run app.py
@@ -26,11 +30,18 @@ heatmap:
 lint:
 	uv run ruff check .
 
+format:
+	uv run ruff format .
+
+ruff: format lint
+
 mypy:
 	uv run mypy .
 
-format:
-	uv run ruff format .
+test:
+	uv run pytest -q
+
+check: lint format mypy test
 
 clean:
 	rm -rf __pycache__

@@ -13,6 +13,7 @@ wheels/
 .venv
 
 # Generated outputs
+outputs/
 *.png
 
 # Lock file
