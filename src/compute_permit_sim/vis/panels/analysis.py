@@ -25,40 +25,49 @@ def AnalysisPanel():
     is_live = run is None
 
     # Force dependency on step count for live updates
-    _ = active_sim.state.value.step_count
+    step_count_live = active_sim.state.value.step_count
+    is_playing = active_sim.state.value.is_playing
 
     # Step index state for historical timeline (hoisted to ensure consistent hook calls)
     run_id = run.id if run else "live"
     step_idx, set_step_idx = solara.use_state(0, key=run_id)
 
     # --- Memoized time series (only recompute when run changes, not on slider move) ---
+    # Use scalar dependencies only: step_count (int) or run_id (str).
+    # Passing the full SimulationState object caused memo to always miss because
+    # model_copy() creates a new object identity on every step.
     def compute_time_series():
         if is_live:
             return (
                 active_sim.state.value.compliance_history,
                 active_sim.state.value.price_history,
+                [],  # caught_series not tracked live — empty for now
             )
         elif run and run.steps:
             compliance = []
             prices = []
+            caught = []
             for s in run.steps:
-                # Compliance & Price
                 compliance.append(calculate_compliance(s.agents))
                 prices.append(s.market.price)
+                caught.append(
+                    sum(1 for a in s.agents if getattr(a, "was_caught", False))
+                )
+            return compliance, prices, caught
+        return [], [], []
 
-            return compliance, prices
-        return [], []
-
-    compliance_series, price_series = solara.use_memo(
+    compliance_series, price_series, caught_series = solara.use_memo(
         compute_time_series,
-        dependencies=[run_id, active_sim.state.value if is_live else 0],
+        # Live: re-run only when step_count changes (not on every state mutation).
+        # Historical: re-run only when the selected run changes.
+        dependencies=[run_id, step_count_live if is_live else 0],
     )
 
     # --- Extract step-specific data ---
     config: ScenarioConfig | None = None
     agents_df: pd.DataFrame | None = None
     if is_live:
-        step_count = active_sim.state.value.step_count
+        step_count = step_count_live
         agents_df = active_sim.state.value.agents_df
         market_price = (
             active_sim.state.value.model.market.current_price
@@ -92,46 +101,36 @@ def AnalysisPanel():
 
         config = run.config if run else None
 
-    # --- Derived values for Summary ---
-    # (Checking compliance_series again inside component, or pass directly)
-    # Passed directly to AnalysisSummary
+    # --- Derive metrics ---
+    if is_live:
+        metrics = None
+        if step_count_live > 0:
+            try:
+                from compute_permit_sim.schemas.data import RunMetrics
+
+                state = active_sim.state.value
+                final_compliance = (
+                    state.compliance_history[-1] if state.compliance_history else 0.0
+                )
+                final_price = state.price_history[-1] if state.price_history else 0.0
+                avg_compliance = (
+                    sum(state.compliance_history) / len(state.compliance_history)
+                    if state.compliance_history
+                    else 0.0
+                )
+
+                metrics = RunMetrics(
+                    final_compliance=final_compliance,
+                    final_price=final_price,
+                    deterrence_success_rate=avg_compliance,
+                )
+            except Exception:
+                pass
+    else:
+        metrics = run.metrics if run else None
 
     # --- Render Unified Layout ---
     with solara.Column(classes=["analysis-panel"]):
-        if is_live:
-            # Derive metrics from current simulation state
-            metrics = None
-            if active_sim.state.value.step_count > 0:
-                try:
-                    # Let's create a temporary object with what we have.
-                    from compute_permit_sim.schemas.data import RunMetrics
-
-                    # Get latest values from state
-                    state = active_sim.state.value
-                    final_compliance = (
-                        state.compliance_history[-1]
-                        if state.compliance_history
-                        else 0.0
-                    )
-                    final_price = (
-                        state.price_history[-1] if state.price_history else 0.0
-                    )
-                    avg_compliance = (
-                        sum(state.compliance_history) / len(state.compliance_history)
-                        if state.compliance_history
-                        else 0.0
-                    )
-
-                    metrics = RunMetrics(
-                        final_compliance=final_compliance,
-                        final_price=final_price,
-                        deterrence_success_rate=avg_compliance,
-                    )
-                except Exception:
-                    pass
-        else:
-            metrics = run.metrics if run else None
-
         # SECTION 1: Key Metrics & Config
         AnalysisSummary(
             is_live=is_live,
@@ -140,8 +139,15 @@ def AnalysisPanel():
             metrics=metrics,
         )
 
-        # SECTION 2: Time Series Graphs
-        RunGraphs(compliance_series, price_series)
+        # SECTION 2: Run Summary (time series + historical breakdowns)
+        steps_for_graphs = run.steps if (not is_live and run) else None
+        RunGraphs(
+            compliance_series,
+            caught_series,
+            price_series,
+            steps_for_graphs,
+            is_playing=is_playing,
+        )
 
         # SECTION 3-6: Step Inspector & Analysis
         StepInspector(
@@ -152,5 +158,4 @@ def AnalysisPanel():
             market_price=market_price,
             market_supply=market_supply,
             agents_df=agents_df,
-            config=config,
         )

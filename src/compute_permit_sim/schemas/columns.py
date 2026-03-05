@@ -24,3 +24,5 @@ class ColumnNames:
     CUMULATIVE_CAPABILITY = "cumulative_capability"
     BID_PRICE = "bid_price"
     PERMITS_WANTED = "permits_wanted"
+    NET_PAYOFF = "net_payoff"
+    RACING_FACTOR = "racing_factor"

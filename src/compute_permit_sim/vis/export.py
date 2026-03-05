@@ -16,8 +16,6 @@ from compute_permit_sim.schemas import AgentSnapshot, RunMetrics, ScenarioConfig
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import (
-    plot_deterrence_frontier,
-    plot_payoff_distribution,
     plot_scatter,
     plot_time_series,
 )
@@ -415,21 +413,6 @@ def _write_graphs_sheet(sheet, run, workbook):
             sheet.insert_image(
                 row_offset + 1, 0, "scatter.png", {"image_data": _fig_to_bytes(fig)}
             )
-
-        # Plot 2: Deterrence Frontier
-        sheet.write(row_offset, 8, "Deterrence Frontier")
-        fig, _ = plot_deterrence_frontier(agents_df)
-        sheet.insert_image(
-            row_offset + 1, 8, "deterrence.png", {"image_data": _fig_to_bytes(fig)}
-        )
-
-        # Plot 3: Payoff Distribution
-        row_offset += 25
-        sheet.write(row_offset, 0, "Payoff Analysis")
-        fig, _ = plot_payoff_distribution(agents_df)
-        sheet.insert_image(
-            row_offset + 1, 0, "payoff.png", {"image_data": _fig_to_bytes(fig)}
-        )
 
 
 def _fig_to_bytes(fig) -> io.BytesIO:

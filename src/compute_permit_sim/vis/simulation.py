@@ -61,6 +61,8 @@ class SimulationEngine:
 
     def start_run(self) -> None:
         """Start a fresh simulation run from the current UI configuration."""
+        import threading
+
         # --- Resolve seed ---
         ui_seed = self.config.seed.value
         run_seed = ui_seed if ui_seed is not None else random.randint(0, 2**31 - 1)
@@ -80,7 +82,10 @@ class SimulationEngine:
         actual_seed = getattr(model, "_seed", run_seed)
         logger.info(f"Model initialized with seed: {actual_seed}")
 
-        # Reset all active state and start playing in ONE transaction
+        # Phase 1 (sync): clear history selection, then reset state WITHOUT
+        # is_playing=True so this render cycle completes cleanly before
+        # use_task picks up the is_playing change.
+        self.history.selected_run.value = None
         self.active.update(
             model=model,
             actual_seed=actual_seed,
@@ -88,12 +93,21 @@ class SimulationEngine:
             compliance_history=[],
             price_history=[],
             agents_df=None,
-            is_playing=True,
+            is_playing=False,
             current_run_steps=[],
         )
 
-        # Clear history selection to show live view
-        self.history.selected_run.value = None
+        # Phase 2 (deferred): set is_playing=True in a background thread so
+        # it fires AFTER the synchronous render from Phase 1 has settled.
+        # This prevents back-to-back state mutations from cascading renders
+        # and hitting Solara's per-cycle render limit.
+        def _start_playing() -> None:
+            import time
+
+            time.sleep(0.05)
+            self.active.update(is_playing=True)
+
+        threading.Thread(target=_start_playing, daemon=True).start()
 
     def step(self) -> None:
         """Advance the simulation one step."""

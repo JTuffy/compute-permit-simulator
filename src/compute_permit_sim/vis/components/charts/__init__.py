@@ -1,4 +1,4 @@
-"""Chart components - organized by plot type for clarity and maintainability."""
+"""Chart components — step-level and sim-level, organized by scope."""
 
 from compute_permit_sim.vis.components.charts.base import (
     PlotConfig,
@@ -6,14 +6,19 @@ from compute_permit_sim.vis.components.charts.base import (
     validate_dataframe,
 )
 from compute_permit_sim.vis.components.charts.deterrence import (
-    AuditTargetingPlot,
-    LabDecisionPlot,
+    AuditSourceBreakdownStepPlot,
 )
-from compute_permit_sim.vis.components.charts.payoff import (
-    PayoffByStrategyPlot,
+from compute_permit_sim.vis.components.charts.expandable import ExpandableChart
+from compute_permit_sim.vis.components.charts.longitudinal import (
+    # Sim-level aggregates (RunGraphs row 2)
+    SimAuditSourcePlot,
+    SimAuditTargetingPlot,
+    SimComplianceDistributionPlot,
+    SimRiskScatterPlot,
 )
 from compute_permit_sim.vis.components.charts.scatter import (
-    CapacityUtilizationPlot,
+    AuditSourcePlot,
+    ComplianceDistributionPlot,
     QuantitativeScatterPlot,
 )
 
@@ -22,12 +27,16 @@ __all__ = [
     "PlotConfig",
     "validate_dataframe",
     "apply_standard_styling",
-    # Scatter plots
+    # UX
+    "ExpandableChart",
+    # Step-level charts
     "QuantitativeScatterPlot",
-    "CapacityUtilizationPlot",
-    # Audit & Deterrence
-    "AuditTargetingPlot",
-    "LabDecisionPlot",
-    # Payoff
-    "PayoffByStrategyPlot",
+    "ComplianceDistributionPlot",
+    "AuditSourcePlot",
+    "AuditSourceBreakdownStepPlot",
+    # Sim-level aggregates
+    "SimRiskScatterPlot",
+    "SimAuditTargetingPlot",
+    "SimComplianceDistributionPlot",
+    "SimAuditSourcePlot",
 ]

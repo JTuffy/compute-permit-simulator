@@ -1,25 +1,31 @@
-"""Scatter plot components for risk, gain, and capacity analysis."""
+"""Scatter plot components — step-level risk analysis."""
+
+from __future__ import annotations
 
 import pandas as pd
 import solara
-from matplotlib.figure import Figure
 
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.vis.components.charts.base import validate_dataframe
-from compute_permit_sim.vis.constants import CHART_COLOR_MAP
-from compute_permit_sim.vis.plotting import plot_scatter
+from compute_permit_sim.vis.components.charts.expandable import ExpandableChart
+from compute_permit_sim.vis.plotting import (
+    plot_audit_source_distribution,
+    plot_compliance_distribution,
+    plot_scatter,
+)
+from compute_permit_sim.vis.transforms import classify_agent_outcome
 
 
 @solara.component
-def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
-    """Scatter plot of Reported (X) vs True (Y) compute for risk analysis.
+def QuantitativeScatterPlot(agents_df: pd.DataFrame | None) -> None:
+    """Scatter of Reported (X) vs True (Y) compute usage, colored by compliance.
 
-    Shows the gap between reported and actual compute usage, colored by compliance.
+    Points on the dashed y=x line are perfectly honest reporters.
+    Points above it used more compute than reported (cheating).
     """
     if not validate_dataframe(
         agents_df,
         [ColumnNames.REPORTED_TRAINING_FLOPS, ColumnNames.USED_TRAINING_FLOPS],
-        "No data for scatter plot.",
     ):
         solara.Markdown("No data for scatter plot.")
         return
@@ -45,48 +51,43 @@ def QuantitativeScatterPlot(agents_df: pd.DataFrame | None):
     )
     ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honesty (y=x)")
     ax.legend()
-
-    solara.FigureMatplotlib(fig)
+    ExpandableChart(fig)
 
 
 @solara.component
-def CapacityUtilizationPlot(agents_df: pd.DataFrame | None):
-    """Scatter plot of Capacity vs Reported Compute.
-
-    Shows the relationship between firm size and reported utilization.
-    """
+def ComplianceDistributionPlot(agents_df: pd.DataFrame | None) -> None:
+    """Bar chart: Compliant / Uncaught / then per-source caught bars this step."""
     if not validate_dataframe(
         agents_df,
-        [
-            ColumnNames.PLANNED_TRAINING_FLOPS,
-            ColumnNames.REPORTED_TRAINING_FLOPS,
-            ColumnNames.IS_COMPLIANT,
-        ],
-        "Missing data for capacity plot.",
+        [ColumnNames.IS_COMPLIANT, ColumnNames.WAS_CAUGHT],
     ):
-        solara.Markdown("Missing data for capacity plot.")
+        solara.Markdown("No compliance data.")
         return
 
     assert agents_df is not None
-    fig = Figure(figsize=(6, 5), dpi=100)
-    ax = fig.subplots()
+    df = classify_agent_outcome(agents_df)
+    fig = plot_compliance_distribution(df)
+    ExpandableChart(fig)
 
-    x = agents_df[ColumnNames.PLANNED_TRAINING_FLOPS]
-    y = agents_df[ColumnNames.REPORTED_TRAINING_FLOPS]
-    colors = agents_df[ColumnNames.IS_COMPLIANT].map(
-        {True: CHART_COLOR_MAP["green"], False: CHART_COLOR_MAP["red"]}
+
+@solara.component
+def AuditSourcePlot(agents_df: pd.DataFrame | None) -> None:
+    """Bar chart: caught labs by detection channel (direct / backcheck / whistleblower / monitoring).
+
+    Shows which enforcement mechanism is finding violators this step.
+    Only caught labs are included; zero-count channels still appear as empty bars.
+    """
+    if not validate_dataframe(
+        agents_df,
+        [ColumnNames.WAS_CAUGHT],
+    ):
+        solara.Markdown("No audit data.")
+        return
+
+    assert agents_df is not None
+    caught_df = classify_agent_outcome(agents_df)
+    caught_only = caught_df[caught_df["outcome"] == "Caught"]
+    fig = plot_audit_source_distribution(
+        caught_only, title="Caught by Channel (This Step)"
     )
-
-    ax.scatter(x, y, c=colors, alpha=0.7, edgecolors="w", s=80)
-
-    max_val = max(x.max(), y.max()) if not x.empty else 1
-    ax.plot([0, max_val], [0, max_val], "k--", alpha=0.3, label="100% Util Reported")
-
-    ax.set_xlabel("Max Capacity (q_max)")
-    ax.set_ylabel("Reported Compute (r)")
-    ax.set_title("Reported Utilization vs Scale")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    solara.FigureMatplotlib(fig)
+    ExpandableChart(fig)
