@@ -1,45 +1,39 @@
-"""Step inspector component — slider and per-step agent analysis."""
+"""Agent details table — per-step agent data view.
 
+Computes agents_df from steps + step_idx internally so that Solara's
+scalar integer prop-change detection drives reactivity reliably.
+"""
+
+from __future__ import annotations
+
+import pandas as pd
 import solara
 
 from compute_permit_sim.schemas.columns import ColumnNames
-from compute_permit_sim.vis.components.factories import ChartFactory
 
 
 @solara.component
-def StepInspector(
-    is_live: bool,
-    run,
-    step_idx: int,
-    set_step_idx,
-    market_price: float,
-    market_supply: float,
-    agents_df,
-):
-    """Component for inspecting details of a specific simulation step."""
-    # Timeline Slider (Historical Only)
-    if not is_live and run and len(run.steps) > 0:
-        with solara.Card("Step Inspector"):
-            solara.SliderInt(
-                label="Step",
-                value=step_idx,
-                on_value=set_step_idx,
-                min=0,
-                max=len(run.steps) - 1,
-                thumb_label="always",
-            )
-            solara.Markdown(
-                f"**Step {step_idx + 1}** — Clearing Price: ${market_price:.2f} | "
-                f"Permits: {market_supply:.0f}"
-            )
+def AgentDetailsTable(
+    steps: list | None = None,
+    step_idx: int = 0,
+    live_agents_df: pd.DataFrame | None = None,
+    is_live: bool = False,
+) -> None:
+    """Tabular view of all agent fields for the selected step.
 
-    # Step Analysis (Agent Graphs)
+    Uses ``step_idx`` (scalar) as the reactive prop to drive re-renders on
+    slider changes. ``agents_df`` is computed here, not passed as a prop.
+    """
+    agents_df: pd.DataFrame | None = None
+
+    if is_live:
+        agents_df = live_agents_df
+    elif steps and len(steps) > 0:
+        idx = max(0, min(step_idx, len(steps) - 1))
+        step = steps[idx]
+        agents_df = pd.DataFrame([a.model_dump() for a in step.agents])
+
     if agents_df is not None and not agents_df.empty:
-        with solara.Card("Step Analysis"):
-            # Row 1: Risk Analysis (scatter, audit targeting, compliance distribution)
-            ChartFactory.render_risk_analysis(agents_df)
-
-        # Agent Details Table
         with solara.Card("Agent Details"):
             cols = [
                 ColumnNames.ID,
@@ -63,4 +57,4 @@ def StepInspector(
             solara.DataFrame(agents_df[valid_cols], items_per_page=15)
     else:
         with solara.Card("Agent Details"):
-            solara.Markdown("No agent data available for this step.")
+            solara.Markdown("*No agent data available for this step.*")

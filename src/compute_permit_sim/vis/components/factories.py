@@ -1,4 +1,4 @@
-"""Component factories for step-level chart groups.
+"""Component factories for chart groups.
 
 3-column layout convention:
   All ``render_*`` methods use ``solara.Columns([1, 1, 1])`` with exactly 3
@@ -8,50 +8,58 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pandas as pd
 import solara
 
 from compute_permit_sim.vis.components.cards import MetricCard
 from compute_permit_sim.vis.components.charts import (
-    AuditSourceBreakdownStepPlot,
     AuditSourcePlot,
+    AuditTargetingPlot,
     ComplianceDistributionPlot,
-    QuantitativeScatterPlot,
+    RiskScatterPlot,
 )
 
 
 class ChartFactory:
-    """Factory for building step-level chart groups.
+    """Factory for building chart groups.
 
-    One group is currently supported:
-      - **risk_analysis**: scatter (true vs reported FLOPs), audit targeting,
-        compliance distribution, and audit source breakdown (4 channels).
+    Supports both step-level (``mode="step"``) and aggregate (``mode="aggregate"``)
+    rendering of the full risk-analysis chart grid.
     """
 
     @staticmethod
-    def render_risk_analysis(agents_df: pd.DataFrame | None) -> None:
-        """Two rows of step-level charts.
+    def render_risk_analysis(
+        agents_df: pd.DataFrame | None,
+        mode: Literal["aggregate", "step"] = "step",
+        steps: list | None = None,
+    ) -> None:
+        """Two rows of risk analysis charts.
 
         Row 1: Risk scatter | Audit targeting | Compliance distribution
         Row 2: Caught by channel (4 detection sources) | (spacer) | (spacer)
+
+        Args:
+            agents_df: Step-level agent DataFrame (used in ``mode="step"``).
+            mode: ``"step"`` or ``"aggregate"``. Determines data source and titles.
+            steps: Full-run step list (used in ``mode="aggregate"``).
         """
-        if agents_df is None or agents_df.empty:
-            solara.Markdown("No agent data available for risk analysis.")
+        if mode == "step" and (agents_df is None or agents_df.empty):
+            solara.Markdown("*No agent data available for risk analysis.*")
             return
 
-        # Row 1: core risk analysis
         with solara.Columns([1, 1, 1]):
             with solara.Column():
-                QuantitativeScatterPlot(agents_df)
+                RiskScatterPlot(mode=mode, agents_df=agents_df, steps=steps)
             with solara.Column():
-                AuditSourceBreakdownStepPlot(agents_df)
+                AuditTargetingPlot(mode=mode, agents_df=agents_df, steps=steps)
             with solara.Column():
-                ComplianceDistributionPlot(agents_df)
+                ComplianceDistributionPlot(mode=mode, agents_df=agents_df, steps=steps)
 
-        # Row 2: audit source breakdown (4 detection channels)
         with solara.Columns([1, 1, 1]):
             with solara.Column():
-                AuditSourcePlot(agents_df)
+                AuditSourcePlot(mode=mode, agents_df=agents_df, steps=steps)
             with solara.Column():
                 pass  # reserved
             with solara.Column():
