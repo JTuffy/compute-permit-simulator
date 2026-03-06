@@ -144,7 +144,17 @@ def ResultsContent(
                         solara.Markdown("*No price data yet*")
 
                 with solara.Column():
-                    pass  # reserved
+                    if caught_series:
+                        fig = plot_time_series(
+                            caught_series,
+                            "Labs Caught",
+                            "orange",
+                            title="Labs Caught per Step",
+                            ylabel="Count",
+                        )
+                        ExpandableChart(fig)
+                    else:
+                        solara.Markdown("*No enforcement data yet*")
 
             if steps:
                 with solara.Columns([1, 1, 1]):

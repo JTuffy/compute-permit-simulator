@@ -1,4 +1,6 @@
-from typing import Any, Dict, List, Set, Type
+from __future__ import annotations
+
+from typing import Any
 
 import solara
 from pydantic import BaseModel
@@ -8,12 +10,11 @@ from compute_permit_sim.vis.components.controls import RangeController, RangeVie
 
 @solara.component
 def AutoConfigView(
-    schema: Type[BaseModel],
+    schema: type[BaseModel],
     model: Any | None = None,
     readonly: bool = False,
-    collapsible: bool = False,
     render_mode: str | None = None,
-    exclude: List[str] | None = None,
+    exclude: list[str] | None = None,
 ):
     """
     Automatically render a configuration view based on a Pydantic schema.
@@ -31,7 +32,7 @@ def AutoConfigView(
 
     # 1. Parse Schema & Group Fields
     # Structure: { "Group Name": [ (field_name, field_info, value_getter) ] }
-    groups: Dict[str, List[Dict[str, Any]]] = {}
+    groups: dict[str, list[dict[str, Any]]] = {}
 
     def get_value(path: str, field_name: str):
         if model is None:
@@ -96,7 +97,7 @@ def AutoConfigView(
     )
 
     # 2. Render Groups Container
-    with solara.Column(gap="0px"):
+    with solara.Column(gap="0px", classes=["config-view"]):
         # Explicitly render Seed at top if it exists and is not excluded
         # Seed is special because it's on the root config but often wanted at top
         if not readonly and (not exclude or "seed" not in exclude):
@@ -129,8 +130,8 @@ def AutoConfigView(
                     )
 
         # Helper to render content of a group
-        def render_group_content(items):
-            processed: Set[str] = set()
+        def render_group_content(items: list[dict[str, Any]]) -> None:
+            processed: set[str] = set()
 
             for item in items:
                 name = item["name"]
@@ -196,104 +197,65 @@ def AutoConfigView(
                     return _setter
 
                 # Render based on type/format
-                # Helper to wrap in tooltip if description exists
-                def wrap_tooltip(element):
-                    description = item["info"].description
-                    if description:
-                        return solara.Tooltip(tooltip=description, children=[element])
-                    return element
-
                 if fmt == "percent":
                     if not readonly and is_reactive:
-                        wrap_tooltip(
-                            solara.InputFloat(
-                                label=label,
-                                value=val,
-                                dense=True,
-                                disabled=disabled,
-                            )
+                        solara.InputFloat(
+                            label=label,
+                            value=val,
+                            dense=True,
+                            disabled=disabled,
                         )
-                    else:
-                        if current_val is not None:
-                            wrap_tooltip(
-                                solara.InputFloat(
-                                    label=label,
-                                    value=current_val,
-                                    dense=True,
-                                    disabled=True,
-                                )
-                            )
+                    elif current_val is not None:
+                        solara.InputFloat(
+                            label=label,
+                            value=current_val,
+                            dense=True,
+                            disabled=True,
+                        )
 
                 elif fmt == "int" or (
-                    # If it's an int field but value might be None (like seed)
                     not fmt and isinstance(current_val, (int, type(None)))
                 ):
-                    # Handle int inputs that might be None
                     if not readonly and is_reactive:
-                        wrap_tooltip(
-                            solara.InputText(
-                                label=label,
-                                value=str(current_val)
-                                if current_val is not None
-                                else "",
-                                on_value=make_setter(val, int),
-                                dense=True,
-                                disabled=disabled,
-                            )
+                        solara.InputText(
+                            label=label,
+                            value=str(current_val) if current_val is not None else "",
+                            on_value=make_setter(val, int),
+                            dense=True,
+                            disabled=disabled,
                         )
-                    else:
-                        if current_val is not None:
-                            wrap_tooltip(
-                                solara.InputInt(
-                                    label=label,
-                                    value=current_val,
-                                    dense=True,
-                                    disabled=True,
-                                )
-                            )
+                    elif current_val is not None:
+                        solara.InputInt(
+                            label=label,
+                            value=current_val,
+                            dense=True,
+                            disabled=True,
+                        )
 
                 elif isinstance(current_val, bool):
                     if not readonly and is_reactive:
-                        wrap_tooltip(
-                            solara.Checkbox(label=label, value=val, disabled=disabled)
-                        )
+                        solara.Checkbox(label=label, value=val, disabled=disabled)
                     else:
-                        # For readonly bool, checkbox is fine
-                        wrap_tooltip(
-                            solara.Checkbox(
-                                label=label, value=current_val, disabled=True
-                            )
-                        )
+                        solara.Checkbox(label=label, value=current_val, disabled=True)
 
                 else:  # float, currency, scientific
                     if not readonly and is_reactive:
-                        wrap_tooltip(
-                            solara.InputText(
-                                label=label,
-                                value=str(current_val)
-                                if current_val is not None
-                                else "",
-                                on_value=make_setter(val, float),
-                                dense=True,
-                                disabled=disabled,
-                            )
+                        solara.InputText(
+                            label=label,
+                            value=str(current_val) if current_val is not None else "",
+                            on_value=make_setter(val, float),
+                            dense=True,
+                            disabled=disabled,
                         )
-                    else:
-                        if current_val is not None:
-                            wrap_tooltip(
-                                solara.InputFloat(
-                                    label=label,
-                                    value=current_val,
-                                    dense=True,
-                                    disabled=True,
-                                )
-                            )
+                    elif current_val is not None:
+                        solara.InputFloat(
+                            label=label,
+                            value=current_val,
+                            dense=True,
+                            disabled=True,
+                        )
 
         # Render all groups vertically
         for group_name in sorted_group_names:
-            # Add a subtle separator/header
-            solara.Markdown(
-                f"**{group_name}**",
-                style="font-size: 0.85rem; opacity: 0.6; margin-top: 12px; margin-bottom: 4px; text-transform: uppercase;",
-            )
+            solara.v.Subheader(children=[group_name])
             render_group_content(groups[group_name])

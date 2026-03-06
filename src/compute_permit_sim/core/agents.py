@@ -180,7 +180,7 @@ class Lab:
 
         # 5. Not deterred -> cheat
         self.is_compliant = False
-        logger.info(
+        logger.debug(
             f"Lab {self.lab_id} CHEATING: Gain ({gain:.3f}) > ExpPenalty ({expected_penalty:.3f})"
         )
         return False
