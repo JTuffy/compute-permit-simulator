@@ -13,6 +13,16 @@ import xlsxwriter
 from pydantic import BaseModel
 
 from compute_permit_sim.schemas import AgentSnapshot, RunMetrics, ScenarioConfig
+from compute_permit_sim.schemas.batch import (
+    BatchColumnNames as _BCN,
+)
+from compute_permit_sim.schemas.batch import (
+    MetricStats as _MetricStats,
+)
+from compute_permit_sim.schemas.batch import (
+    MonteCarloResult,
+    SweepResult,
+)
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import (
@@ -421,3 +431,259 @@ def _fig_to_bytes(fig) -> io.BytesIO:
     fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
     buf.seek(0)
     return buf
+
+
+# =============================================================================
+# Batch / Monte Carlo Exports
+# =============================================================================
+
+_os = os
+_pd = pd
+
+
+def export_monte_carlo_to_csv(
+    results: list[MonteCarloResult],
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a list of MonteCarloResult objects to a summary CSV.
+
+    One row per scenario. Columns use :class:`~BatchColumnNames` constants.
+
+    Args:
+        results: List of ``MonteCarloResult`` instances.
+        output_path: ``None`` = auto-generate path, ``""`` = return bytes.
+    """
+    rows = [
+        {
+            _BCN.SCENARIO: r.scenario_name,
+            _BCN.N_RUNS: r.n_runs,
+            _BCN.AVG_COMPLIANCE_MEAN: r.avg_compliance.mean,
+            _BCN.AVG_COMPLIANCE_STD: r.avg_compliance.std,
+            _BCN.FINAL_COMPLIANCE_MEAN: r.final_compliance.mean,
+            "final_compliance_std": r.final_compliance.std,
+            _BCN.P10_COMPLIANCE: r.p10_compliance,
+            _BCN.P90_COMPLIANCE: r.p90_compliance,
+            _BCN.PCT_RUNS_FULL_COMPLIANCE: r.pct_runs_full_compliance,
+            _BCN.AVG_PRICE_MEAN: r.avg_price.mean,
+            _BCN.AVG_PRICE_STD: r.avg_price.std,
+            _BCN.AVG_NET_PAYOFF_MEAN: r.avg_net_payoff.mean,
+            _BCN.AVG_NET_PAYOFF_STD: r.avg_net_payoff.std,
+            _BCN.PAYOFF_COMPLIANT_MEAN: r.payoff_compliant.mean,
+            _BCN.PAYOFF_COMPLIANT_STD: r.payoff_compliant.std,
+            _BCN.PAYOFF_VIOLATOR_MEAN: r.payoff_violator.mean,
+            _BCN.PAYOFF_VIOLATOR_STD: r.payoff_violator.std,
+            _BCN.AUDIT_RATE_MEAN: r.audit_rate.mean,
+            _BCN.AUDIT_RATE_STD: r.audit_rate.std,
+            _BCN.FALSE_POSITIVE_RATE_MEAN: r.false_positive_rate.mean,
+            _BCN.FALSE_POSITIVE_RATE_STD: r.false_positive_rate.std,
+            _BCN.DETECTION_RATE_MEAN: r.detection_rate.mean,
+            _BCN.DETECTION_RATE_STD: r.detection_rate.std,
+        }
+        for r in results
+    ]
+
+    df = _pd.DataFrame(rows)
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        output_path = "outputs/monte_carlo_summary.csv"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+
+def export_mc_per_seed_to_csv(
+    result: MonteCarloResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export per-seed scalar summaries — one row per seed.
+
+    Requires ``MonteCarloResult.raw_seeds`` to be populated
+    (i.e. ``store_raw=True`` was passed to ``run_monte_carlo``).
+
+    Args:
+        result: A ``MonteCarloResult`` with ``raw_seeds`` populated.
+        output_path: ``None`` = auto-generate, ``""`` = return bytes.
+
+    Raises:
+        ValueError: If ``raw_seeds`` is empty.
+    """
+    if not result.raw_seeds:
+        raise ValueError(
+            "MonteCarloResult.raw_seeds is empty. "
+            "Run with store_raw=True to capture per-seed data."
+        )
+
+    rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.SEED: s.seed,
+            _BCN.AVG_COMPLIANCE_MEAN: s.avg_compliance,
+            _BCN.FINAL_COMPLIANCE_MEAN: s.final_compliance,
+            _BCN.AVG_PRICE_MEAN: s.avg_price,
+            _BCN.AVG_NET_PAYOFF_MEAN: s.avg_net_payoff,
+            _BCN.PAYOFF_COMPLIANT_MEAN: s.avg_payoff_compliant,
+            _BCN.PAYOFF_VIOLATOR_MEAN: s.avg_payoff_violator,
+            _BCN.AUDIT_RATE_MEAN: s.audit_rate,
+            _BCN.FALSE_POSITIVE_RATE_MEAN: s.false_positive_rate,
+            _BCN.DETECTION_RATE_MEAN: s.detection_rate,
+        }
+        for s in result.raw_seeds
+    ]
+
+    df = _pd.DataFrame(rows)
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe = result.scenario_name.lower().replace(" ", "_")
+        output_path = f"outputs/mc_per_seed_{safe}.csv"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+
+def export_mc_trajectory_to_csv(
+    result: MonteCarloResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export per-step trajectory data in long format — one row per step.
+
+    Columns: step, compliance_mean, compliance_std, n_violators_mean,
+    n_violators_std.  Downstream tools (R, matplotlib) can use this
+    directly for publication trajectory plots.
+
+    Args:
+        result: A ``MonteCarloResult`` with ``step_compliance`` populated.
+        output_path: ``None`` = auto-generate, ``""`` = return bytes.
+    """
+    rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.STEP: step + 1,
+            _BCN.COMPLIANCE_RATE: s.mean,
+            f"{_BCN.COMPLIANCE_RATE}_std": s.std,
+            _BCN.N_VIOLATORS: v.mean,
+            f"{_BCN.N_VIOLATORS}_std": v.std,
+        }
+        for step, (s, v) in enumerate(
+            zip(result.step_compliance, result.step_n_violators)
+        )
+    ]
+
+    df = _pd.DataFrame(rows)
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe = result.scenario_name.lower().replace(" ", "_")
+        output_path = f"outputs/mc_trajectory_{safe}.csv"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+
+def export_monte_carlo_to_latex(results: list[MonteCarloResult]) -> str:
+    """Generate a ready-to-paste LaTeX tabular for Monte Carlo results.
+
+    Columns: Scenario, Avg Compliance (P10–P90), Market Price,
+    Net Payoff, Audit Rate, and % Full Compliance.
+    Format: mean (SD) where SD > 0, plain mean if deterministic.
+    """
+
+    def _pct(s: _MetricStats) -> str:
+        mean, sd = s.mean * 100, s.std * 100
+        if sd < 1e-9:
+            return rf"{mean:.1f}\%"
+        return rf"{mean:.1f} ({sd:.1f})\%"
+
+    def _flt(s: _MetricStats) -> str:
+        mean, sd = s.mean, s.std
+        if sd < 1e-9:
+            return f"{mean:.2f}"
+        return f"{mean:.2f} ({sd:.2f})"
+
+    lines = [
+        r"\begin{table}[h]",
+        r"\centering",
+        r"\small",
+        r"\caption{Simulation outcomes by scenario (mean with SD in parentheses; compliance range is P10--P90 across seeds).}",
+        r"\label{tab:mc-results}",
+        r"\begin{tabular}{lcccccc}",
+        r"\toprule",
+        (
+            r"\textbf{Scenario} "
+            r"& \textbf{Avg Compliance} "
+            r"& \textbf{P10--P90 Range} "
+            r"& \textbf{Price (M\$)} "
+            r"& \textbf{Net Payoff (M\$)} "
+            r"& \textbf{Audit Rate} "
+            r"& \textbf{Full Compliance \%} \\\\"
+        ),
+        r"\midrule",
+    ]
+    for r in results:
+        p10 = f"{r.p10_compliance * 100:.1f}"
+        p90 = f"{r.p90_compliance * 100:.1f}"
+        pct_full = f"{r.pct_runs_full_compliance * 100:.0f}\\%"
+        lines.append(
+            f"{r.scenario_name} "
+            f"& {_pct(r.avg_compliance)} "
+            f"& [{p10}\\%--{p90}\\%] "
+            f"& {_flt(r.avg_price)} "
+            f"& {_flt(r.avg_net_payoff)} "
+            f"& {_pct(r.audit_rate)} "
+            f"& {pct_full} \\\\"
+        )
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\end{table}",
+        "",
+        r"% Compliance: mean (SD); P10/P90 across seeds; payoffs in M$.",
+    ]
+    return "\n".join(lines)
+
+
+def export_sweep_to_csv(
+    result: SweepResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a SweepResult to CSV with one row per sweep point.
+
+    Args:
+        result: A ``SweepResult`` instance.
+        output_path: ``None`` = auto-generate, ``""`` = return bytes.
+    """
+    rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.PARAM_PATH: result.param_path,
+            _BCN.PARAM_VALUE: pt.param_value,
+            _BCN.N_RUNS: pt.result.n_runs,
+            _BCN.AVG_COMPLIANCE_MEAN: pt.result.avg_compliance.mean,
+            _BCN.AVG_COMPLIANCE_STD: pt.result.avg_compliance.std,
+            _BCN.P10_COMPLIANCE: pt.result.p10_compliance,
+            _BCN.P90_COMPLIANCE: pt.result.p90_compliance,
+            _BCN.AVG_PRICE_MEAN: pt.result.avg_price.mean,
+            _BCN.AVG_PRICE_STD: pt.result.avg_price.std,
+            _BCN.AVG_NET_PAYOFF_MEAN: pt.result.avg_net_payoff.mean,
+            _BCN.AVG_NET_PAYOFF_STD: pt.result.avg_net_payoff.std,
+            _BCN.PAYOFF_COMPLIANT_MEAN: pt.result.payoff_compliant.mean,
+            _BCN.PAYOFF_VIOLATOR_MEAN: pt.result.payoff_violator.mean,
+            _BCN.AUDIT_RATE_MEAN: pt.result.audit_rate.mean,
+            _BCN.AUDIT_RATE_STD: pt.result.audit_rate.std,
+            _BCN.FALSE_POSITIVE_RATE_MEAN: pt.result.false_positive_rate.mean,
+            _BCN.DETECTION_RATE_MEAN: pt.result.detection_rate.mean,
+        }
+        for pt in result.points
+    ]
+
+    df = _pd.DataFrame(rows)
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe_s = result.scenario_name.lower().replace(" ", "_")
+        safe_p = result.param_path.replace(".", "_")
+        output_path = f"outputs/sweep_{safe_s}_{safe_p}.csv"
+    df.to_csv(output_path, index=False)
+    return output_path

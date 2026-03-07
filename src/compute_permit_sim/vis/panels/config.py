@@ -6,9 +6,9 @@ from compute_permit_sim.vis.components import AutoConfigView
 from compute_permit_sim.vis.components.dialogs import LoadScenarioDialog
 from compute_permit_sim.vis.components.history import RunHistoryList
 from compute_permit_sim.vis.state import engine
-from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
 from compute_permit_sim.vis.state.history import session_history
+from compute_permit_sim.vis.state.run_state import basic_run
 
 
 @solara.component
@@ -42,7 +42,7 @@ def ConfigPanel():
                     icon=True,
                     small=True,
                     color="primary",
-                    disabled=active_sim.state.value.is_playing,
+                    disabled=basic_run.value.is_running,
                 )
                 solara.Button(
                     "Load",
@@ -59,7 +59,7 @@ def ConfigPanel():
             exclude=["name", "description"],  # Seed is handled explicitly now
         )
 
-        is_running = active_sim.state.value.is_playing
+        is_running = basic_run.value.is_running
         solara.Button(
             label="⏳ Running..." if is_running else "▶ Play",
             on_click=engine.start_run,

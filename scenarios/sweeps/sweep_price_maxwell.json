@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_3_smart.json",
+    "param_path": "market.fixed_price",
+    "param_label": "Permit Price p\u0304 (M$)",
+    "min_val": 0.5,
+    "max_val": 70.0,
+    "interval": 5.0,
+    "n_runs": 50
+}

@@ -31,6 +31,7 @@ class UIConfig:
 
         # Special handling for Scenario metadata
         self.selected_scenario = solara.reactive("Custom")
+        self.notes: solara.Reactive[str] = solara.reactive("")
         self.seed: solara.Reactive[int | None] = solara.reactive(
             None
         )  # Default to random
@@ -49,7 +50,7 @@ class UIConfig:
             else:
                 # Leaf field - create reactive
                 # Skip seed/name as they are handled specially or not fully reactive in the same way
-                if name in ("seed", "name", "description"):
+                if name in ("seed", "name", "description", "notes"):
                     continue
 
                 # Use setattr to create self.field_name = solara.reactive(value)
@@ -77,6 +78,8 @@ class UIConfig:
                         data[name] = self.selected_scenario.value
                     elif name == "description":
                         data[name] = ""  # Description not editable currently
+                    elif name == "notes":
+                        data[name] = self.notes.value
                     elif hasattr(self, name):
                         val = getattr(self, name).value
                         # Ensure correct type (e.g. int vs float if Solara input returns string/float)
@@ -95,6 +98,7 @@ class UIConfig:
     def from_scenario_config(self, config: ScenarioConfig) -> None:
         """Apply a ScenarioConfig to the reactive state."""
         self.selected_scenario.value = config.name or "Custom"
+        self.notes.value = config.notes
         self.seed.value = config.seed
 
         def update_fields(model):
@@ -104,7 +108,7 @@ class UIConfig:
                 if isinstance(value, BaseModel):
                     update_fields(value)
                 else:
-                    if name in ("seed", "name", "description"):
+                    if name in ("seed", "name", "description", "notes"):
                         continue
 
                     if hasattr(self, name):

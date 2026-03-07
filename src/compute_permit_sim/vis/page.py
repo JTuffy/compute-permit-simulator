@@ -1,6 +1,13 @@
 """Root page for the Solara application.
 
-Logic is distributed across `vis/panels`, `vis/components`, and `vis/state`.
+Right-pane state machine (centralized here):
+    basic_run.phase == "running"          → RunSpinner (basic sim)
+    mc_run.phase == "running"             → RunSpinner (Monte Carlo)
+    sweep_run.phase == "running"          → RunSpinner (Sweep)
+    mc_run.phase == "ready"               → BatchResultsPanel
+    sweep_run.phase == "ready"            → BatchResultsPanel
+    basic_run.phase == "ready" OR history → AnalysisPanel
+    else                                  → EmptyState
 """
 
 import logging
@@ -9,14 +16,17 @@ from pathlib import Path
 import solara
 import solara.lab
 
+from compute_permit_sim.vis.components.run_spinner import RunSpinner
 from compute_permit_sim.vis.components.system import (
     SimulationController,
     UrlManager,
 )
 from compute_permit_sim.vis.panels.analysis import AnalysisPanel
+from compute_permit_sim.vis.panels.batch import BatchPanel
+from compute_permit_sim.vis.panels.batch_results import BatchResultsPanel
 from compute_permit_sim.vis.panels.config import ConfigPanel
-from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.history import session_history
+from compute_permit_sim.vis.state.run_state import basic_run, mc_run, sweep_run
 
 # --- Logging Configuration ---
 logger = logging.getLogger("compute_permit_sim")
@@ -65,15 +75,6 @@ def EmptyState():
 
 
 @solara.component
-def LoadingState():
-    with solara.Column(
-        style="height: 60vh; justify-content: center; align-items: center;"
-    ):
-        solara.v.ProgressCircular(indeterminate=True, color="primary", size=50)
-        solara.Text("Simulating Scenario...", classes=["mt-4", "text-xl", "font-bold"])
-
-
-@solara.component
 def Page():
     # Inject CSS
     solara.Style(Path(__file__).parent / "assets" / "style.css")
@@ -81,7 +82,7 @@ def Page():
     # Sync URL State
     UrlManager()
 
-    # Mount the controller (handles the play loop when is_playing becomes True)
+    # No-op stub — headless runs don't need a controller loop
     SimulationController()
 
     # --- Top App Bar: dark/light toggle in top-right ---
@@ -101,21 +102,29 @@ def Page():
         )
 
     with solara.Sidebar():
-        ConfigPanel()
+        with solara.lab.Tabs(background_color="transparent"):
+            with solara.lab.Tab("Simulate", icon_name="mdi-play-circle-outline"):
+                ConfigPanel()
+            with solara.lab.Tab("Batch", icon_name="mdi-chart-bell-curve-cumulative"):
+                BatchPanel()
 
     with solara.Column(style="height: 100vh; outline: none;"):
         solara.Title("Compute Permit Market Simulator")
 
         # --- Right Pane State Machine ---
-        has_data = (active_sim.state.value.step_count > 0) or (
-            session_history.selected_run.value is not None
-        )
-        is_playing = active_sim.state.value.is_playing
+        # All run types use the same RunState[T] pattern; this is the single
+        # source of truth for what the right pane displays.
+        basic = basic_run.value
+        mc = mc_run.value
+        sw = sweep_run.value
 
-        if is_playing:
-            LoadingState()
-        elif not has_data:
-            EmptyState()
-        else:
-            # Unified analysis view (no tabs)
+        if basic.is_running:
+            RunSpinner("Simulating\u2026")
+        elif mc.is_running or sw.is_running:
+            RunSpinner("Running batch analysis\u2026")
+        elif mc.is_ready or sw.is_ready:
+            BatchResultsPanel()
+        elif basic.is_ready or session_history.selected_run.value is not None:
             AnalysisPanel()
+        else:
+            EmptyState()

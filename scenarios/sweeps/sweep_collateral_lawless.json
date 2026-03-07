@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_1_minimal.json",
+    "param_path": "collateral_amount",
+    "param_label": "Collateral K (M$)",
+    "min_val": 0.0,
+    "max_val": 100.0,
+    "interval": 10.0,
+    "n_runs": 50
+}

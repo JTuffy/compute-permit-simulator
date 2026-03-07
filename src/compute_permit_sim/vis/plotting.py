@@ -395,3 +395,289 @@ def plot_audit_source_distribution(
     ax.yaxis.grid(True, alpha=0.25)
     fig.tight_layout()
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Batch / Monte Carlo plots
+# ---------------------------------------------------------------------------
+
+
+def plot_mc_trajectory(result) -> "Figure":
+    """Plot compliance trajectory: mean ± 1 SD band over simulation steps.
+
+    Args:
+        result: A ``MonteCarloResult`` with ``step_compliance`` populated.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    from compute_permit_sim.schemas.batch import MonteCarloResult
+
+    if not isinstance(result, MonteCarloResult):
+        raise TypeError(f"Expected MonteCarloResult, got {type(result)}")
+
+    fig, ax = create_figure(figsize=(7, 4))
+    steps = list(range(1, len(result.step_compliance) + 1))
+    means = [s.mean for s in result.step_compliance]
+    lows = [max(0.0, s.mean - s.std) for s in result.step_compliance]
+    highs = [min(1.0, s.mean + s.std) for s in result.step_compliance]
+
+    color = CHART_COLOR_MAP.get("compliant", "#42A5F5")
+    ax.plot(steps, means, color=color, linewidth=2, label="Mean compliance")
+    ax.fill_between(steps, lows, highs, alpha=0.18, color=color, label="± 1 SD")
+    ax.axhline(
+        1.0,
+        color="#66BB6A",
+        linewidth=1,
+        linestyle="--",
+        alpha=0.5,
+        label="100% threshold",
+    )
+
+    ax.set_xlim(1, max(steps))
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlabel("Simulation Step")
+    ax.set_ylabel("Compliance Rate")
+    ax.set_title(
+        f"Compliance Trajectory — {result.scenario_name} ({result.n_runs} seeds)",
+        fontsize=11,
+        fontweight="600",
+    )
+    ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
+def plot_mc_violator_trajectory(result) -> "Figure":
+    """Plot violator-count trajectory: mean ± 1 SD band over simulation steps.
+
+    Complements :func:`plot_mc_trajectory` to show the magnitude of non-compliance
+    rather than the rate.
+
+    Args:
+        result: A ``MonteCarloResult`` with ``step_n_violators`` populated.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    from compute_permit_sim.schemas.batch import MonteCarloResult
+
+    if not isinstance(result, MonteCarloResult):
+        raise TypeError(f"Expected MonteCarloResult, got {type(result)}")
+
+    fig, ax = create_figure(figsize=(7, 4))
+    steps = list(range(1, len(result.step_n_violators) + 1))
+    means = [s.mean for s in result.step_n_violators]
+    lows = [max(0.0, s.mean - s.std) for s in result.step_n_violators]
+    highs = [s.mean + s.std for s in result.step_n_violators]
+
+    color = CHART_COLOR_MAP.get("violator", "#EF5350")
+    ax.plot(steps, means, color=color, linewidth=2, label="Mean violators")
+    ax.fill_between(steps, lows, highs, alpha=0.18, color=color, label="± 1 SD")
+    ax.axhline(
+        0,
+        color="#66BB6A",
+        linewidth=1,
+        linestyle="--",
+        alpha=0.5,
+        label="Zero violators",
+    )
+
+    ax.set_xlim(1, max(steps))
+    ax.set_ylim(bottom=-0.5)
+    ax.set_xlabel("Simulation Step")
+    ax.set_ylabel("Number of Violators")
+    ax.set_title(
+        f"Violator Count Trajectory — {result.scenario_name} ({result.n_runs} seeds)",
+        fontsize=11,
+        fontweight="600",
+    )
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
+def plot_mc_audit_trajectory(result) -> "Figure":
+    """Plot audit rate as a horizontal band across simulation steps.
+
+    Shows the aggregate audit burden with ± 1 SD shading.
+    Useful for Section 4.2 audit burden analysis.
+
+    Args:
+        result: A ``MonteCarloResult``.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    from compute_permit_sim.schemas.batch import MonteCarloResult
+
+    if not isinstance(result, MonteCarloResult):
+        raise TypeError(f"Expected MonteCarloResult, got {type(result)}")
+
+    fig, ax = create_figure(figsize=(7, 4))
+    n_steps = len(result.step_compliance)
+    steps = list(range(1, n_steps + 1))
+    mean = result.audit_rate.mean
+    std = result.audit_rate.std
+
+    color = CHART_COLOR_MAP.get("audit", "#AB47BC")
+    ax.axhline(mean, color=color, linewidth=2, label=f"Mean audit rate ({mean:.1%})")
+    ax.fill_between(
+        steps,
+        [max(0.0, mean - std)] * n_steps,
+        [min(1.0, mean + std)] * n_steps,
+        alpha=0.18,
+        color=color,
+        label="± 1 SD",
+    )
+
+    ax.set_xlim(1, max(steps))
+    ax.set_ylim(-0.02, min(1.05, mean + 3 * std + 0.05))
+    ax.set_xlabel("Simulation Step")
+    ax.set_ylabel("Audit Rate")
+    ax.set_title(
+        f"Audit Rate — {result.scenario_name} ({result.n_runs} seeds)",
+        fontsize=11,
+        fontweight="600",
+    )
+    ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
+def plot_mc_payoff_comparison(result) -> "Figure":
+    """Bar chart comparing split payoffs: compliant vs. violating labs.
+
+    Shows mean payoff per lab‑step with 95 % CI error bars.
+    Directly feeds Section 4.2 economic analysis.
+
+    Args:
+        result: A ``MonteCarloResult`` with ``payoff_compliant``
+                and ``payoff_violator`` populated.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    import math
+
+    from compute_permit_sim.schemas.batch import MonteCarloResult
+
+    if not isinstance(result, MonteCarloResult):
+        raise TypeError(f"Expected MonteCarloResult, got {type(result)}")
+
+    fig, ax = create_figure(figsize=(5, 4))
+
+    labels = ["Compliant Labs", "Violating Labs"]
+    means = [result.payoff_compliant.mean, result.payoff_violator.mean]
+    cis = [
+        result.payoff_compliant.mean - result.payoff_compliant.ci_low,
+        result.payoff_violator.mean - result.payoff_violator.ci_low,
+    ]
+    # Replace NaN with 0 for display
+    means = [0.0 if math.isnan(m) else m for m in means]
+    cis = [0.0 if math.isnan(c) else c for c in cis]
+
+    colors = [
+        CHART_COLOR_MAP.get("compliant", "#42A5F5"),
+        CHART_COLOR_MAP.get("violator", "#EF5350"),
+    ]
+    bars = ax.bar(labels, means, color=colors, width=0.45, zorder=2)
+    ax.errorbar(
+        labels,
+        means,
+        yerr=cis,
+        fmt="none",
+        color="#333333",
+        capsize=6,
+        linewidth=1.5,
+        zorder=3,
+    )
+    for bar, m in zip(bars, means):
+        ypos = (
+            bar.get_height() + 0.05
+            if bar.get_height() >= 0
+            else bar.get_height() - 0.15
+        )
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            ypos,
+            f"${m:.2f}M",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="500",
+        )
+
+    ax.axhline(0, color="#999", linewidth=0.8)
+    ax.set_ylabel("Avg Net Payoff per Lab-Step (M$)")
+    ax.set_title(
+        f"Payoff: Compliant vs. Violating — {result.scenario_name}",
+        fontsize=11,
+        fontweight="600",
+    )
+    ax.yaxis.grid(True, alpha=0.25, zorder=0)
+    fig.tight_layout()
+    return fig
+
+
+def plot_sweep_curve(result, metric: str = "avg_compliance") -> "Figure":
+    """Plot a 1D parameter sweep curve: param value on X, metric on Y.
+
+    Renders the mean as a line with ± 1 SD shading. Annotates the tipping
+    point (first value where compliance ≥ 95 %) if present.
+
+    Args:
+        result: A ``SweepResult`` instance.
+        metric: Attribute name on ``MonteCarloResult`` to plot (default: avg_compliance).
+
+    Returns:
+        Matplotlib Figure.
+    """
+    from compute_permit_sim.schemas.batch import SweepResult
+
+    if not isinstance(result, SweepResult):
+        raise TypeError(f"Expected SweepResult, got {type(result)}")
+
+    fig, ax = create_figure(figsize=(7, 4))
+    xs = [pt.param_value for pt in result.points]
+    metric_stats = [getattr(pt.result, metric) for pt in result.points]
+    means = [s.mean for s in metric_stats]
+    stds = [s.std for s in metric_stats]
+    lows = [m - sd for m, sd in zip(means, stds)]
+    highs = [m + sd for m, sd in zip(means, stds)]
+
+    color = CHART_COLOR_MAP.get("compliant", "#42A5F5")
+    ax.plot(xs, means, color=color, linewidth=2, marker="o", markersize=5, label="Mean")
+    ax.fill_between(xs, lows, highs, alpha=0.18, color=color, label="± 1 SD")
+
+    tp = result.tipping_point(threshold=0.95)
+    if tp is not None:
+        ax.axvline(tp, color="#FFA726", linewidth=1.5, linestyle="--")
+        ax.annotate(
+            f"Tipping ≈ {tp:.3f}",
+            xy=(tp, 0.95),
+            xytext=(tp, 0.70),
+            fontsize=8,
+            color="#FFA726",
+            arrowprops={"arrowstyle": "->", "color": "#FFA726"},
+        )
+
+    is_compliance = "compliance" in metric
+    if is_compliance:
+        ax.set_ylim(-0.05, 1.05)
+        ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
+        ax.set_ylabel("Compliance Rate")
+    else:
+        ax.set_ylabel(metric.replace("_", " ").title())
+
+    ax.set_xlabel(result.param_label)
+    ax.set_title(
+        f"Sensitivity: {result.param_label} — {result.scenario_name}",
+        fontsize=11,
+        fontweight="600",
+    )
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    return fig

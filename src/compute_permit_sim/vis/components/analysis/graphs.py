@@ -45,7 +45,6 @@ def ResultsContent(
     price_series: list | pd.Series,
     steps: list | None = None,
     live_agents_df: pd.DataFrame | None = None,
-    is_playing: bool = False,
     is_live: bool = False,
 ) -> None:
     """Unified results card: toggle, slider, and charts in one section.
@@ -74,16 +73,6 @@ def ResultsContent(
         agents_df = pd.DataFrame([a.model_dump() for a in step.agents])
 
     with solara.Card("Results"):
-        # --- Live progress banner ---
-        if is_playing:
-            with solara.Row(
-                style="align-items: center; gap: 12px; margin-bottom: 8px;"
-            ):
-                solara.v.ProgressCircular(
-                    indeterminate=True, color="primary", size=20, width=3
-                )
-                solara.Text("Simulating…", style="color: #888; font-style: italic;")
-
         # --- Toggle + Slider (historical with steps only) ---
         if can_step:
             with solara.Row(

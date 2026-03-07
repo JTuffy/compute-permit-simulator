@@ -18,10 +18,17 @@ class SessionHistory:
         self.selected_run: solara.Reactive[SimulationRun | None] = solara.reactive(None)
 
         # --- Available Scenarios ---
-        # --- Available Scenarios ---
-        from compute_permit_sim.services.config_manager import list_scenarios
+        # scenario_name_map: {display_name -> relative_filename}
+        from compute_permit_sim.services.config_manager import (
+            list_scenario_names,
+            list_scenarios,
+        )
 
         self.available_scenarios = solara.reactive(list_scenarios())
+        pairs = list_scenario_names()
+        self.scenario_name_map: solara.Reactive[dict[str, str]] = solara.reactive(
+            {name: filename for name, filename in pairs}
+        )
 
     def add_run(self, run: SimulationRun) -> None:
         """Add a completed run to history."""
@@ -36,11 +43,15 @@ class SessionHistory:
         self.selected_run.value = None
 
     def refresh_scenarios(self) -> None:
-        """Refresh the list of available scenario files."""
-        """Refresh the list of available scenario files."""
-        from compute_permit_sim.services.config_manager import list_scenarios
+        """Refresh the list of available scenario files and name map."""
+        from compute_permit_sim.services.config_manager import (
+            list_scenario_names,
+            list_scenarios,
+        )
 
         self.available_scenarios.value = list_scenarios()
+        pairs = list_scenario_names()
+        self.scenario_name_map.value = {name: filename for name, filename in pairs}
 
 
 # Singleton instance

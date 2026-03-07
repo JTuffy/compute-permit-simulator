@@ -1,292 +1,124 @@
-"""Simulation engine - handles simulation execution logic.
+"""Simulation engine — headless background runner for basic single-scenario runs.
 
-This module contains the stateless simulation engine that operates
-on the modular state components. It handles model creation, stepping,
-and the async play loop.
+Uses ``basic_run`` (a ``RunState[SimulationRun]`` reactive) as its single
+output signal.  Page-level state machine in ``vis/page.py`` reads this reactive
+to drive the right-pane display.
+
+Phases:
+    idle    → no run yet
+    running → background thread active; right pane shows spinner
+    ready   → ``basic_run.value.result`` contains the complete SimulationRun
 """
 
-import asyncio
 import logging
 import random
-import time
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pandas as pd
-
-from compute_permit_sim.schemas import (
-    MarketSnapshot,
-    RunMetrics,
-    SimulationRun,
-    StepResult,
-)
+from compute_permit_sim.schemas import SimulationRun
+from compute_permit_sim.services.config_manager import load_scenario
+from compute_permit_sim.services.simulation_runner import run_single
+from compute_permit_sim.vis.state.run_state import RunState, basic_run
 
 if TYPE_CHECKING:
-    from compute_permit_sim.vis.state.active import ActiveSimulation
     from compute_permit_sim.vis.state.config import UIConfig
     from compute_permit_sim.vis.state.history import SessionHistory
-
-from compute_permit_sim.services.config_manager import load_scenario
-from compute_permit_sim.services.mesa_model import ComputePermitModel
-from compute_permit_sim.services.metrics import (
-    calculate_compliance,
-)
 
 logger = logging.getLogger(__name__)
 
 
 class SimulationEngine:
-    """Stateful simulation engine with dependency injection.
+    """Headless simulation engine.
 
-    This class provides methods to control simulation execution.
-    It operates on injected state objects, allowing for better testability.
+    Runs single-scenario simulations in a background daemon thread.
+    State is communicated exclusively via the ``basic_run`` reactive:
+    - ``phase="running"`` while the thread is active
+    - ``phase="ready"`` with ``result`` populated when complete
     """
 
     def __init__(
         self,
         config: "UIConfig",
-        active: "ActiveSimulation",
         history: "SessionHistory",
     ) -> None:
-        """Initialize the engine with state dependencies.
-
-        Args:
-            config: UI configuration state.
-            active: Active simulation state.
-            history: Session history state.
-        """
         self.config = config
-        self.active = active
         self.history = history
 
-    def start_run(self) -> None:
-        """Start a fresh simulation run from the current UI configuration."""
-        import threading
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
-        # --- Resolve seed ---
+    def start_run(self) -> None:
+        """Launch a headless run from the current UI config.
+
+        Sets ``basic_run`` to ``running`` (one re-render → spinner),
+        then starts a daemon thread.  On completion, ``basic_run`` is set
+        to ``ready`` with the full result (one re-render → results).
+        """
+        if basic_run.value.is_running:
+            logger.warning("start_run called while already running — ignoring")
+            return
+
         ui_seed = self.config.seed.value
         run_seed = ui_seed if ui_seed is not None else random.randint(0, 2**31 - 1)
-
-        # Build config from CURRENT UI values
         scenario_config = self.config.to_scenario_config()
-        # Inject the resolved seed (model_copy because ScenarioConfig is frozen)
         scenario_config = scenario_config.model_copy(update={"seed": run_seed})
 
         logger.info(
-            f"Starting new run with seed={run_seed} (user-provided={ui_seed is not None})"
+            "Starting headless run: seed=%d (user-set=%s)",
+            run_seed,
+            ui_seed is not None,
         )
 
-        model = ComputePermitModel(scenario_config)
+        # One update → spinner appears
+        basic_run.set(RunState[SimulationRun](phase="running"))
 
-        # Capture actual seed written by Mesa (for reproducibility record)
-        actual_seed = getattr(model, "_seed", run_seed)
-        logger.info(f"Model initialized with seed: {actual_seed}")
+        def _run() -> None:
+            try:
+                run: SimulationRun = run_single(scenario_config)
+                logger.info(
+                    "Headless run done: compliance=%.1f%%, steps=%d",
+                    run.metrics.final_compliance * 100,
+                    len(run.steps),
+                )
+                # Bookkeeping before result lands — panel sees complete state
+                self.history.add_run(run)
+                self.history.select_run(run)
+                # One update → spinner clears into full results
+                basic_run.set(RunState[SimulationRun](phase="ready", result=run))
+            except Exception as e:
+                logger.error("Error in headless run: %s", e, exc_info=True)
+                basic_run.set(RunState[SimulationRun](phase="idle"))
 
-        # Phase 1 (sync): clear history selection, then reset state WITHOUT
-        # is_playing=True so this render cycle completes cleanly before
-        # use_task picks up the is_playing change.
-        self.history.selected_run.value = None
-        self.active.update(
-            model=model,
-            actual_seed=actual_seed,
-            step_count=0,
-            compliance_history=[],
-            price_history=[],
-            agents_df=None,
-            is_playing=False,
-            current_run_steps=[],
-        )
+        threading.Thread(target=_run, daemon=True).start()
 
-        # Phase 2 (deferred): set is_playing=True in a background thread so
-        # it fires AFTER the synchronous render from Phase 1 has settled.
-        # This prevents back-to-back state mutations from cascading renders
-        # and hitting Solara's per-cycle render limit.
-        def _start_playing() -> None:
-            import time
-
-            time.sleep(0.05)
-            self.active.update(is_playing=True)
-
-        threading.Thread(target=_start_playing, daemon=True).start()
-
-    def step(self) -> None:
-        """Advance the simulation one step."""
-        model = self.active.state.value.model
-        if not model:
-            logger.warning("Attempted to step without a model")
-            return
-
-        # Advance step count
-        step_num = self.active.state.value.step_count + 1
-        logger.debug(f"Starting step {step_num}")
-
-        model.step()
-
-        # Get agent data
-        agents = model.get_agent_snapshots()  # Returns list[AgentSnapshot]
-        agents_df = pd.DataFrame([a.model_dump() for a in agents])
-
-        state = self.active.state.value
-        compliance = calculate_compliance(agents)
-        new_compliance = state.compliance_history + [compliance]
-        new_price = state.price_history + [model.market.current_price]
-
-        logger.info(
-            f"Step {step_num} complete. Price: {model.market.current_price:.2f}, Compliance: {compliance:.2%}"
-        )
-
-        # Store step result
-        step_res = StepResult(
-            step=step_num,
-            market=MarketSnapshot(
-                price=model.market.current_price,
-                supply=model.market.max_supply,
-            ),
-            agents=agents,
-            audit=[],
-        )
-        new_run_steps = state.current_run_steps + [step_res]
-
-        # Update unified state
-        self.active.update(
-            step_count=step_num,
-            agents_df=agents_df,
-            compliance_history=new_compliance,
-            price_history=new_price,
-            current_run_steps=new_run_steps,
-        )
-
-    async def play_loop(self) -> None:
-        """Async loop that runs all steps until the step limit is reached.
-
-        Triggered by SimulationController when is_playing transitions to True.
-        Uses defensive pattern for Python 3.13 compatibility.
-        """
-        if not self.active.state.value.is_playing:
-            return
-
-        logger.info("Play loop started")
-        try:
-            while self.active.state.value.is_playing:
-                model = self.active.state.value.model
-                if not model:
-                    break
-
-                # Check step limit
-                if self.active.state.value.step_count >= model.config.steps:
-                    logger.info("Step limit reached — packing run")
-                    self.pack_current_run()
-                    self.active.update(is_playing=False)
-                    break
-
-                self.step()
-                await asyncio.sleep(0.05)
-
-        except asyncio.CancelledError:
-            logger.debug("Play loop task cancelled gracefully.")
-            raise
-        except Exception as e:
-            logger.error(f"Error in play loop: {e}", exc_info=True)
-            self.active.update(is_playing=False)
-
-    def pack_current_run(self) -> None:
-        """Finalize the current run and add to history."""
-        model = self.active.state.value.model
-        if not model:
-            return
-
-        import base64
-        import hashlib
-        import json
-
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        logger.info(f"Packing run {timestamp}")
-
-        # Calculate final metrics
-        agents = model.get_agent_snapshots()
-        final_compliance = calculate_compliance(agents)
-
-        # Build final config with the ACTUAL seed used (not the UI field)
-        final_config = self.config.to_scenario_config()
-        final_config = final_config.model_copy(
-            update={"seed": self.active.state.value.actual_seed}
-        )
-
-        # Regulator metrics
-
-        # Build compact config for hashing and shareable URL
-        # We use exclude_defaults=True to keep the URL short and avoid maintaining a separate UrlConfig DTO.
-        run_state = final_config.model_dump(exclude_defaults=True, exclude_none=True)
-
-        # sim_id: short SHA-256 hash for display label
-        json_bytes = json.dumps(run_state, sort_keys=True).encode("utf-8")
-        short_hash = hashlib.sha256(json_bytes).hexdigest()[:8]
-
-        # url_id: base64-encoded JSON for shareable ?id=... URL
-        url_id = base64.b64encode(json.dumps(run_state).encode("utf-8")).decode("utf-8")
-
-        run = SimulationRun(
-            id=f"run_{timestamp}",
-            sim_id=short_hash,
-            url_id=url_id,
-            config=final_config,
-            steps=self.active.state.value.current_run_steps.copy(),
-            metrics=RunMetrics(
-                final_compliance=final_compliance,
-                final_price=model.market.current_price,
-                deterrence_success_rate=final_compliance,
-            ),
-        )
-
-        self.history.add_run(run)
-
-        # Auto-select to show results immediately (reveals slider)
-        self.history.select_run(run)
+    # ------------------------------------------------------------------
+    # Scenario / persistence helpers
+    # ------------------------------------------------------------------
 
     def load_scenario(self, filename: str) -> None:
-        """Load a scenario from a JSON file into the UI config.
-
-        This updates UI reactive state only.  The user must click Play
-        to actually start a run with the loaded parameters.
-        """
-        logger.info(f"Loading scenario: {filename}")
+        """Load a scenario file into UI config."""
+        logger.info("Loading scenario: %s", filename)
         try:
             config = load_scenario(filename)
             self.config.from_scenario_config(config)
             self.config.selected_scenario.value = config.name or filename
         except Exception as e:
-            logger.error(f"Error loading scenario {filename}: {e}")
-            print(f"Error loading scenario {filename}: {e}")
+            logger.error("Error loading scenario %s: %s", filename, e)
 
-    def save_run(self, name_prefix="run") -> str | None:
-        """Persist the structured simulation run to a JSON file."""
-        model = self.active.state.value.model
-        if not model:
-            return None
-
+    def save_run(self, name_prefix: str = "run") -> str | None:
+        """Persist the selected run to a JSON file."""
         run_to_save = self.history.selected_run.value
         if not run_to_save:
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-
-            # Ensure config has seed
-            final_config = self.config.to_scenario_config()
-            final_config = final_config.model_copy(
-                update={"seed": self.active.state.value.actual_seed}
-            )
-
-            run_to_save = SimulationRun(
-                id=f"{timestamp}_current",
-                config=final_config,
-                steps=self.active.state.value.current_run_steps,
-                metrics={},
-            )
+            logger.warning("save_run called with no selected run")
+            return None
 
         run_dir = Path("runs") / run_to_save.id
         run_dir.mkdir(parents=True, exist_ok=True)
-
         filepath = run_dir / "full_run.json"
         with open(filepath, "w") as f:
             f.write(run_to_save.model_dump_json(indent=2))
 
-        logger.info(f"Saved run to {filepath}")
+        logger.info("Saved run to %s", filepath)
         return str(run_dir)

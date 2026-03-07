@@ -19,7 +19,7 @@ from compute_permit_sim.vis.state.config import UIConfig
 
 # Fields that are intentionally excluded from UIConfig sync
 # (e.g. metadata-only fields that aren't user-facing)
-_UICONFIG_SKIP = {"name", "description", "audit", "market", "lab"}
+_UICONFIG_SKIP = {"name", "description", "notes", "audit", "market", "lab"}
 
 
 def _flatten_fields(model_class, prefix=""):
