@@ -3,22 +3,22 @@
 from .auto_config import AutoConfigView
 from .cards import MetricCard, ScenarioCard
 from .charts import (
+    AuditSourcePlot,
     AuditTargetingPlot,
-    CapacityUtilizationPlot,
-    LabDecisionPlot,
-    PayoffByStrategyPlot,
-    QuantitativeScatterPlot,
+    ComplianceDistributionPlot,
+    ExpandableChart,
+    RiskScatterPlot,
 )
 from .controls import RangeController, RangeView
 
 __all__ = [
     "MetricCard",
     "ScenarioCard",
+    "AuditSourcePlot",
     "AuditTargetingPlot",
-    "CapacityUtilizationPlot",
-    "LabDecisionPlot",
-    "PayoffByStrategyPlot",
-    "QuantitativeScatterPlot",
+    "ComplianceDistributionPlot",
+    "ExpandableChart",
+    "RiskScatterPlot",
     "AutoConfigView",
     "RangeController",
     "RangeView",

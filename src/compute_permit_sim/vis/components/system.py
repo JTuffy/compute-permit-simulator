@@ -1,31 +1,17 @@
 import solara
 import solara.lab
 
-from compute_permit_sim.vis.state import engine
-from compute_permit_sim.vis.state.active import active_sim
 from compute_permit_sim.vis.state.config import ui_config
 
 
 @solara.component
 def SimulationController():
-    """Invisible component to handle the play loop."""
+    """Invisible component — previously drove the async play loop.
 
-    # Using raise_error=False to gracefully handle Python 3.13 asyncio race conditions
-    async def run_loop():
-        try:
-            await engine.play_loop()
-        except RuntimeError:
-            # "RuntimeError: Set changed size during iteration" can happen in solara hooks
-            # "InvalidStateError" can happen in asyncio event loop
-            pass
-        except Exception:
-            pass
-
-    solara.lab.use_task(
-        run_loop,
-        dependencies=[active_sim.state.value.is_playing],
-        raise_error=False,
-    )
+    The play loop has been replaced by a headless background thread launched
+    directly from SimulationEngine.start_run().  This component is kept as
+    a no-op stub so app.py import sites remain stable.
+    """
     return solara.Div(style="display: none;")
 
 

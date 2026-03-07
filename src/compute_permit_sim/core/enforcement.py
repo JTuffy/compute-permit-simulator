@@ -32,6 +32,7 @@ Stage 2 — AUDIT OUTCOME: Given an audit, is the violation found?
 import random
 
 from compute_permit_sim.schemas import AuditConfig
+from compute_permit_sim.schemas.enums import AuditSource
 
 
 class Auditor:
@@ -138,8 +139,8 @@ class Auditor:
         is_compliant: bool,
         p_w: float = 0.0,
         p_m: float = 0.0,
-    ) -> tuple[bool, bool]:
-        """Run the full audit outcome and return (caught, caught_via_backcheck).
+    ) -> tuple[bool, AuditSource | None]:
+        """Run the full audit outcome and return (caught, caught_source).
 
         All detection channels (direct audit, backcheck, whistleblower,
         monitoring) are resolved together as part of one audit event.
@@ -157,17 +158,19 @@ class Auditor:
             p_m: Monitoring detection probability.
 
         Returns:
-            Tuple (caught, caught_via_backcheck):
+            Tuple (caught, caught_source):
                 caught             — True if any channel found a violation
-                caught_via_backcheck — True if the backcheck specifically fired
+                caught_source      — The AuditSource that triggered, or None
         """
         if is_compliant:
             # False positive: same sequential structure as non-compliant.
             # p_w/p_m don't apply (no real violation to find via those channels).
             if self._random() < self.config.false_positive_rate:
-                return True, False  # false positive on direct pass
+                return True, AuditSource.DIRECT  # false positive on direct pass
             caught_backcheck = self._random() < self.config.backcheck_prob
-            return caught_backcheck, caught_backcheck
+            if caught_backcheck:
+                return True, AuditSource.BACKCHECK
+            return False, None
 
         # Steps 3-4: whistleblower and monitoring fire within the audit event,
         # catching violations the direct pass and backcheck missed.
@@ -175,15 +178,22 @@ class Auditor:
         caught_mon = self._random() < p_m
 
         # Step 1: direct audit pass
-        caught_direct = self._random() < (1.0 - self.config.false_negative_rate)
+        if self._random() < (1.0 - self.config.false_negative_rate):
+            return True, AuditSource.DIRECT
 
         # Step 2: backcheck (only runs if the direct pass missed)
-        caught_backcheck = False
-        if not caught_direct:
-            caught_backcheck = self._random() < self.config.backcheck_prob
+        if self._random() < self.config.backcheck_prob:
+            return True, AuditSource.BACKCHECK
 
-        caught = caught_direct or caught_backcheck or caught_wb or caught_mon
-        return caught, caught_backcheck
+        # Step 3: Whistleblower
+        if caught_wb:
+            return True, AuditSource.WHISTLEBLOWER
+
+        # Step 4: Monitoring
+        if caught_mon:
+            return True, AuditSource.MONITORING
+
+        return False, None
 
     def audit_finds_violation(self, is_compliant: bool) -> bool:
         """Convenience wrapper — returns only the boolean from audit_detection_channel."""

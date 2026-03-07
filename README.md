@@ -9,69 +9,82 @@ This project models the strategic interaction between **AI Labs** (seeking to ma
 
 ## 🚀 Quick Start
 
-The simulator provides an interactive web dashboard for real-time experimentation.
-
-### Prerequisites
-
-- Python 3.13+
-- [uv](https://astral.sh/uv) (recommended for dependency management)
-
-### Installation
-
 ```bash
 # 1. Install uv (if needed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Clone and Sync
+# 2. Clone and sync dependencies
 git clone https://gitlab.com/your-org/aisc-cm-simulator.git
 cd aisc-cm-simulator
 uv sync
+
+# 3. Launch the interactive dashboard
+make app
 ```
 
 ## 🎮 Usage
 
 ### Interactive Dashboard
-Launch the visualization dashboard to explore the model interactively.
 
 ```bash
-uv run solara run app.py
+make app            # Solara web UI (primary interface)
 ```
 
-**Key Features:**
-- **Scenario Control**: Adjust penalty ($P$), detection prob ($p$), and audit capacity ($N$) on the fly.
-- **Real-time Analysis**: Watch compliance rates and market prices evolve.
-- **Agent Inspector**: Drill down into individual lab behaviors and audit history.
+The UI provides three modes:
+- **Simulate** tab — configure and run a single scenario, view results with step-by-step explorer
+- **Batch** tab — Monte Carlo across many seeds, or parameter sweep across a range
+- **Run History** — accessible from either tab; click any historical run to load its results
 
 ### CLI Simulation
-Run headless simulations for bulk data collection.
 
 ```bash
-uv run main.py
+make run            # CLI: run all scenarios once
+make mc             # CLI: Monte Carlo, 50 seeds
+make sweep          # CLI: parameter sweep from JSON file
+make paper-results  # mc + sweep + print LaTeX
 ```
 
----
+### Key Parameters
+
+| Parameter | Symbol | Effect |
+|---|---|---|
+| `audit.base_prob` | π₀ | Baseline audit probability — higher → more deterrence |
+| `collateral_amount` | — | Upfront collateral at stake — higher → more deterrence |
+| `audit.penalty_amount` | — | Fine for caught violators — higher → more deterrence |
+| `lab.risk_profile` | — | Lab risk tolerance — higher → less deterrence |
+| `market.permit_cap` | — | Permit supply ceiling |
 
 ## 🛠️ Development
 
-We use `uv` for all development tasks to ensure reproducibility.
+```bash
+uv run pytest -q          # run tests
+uv run ruff check . --fix # lint (auto-fix)
+uv run ruff format .      # format
+uv run mypy .             # type check
+```
 
-| Task | Command |
-|------|---------|
-| **Run Tests** | `uv run pytest` |
-| **Lint** | `uv run ruff check .` |
-| **Type Check** | `uv run mypy .` |
-| **Format** | `uv run ruff format .` |
+### Project Structure
 
+```
+src/compute_permit_sim/
+├── schemas/         # Data models (SimulationRun, ScenarioConfig, …)
+├── services/        # Simulation logic, Monte Carlo, sweep, exports
+└── vis/             # Solara UI
+    ├── panels/      # Sidebar + results panels
+    ├── components/  # Shared UI primitives (results.py, history.py, …)
+    └── state/       # Reactive singletons (run_state.py, history.py, …)
+scenarios/
+├── basic/           # Scenario JSON files (match ScenarioConfig)
+└── sweeps/          # Sweep config JSON files
+```
 
 ### CI/CD Pipeline
-This project includes a GitLab CI/CD pipeline that:
-1.  **Tests**: Runs `pytest` on every commit.
-2.  **Deploys**: Builds the Solara app (WASM) to GitLab Pages on merge to `main`.
+
+GitLab CI runs `pytest`, `ruff`, and `mypy` on every commit and deploys the Solara app to GitLab Pages on merge to `main`.
 
 ---
 
 ## 📚 Documentation
 
-For deep technical details on the architecture, decision logic, and mesa model structure, see:
-👉 [**Technical Documentation**](TECHNICAL_DOCUMENTATION.md)
-
+Scenario configuration reference: see `scenarios/basic/` for example JSON files
+and `src/compute_permit_sim/schemas/config.py` for annotated field definitions.

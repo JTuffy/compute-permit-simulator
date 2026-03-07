@@ -21,12 +21,11 @@ class PlotConfig:
 def validate_dataframe(
     df: pd.DataFrame | None,
     required_cols: list[str],
-    error_msg: str = "Missing required columns for plot.",
 ) -> bool:
     """Validate that a DataFrame exists and has all required columns.
 
     Returns:
-        True if valid, False otherwise. Caller is responsible for error handling.
+        True if valid, False otherwise. Caller is responsible for error display.
     """
     if df is None or df.empty:
         return False

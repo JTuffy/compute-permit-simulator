@@ -16,3 +16,10 @@ CHART_COLOR_MAP = {
     "red": COLOR_LAB_ERROR,
     "orange": COLOR_LAB_WARNING,
 }
+
+# Outcome color tokens — used consistently across all charts
+OUTCOME_COLORS: dict[str, str] = {
+    "Compliant": COLOR_LAB_SUCCESS,  # green
+    "Caught": "#212121",  # near-black
+    "Uncaught": COLOR_LAB_ERROR,  # red
+}

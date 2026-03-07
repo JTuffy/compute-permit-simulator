@@ -283,6 +283,14 @@ class ScenarioConfig(BaseModel):
 
     name: str = "Scenario"
     description: str = ""
+    notes: str = Field(
+        default="",
+        description=(
+            "Free-form researcher notes: rationale, citations, model choices, "
+            "outstanding questions. Stored in the JSON file but excluded from "
+            "the parameter sidebar."
+        ),
+    )
     n_agents: int = Field(
         DEFAULT_SCENARIO_N_AGENTS,
         gt=0,

@@ -1,32 +1,196 @@
-/* Hide Solara watermark */
+/* =============================================================================
+   Compute Permit Market Simulator — Global Stylesheet
+   Stack: Solara 1.57 / Vuetify 2 / Python 3.13
+   Font:  Inter (UI), JetBrains Mono (numbers/code)
+   =============================================================================
+
+   TABLE OF CONTENTS
+   1. Fonts & Design Tokens
+   2. Base / Reset
+   3. App Bar
+   4. Input Fields  ← GLOBAL rules (no container dependency)
+   5. Section Headers (v-subheader)
+   6. Sidebar (config panel)
+   7. Config Dialog
+   8. Analysis Panel (results pane)
+   9. Run History
+   10. Utilities
+   ============================================================================= */
+
+
+/* ── 1. Fonts & Design Tokens ─────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+    /* Typography */
+    --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+
+    /* Spacing */
+    --sp-xs: 4px;
+    --sp-sm: 8px;
+    --sp-md: 16px;
+    --sp-lg: 24px;
+
+    /* Input field styling */
+    --input-border-idle: rgba(128, 128, 128, 0.22);
+    --input-border-focus: var(--v-primary-base, #42A5F5);
+    --input-label-size: 0.74rem;
+    --input-value-size: 0.82rem;
+}
+
+
+/* ── 2. Base / Reset ──────────────────────────────────────────────────────── */
+
+/* Apply Inter to every element except MDI icons */
+.v-application,
+.v-application *:not(.mdi):not([class^="mdi-"]) {
+    font-family: var(--font-ui) !important;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Remove Solara watermark */
 footer {
     display: none !important;
 }
 
-/* Color Palette - Research Lab Theme */
-:root {
-    --lab-primary: #2196F3;
-    --lab-success: #4CAF50;
-    --lab-warning: #FF9800;
-    --lab-error: #F44336;
-    --lab-input-bg: #F5F7FA;
-    --lab-output-bg: #FFFFFF;
-    --lab-metric-bg: #E3F2FD;
-    --lab-spacing-tight: 4px;
-    --lab-spacing-normal: 8px;
-    --lab-spacing-loose: 16px;
+/* Buttons: sentence case, consistent tracking */
+.v-btn {
+    text-transform: none !important;
+    letter-spacing: 0.02em !important;
 }
 
-/* Left Panel: Compact Control Panel Style */
+
+/* ── 3. App Bar ───────────────────────────────────────────────────────────── */
+
+/* Dark frosted-glass bar — replaces harsh solid blue */
+.v-app-bar.v-toolbar {
+    background: rgba(18, 24, 38, 0.94) !important;
+    backdrop-filter: blur(14px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 1px 16px rgba(0, 0, 0, 0.40) !important;
+}
+
+/* Title text inside the bar */
+.v-app-bar .v-toolbar__title {
+    font-weight: 700 !important;
+    font-size: 0.88rem !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    color: rgba(255, 255, 255, 0.90) !important;
+}
+
+
+/* ── 4. Input Fields (GLOBAL) ─────────────────────────────────────────────── */
+/*
+ * These rules apply to ALL v-text-field inputs app-wide — sidebar, dialogs,
+ * results pane, and any future context. Scope is intentionally wide.
+ *
+ * DESIGN INTENT
+ * ─────────────
+ * Vuetify 2's default text-field uses two animated pseudo-elements (::before /
+ * ::after) on .v-input__slot to draw the underline. We replace them with a
+ * single, controlled border-bottom so we own the exact visual position.
+ *
+ * LABEL-THROUGH-VALUE BUG (root cause + fix)
+ * ───────────────────────────────────────────
+ * Vuetify 2 floats the label above the input via
+ *   .v-label--active { transform: translateY(-18px) scale(0.75) }
+ * It applies v-label--active only when its internal `isDirty` flag is true
+ * (i.e. the field has been interacted with or has an initial non-null value).
+ * For disabled/readonly fields the flag is never set, so the label stays at
+ * its resting y-position — vertically centered over the value text, making
+ * the underline appear to cut through the label.
+ *
+ * Fix: explicitly float the label for ANY .v-input that is disabled, OR that
+ * contains a populated input (detected via :not(:placeholder-shown)).
+ * We also use the .v-label--active class as a fallback for interactive fields.
+ *
+ * We do NOT use !important on transform so that Vuetify's own active-label
+ * transitions still operate for editable fields during focus animations.
+ */
+
+/* 4a. Hide Vuetify's animated underline pseudo-elements globally */
+.v-text-field .v-input__slot::before,
+.v-text-field .v-input__slot::after {
+    display: none !important;
+}
+
+/* 4b. Replace with a single clean border */
+.v-text-field .v-input__slot {
+    border-bottom: 1px solid var(--input-border-idle) !important;
+    transition: border-color 0.15s ease !important;
+}
+
+/* 4c. Highlight on focus */
+.v-text-field.v-input--is-focused .v-input__slot {
+    border-bottom-color: var(--input-border-focus) !important;
+}
+
+/* 4d. Label float — force active position for disabled inputs and
+ *     for any input whose native <input> has content (placeholder trick).
+ *     The .v-label--active selector covers normally-focused editable fields. */
+.v-input--is-disabled .v-label,
+.v-label--active {
+    transform: translateY(-18px) scale(0.75) !important;
+}
+
+/* 4e. Monospaced values inside all text inputs */
+.v-text-field input {
+    font-family: var(--font-mono) !important;
+    font-size: var(--input-value-size) !important;
+    padding-top: 4px !important;
+}
+
+/* 4f. Labels — shared across all inputs app-wide */
+.v-text-field .v-label {
+    font-size: var(--input-label-size) !important;
+    font-weight: 500 !important;
+    opacity: 0.65 !important;
+}
+
+/* 4g. Collapse Vuetify's default bottom margin on all inputs */
+.v-input {
+    margin-bottom: 0 !important;
+}
+
+
+/* ── 5. Section Headers (v-subheader) ────────────────────────────────────── */
+/*
+ * Applied globally — v-subheader is only ever used in config contexts
+ * (AutoConfigView groups, RangeView labels). No context scoping needed.
+ */
+
+.v-subheader {
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.12em !important;
+    color: var(--v-primary-base, #42A5F5) !important;
+    opacity: 1 !important;
+    height: 26px !important;
+    padding: 0 !important;
+    margin-top: 14px !important;
+}
+
+
+/* ── 6. Sidebar (config panel) ────────────────────────────────────────────── */
+
+/* Tab bar */
+.sidebar-compact .v-tab {
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    min-width: 56px !important;
+    padding: 0 8px !important;
+    text-transform: none !important;
+    letter-spacing: 0.01em !important;
+}
+
+/* Compact cards */
 .sidebar-compact .v-card {
-    margin-bottom: 8px !important;
-    background: var(--lab-input-bg) !important;
-    border-radius: 4px !important;
-}
-
-.sidebar-compact .v-input {
-    margin-bottom: 2px !important;
-    font-size: 0.85rem !important;
+    margin-bottom: 6px !important;
+    border-radius: 6px !important;
 }
 
 .sidebar-compact .v-card__text {
@@ -34,116 +198,196 @@ footer {
 }
 
 .sidebar-compact .v-card__title {
-    font-size: 0.75rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    opacity: 0.7 !important;
-    padding: 6px 10px !important;
-    font-weight: 600 !important;
-}
-
-.sidebar-compact .v-label {
-    font-size: 0.85rem !important;
-}
-
-/* Compact tab styling */
-.sidebar-compact .v-tab {
-    font-size: 0.8rem !important;
-    min-width: 60px !important;
-    padding: 0 8px !important;
-}
-
-/* Right Panel: Spacious Analytical Readout */
-.analysis-panel {
-    padding: 24px !important;
-}
-
-.analysis-panel .v-card {
-    margin-bottom: 20px !important;
-}
-
-.analysis-panel .v-card__title {
-    font-size: 1.1rem !important;
-    padding: 12px 16px !important;
-    font-weight: 600 !important;
-}
-
-.analysis-panel .v-card__text {
-    padding: 16px !important;
-}
-
-/* Metric Cards */
-.metric-card {
-    padding: 8px 12px !important;
-    background: var(--lab-metric-bg) !important;
-    border-left: 3px solid var(--lab-primary) !important;
-    border-radius: 4px !important;
-    margin-bottom: 8px !important;
-}
-
-.metric-card.success {
-    border-left-color: var(--lab-success) !important;
-    background: #E8F5E9 !important;
-}
-
-.metric-card.warning {
-    border-left-color: var(--lab-warning) !important;
-    background: #FFF3E0 !important;
-}
-
-.metric-value {
-    font-size: 1.4rem !important;
-    font-family: 'Roboto Mono', monospace !important;
+    font-size: 0.70rem !important;
     font-weight: 700 !important;
-    line-height: 1.2 !important;
-    margin-bottom: 2px !important;
-}
-
-.metric-label {
-    font-size: 0.65rem !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    opacity: 0.6 !important;
+    letter-spacing: 0.08em !important;
+    opacity: 0.60 !important;
+    padding: 6px 10px !important;
+}
+
+/* Markdown text in sidebar */
+.sidebar-compact .solara-markdown p {
+    margin: 0 !important;
+    font-size: 0.82rem !important;
+}
+
+/* Select value text inside sidebar */
+.sidebar-compact .v-select__selection--comma,
+.sidebar-compact .v-select__selections input {
+    font-size: 0.82rem !important;
+}
+
+
+/* ── 7. Config Dialog ─────────────────────────────────────────────────────── */
+
+.config-view .v-tab {
+    font-size: 0.78rem !important;
     font-weight: 600 !important;
-}
-
-/* Compact Run History */
-.run-history-compact {
-    max-height: 250px !important;
-    overflow-y: auto !important;
-    padding: 4px !important;
-}
-
-.run-history-compact .v-btn {
-    font-size: 0.75rem !important;
-    padding: 2px 6px !important;
-}
-
-/* General density improvements */
-.v-application .v-input--dense .v-input__control {
-    min-height: 32px !important;
-}
-
-.solara-markdown p {
-    margin-bottom: 4px !important;
-}
-
-/* Button hierarchy */
-.v-btn.v-btn--text {
     text-transform: none !important;
+    letter-spacing: 0.01em !important;
 }
 
-/* Numeric display */
-.numeric-display {
-    font-family: 'Roboto Mono', monospace !important;
-    font-weight: 500 !important;
-}
-
-/* Dialog fixes - prevent unwanted scrollbars */
+/* Dialog overflow fix (for dropdowns / selects inside dialogs) */
 .v-dialog .v-card {
     overflow: visible !important;
 }
 
 .v-dialog .v-card__text {
     overflow: visible !important;
+}
+
+
+/* ── 8. Analysis Panel (results pane) ────────────────────────────────────── */
+
+.analysis-panel {
+    padding: var(--sp-lg) !important;
+}
+
+.analysis-panel .v-card {
+    margin-bottom: 18px !important;
+    border-radius: 10px !important;
+}
+
+/* Card titles in the analysis panel — larger, more prominent than sidebar cards.
+ * Scoped to .analysis-panel to avoid colliding with .sidebar-compact .v-card__title
+ * which has its own (smaller) override. */
+.analysis-panel .v-card__title {
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 12px 16px !important;
+}
+
+.analysis-panel .v-card__text {
+    padding: 14px 16px !important;
+}
+
+
+/* ── 9. Run History ───────────────────────────────────────────────────────── */
+
+.run-history-compact {
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    padding: 2px 0 !important;
+}
+
+.run-history-compact .v-btn {
+    font-size: 0.73rem !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+}
+
+/* Truncate long labels (scenario names, MC descriptions) so they never
+ * expand the fixed-width sidebar. display:block is required for
+ * text-overflow to work inside a flex button. */
+.run-history-compact .v-btn .v-btn__content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+
+/* ── 10. Utilities ────────────────────────────────────────────────────────── */
+
+/* Mono number display helper (add class="numeric-display" to any element) */
+.numeric-display {
+    font-family: var(--font-mono) !important;
+    font-weight: 500 !important;
+}
+
+/* Tighter markdown paragraph spacing in panels */
+.solara-markdown p {
+    margin-bottom: 4px !important;
+}
+
+
+/* ── 11. Sidebar Typography Utilities ─────────────────────────────────────── */
+/*
+ * Replaces hardcoded inline style= attributes for common text roles in panels.
+ * Use these classes instead of inline font-size/opacity/color attributes.
+ */
+
+/* Panel section headings (SCENARIO / BATCH ANALYSIS / RUN HISTORY) */
+.sidebar-section-label .solara-markdown p,
+.sidebar-section-label .md-text {
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    opacity: 0.60 !important;
+    margin: 0 !important;
+}
+
+/* Descriptive / hint text below inputs */
+.sidebar-hint-text .solara-markdown p,
+.sidebar-hint-text {
+    font-size: 0.72rem !important;
+    opacity: 0.55 !important;
+    margin-bottom: 4px !important;
+    white-space: normal !important;
+}
+
+/* Inline error / status messages */
+.sidebar-error-text {
+    font-size: 0.75rem !important;
+    color: var(--v-error-base, #ef5350) !important;
+    /* theme variable — no raw hex in Python */
+    margin-top: 4px !important;
+    white-space: normal !important;
+}
+
+/* Empty-state / muted text inside sidebar cards */
+.sidebar-empty-text {
+    font-size: 0.8rem !important;
+    opacity: 0.55 !important;
+}
+
+/* ── 11b. History Section Scroll Container ─────────────────────────────────── */
+
+/* Prevents the combined history section (batch + run) from growing the sidebar
+ * past the viewport. Applied via classes=["sidebar-history-section"]. */
+.sidebar-history-section {
+    max-height: 38vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    /* keeps scrollbar from clipping content */
+}
+
+
+/* ── 12. History Item Utilities ───────────────────────────────────────────── */
+
+/* Selected row highlight — used in RunHistoryItem and BatchHistoryItem */
+.history-item-selected {
+    background: rgba(66, 165, 245, 0.12) !important;
+    /* primary-400 at 12% */
+    border-radius: 4px !important;
+}
+
+/* Button text inside batch history items */
+.sidebar-compact .history-item-btn {
+    font-size: 0.75rem !important;
+    text-transform: none !important;
+    text-align: left !important;
+    padding: 0 !important;
+}
+
+/* Copy-link HTML button inside run history items.
+ * Applied via class= attribute on the injected <button> element.
+ * Avoids hardcoding hex colors in Python. */
+.history-link-btn {
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 6px !important;
+    color: var(--v-primary-base, #42a5f5) !important;
+    border-radius: 50% !important;
+    transition: background 0.2s !important;
+}
+
+.history-link-btn:hover {
+    background: rgba(66, 165, 245, 0.1) !important;
 }

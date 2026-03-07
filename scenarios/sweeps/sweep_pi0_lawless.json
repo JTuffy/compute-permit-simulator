@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_1_minimal.json",
+    "param_path": "audit.base_prob",
+    "param_label": "Base Audit Rate \u03c0\u2080",
+    "min_val": 0.01,
+    "max_val": 0.30,
+    "interval": 0.05,
+    "n_runs": 50
+}

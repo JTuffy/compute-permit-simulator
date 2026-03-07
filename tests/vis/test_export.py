@@ -19,7 +19,7 @@ from compute_permit_sim.schemas.data import (
     SimulationRun,
     StepResult,
 )
-from compute_permit_sim.vis.export import export_run_to_excel
+from compute_permit_sim.vis.export import export_run_to_csv, export_run_to_excel
 
 
 @pytest.fixture
@@ -58,6 +58,27 @@ def sample_run(agent_snapshot_factory) -> SimulationRun:
             deterrence_success_rate=0.5,
         ),
     )
+
+
+def test_export_run_to_csv_creates_file(sample_run: SimulationRun) -> None:
+    """Test that CSV export creates a file with step-wise agent data only."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "test_export.csv"
+
+        result_path = export_run_to_csv(sample_run, output_path=str(output_path))
+
+        assert os.path.exists(result_path)
+
+        df = pd.read_csv(result_path)
+
+        # 3 steps x 2 agents = 6 rows
+        assert len(df) == 6
+        assert "step" in df.columns
+        assert "market_price" in df.columns
+        assert "agent_id" in df.columns
+        # Config should NOT be in the CSV
+        assert "config_name" not in df.columns
+        assert df["market_price"].iloc[0] == 10.0
 
 
 def test_export_run_to_excel_creates_file(sample_run: SimulationRun) -> None:

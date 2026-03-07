@@ -1,10 +1,18 @@
 """Analysis Summary component — config + key metrics for a simulation run."""
 
+from __future__ import annotations
+
 import solara
-import solara.lab
 
 from compute_permit_sim.schemas import RunMetrics, ScenarioConfig
-from compute_permit_sim.vis.components import AutoConfigView
+from compute_permit_sim.vis.components.dialogs import RunConfigDialog
+from compute_permit_sim.vis.components.results import (
+    DownloadCSV,
+    DownloadExcel,
+    DownloadJSON,
+    MetricChip,
+    ResultsActions,
+)
 
 
 @solara.component
@@ -12,54 +20,76 @@ def AnalysisSummary(
     is_live: bool,
     config: ScenarioConfig | None,
     step_count: int,
-    metrics: RunMetrics | None,  # Pass full metrics object
+    metrics: RunMetrics | None,
+    run=None,  # SimulationRun | None — passed for export + rerun actions
 ):
     """Display key metrics and full run configuration."""
     if not config:
         return
 
     with solara.Card("Summary", style="margin-bottom: 12px;"):
-        with solara.Row(style="gap: 24px; flex-wrap: wrap;"):
-            _MetricChip("Steps", str(step_count))
+        with solara.Row(
+            style="align-items: center; justify-content: space-between; flex-wrap: wrap;"
+        ):
+            # --- Metric chips row (left) ---
+            with solara.Row(style="gap: 24px; flex-wrap: wrap; flex: 1;"):
+                MetricChip("Steps", str(step_count))
 
-            # Dynamically render metrics from global source of truth
-            if metrics:
-                for field_name, field_info in RunMetrics.model_fields.items():
-                    val = getattr(metrics, field_name)
-                    # Use description or title as label
-                    label = (
-                        field_info.description.split("(")[0].strip()
-                        if field_info.description
-                        else field_name.replace("_", " ").title()
-                    )
+                if config.collateral_amount > 0:
+                    MetricChip("Collateral", f"${config.collateral_amount:.0f}M")
 
-                    # Simple heuristic formatting (shared logic with export.py ideally)
-                    if "rate" in field_name or "compliance" in field_name:
-                        value_str = f"{val:.1%}"
-                    elif "price" in field_name or "cost" in field_name:
-                        value_str = f"${val:.2f}"
-                    else:
-                        value_str = f"{val:.2f}"
+                if metrics:
+                    for field_name, field_info in RunMetrics.model_fields.items():
+                        val = getattr(metrics, field_name)
+                        label = (
+                            field_info.description.split("(")[0].strip()
+                            if field_info.description
+                            else field_name.replace("_", " ").title()
+                        )
+                        if "rate" in field_name or "compliance" in field_name:
+                            value_str = f"{val:.1%}"
+                        elif "price" in field_name or "cost" in field_name:
+                            value_str = f"${val:.2f}"
+                        else:
+                            value_str = f"{val:.2f}"
+                        MetricChip(label, value_str)
+                else:
+                    MetricChip("Status", "In Progress..." if is_live else "No Metrics")
 
-                    _MetricChip(label, value_str)
-            else:
-                _MetricChip("Status", "In Progress..." if is_live else "No Metrics")
+                if config.seed is not None:
+                    MetricChip("Seed", str(config.seed))
 
-            if config.seed is not None:
-                _MetricChip("Seed", str(config.seed))
-
-        solara.Markdown("---")
-        with solara.Details("Full Configuration"):
-            with solara.Column(style="font-size: 0.95em;"):
-                AutoConfigView(
-                    schema=ScenarioConfig,
-                    model=config,
-                    readonly=True,
-                    render_mode="tabs",
+            # --- Action buttons (right, bordered subsection) ---
+            with ResultsActions():
+                run_title = (
+                    f"Run: {run.sim_id or run.id}" if run else "Active Configuration"
+                )
+                RunConfigDialog(
+                    config=config,
+                    title=run_title,
+                    metrics=metrics if (run is not None) else None,
                 )
 
+                if run is not None:
+                    from compute_permit_sim.vis.export import (
+                        export_run_summary_to_csv,
+                        export_run_to_excel,
+                    )
 
-@solara.component
-def _MetricChip(label: str, value: str):
-    """Small metric display chip."""
-    solara.Markdown(f"**{label}:** {value}", style="white-space: nowrap;")
+                    fname = run.sim_id or run.id
+
+                    DownloadExcel(
+                        "Export to Excel",
+                        lambda: export_run_to_excel(run, output_path=""),
+                        f"{fname}.xlsx",
+                    )
+                    DownloadCSV(
+                        "Export summary to CSV",
+                        lambda: export_run_summary_to_csv(run, output_path=""),
+                        f"{fname}.csv",
+                    )
+                    DownloadJSON(
+                        "Export full run JSON (for reproducibility)",
+                        lambda: run.model_dump_json(indent=2).encode("utf-8"),
+                        f"{fname}.json",
+                    )

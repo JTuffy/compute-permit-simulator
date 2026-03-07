@@ -22,6 +22,7 @@ from compute_permit_sim.core.agents import Lab
 from compute_permit_sim.core.enforcement import Auditor
 from compute_permit_sim.core.market import SimpleClearingMarket
 from compute_permit_sim.schemas import ScenarioConfig
+from compute_permit_sim.schemas.enums import AuditSource
 
 
 @dataclass
@@ -32,11 +33,17 @@ class AgentOutcome:
     permits_allocated: int = 0  # Permits received from market this step
     audited: bool = False  # Was an audit triggered for this lab?
     caught: bool = False  # Caught by any detection channel?
-    caught_backcheck: bool = False  # Was the backcheck specifically involved?
+    caught_source: AuditSource | None = None  # Specific channel that caught them
     penalty: float = 0.0
     collateral_seized: bool = False
     ran: bool = False  # Did the lab run its training this step?
     realized_excess: float = 0.0  # Unpermitted FLOPs run (0 if compliant)
+
+    # State snapshots at the time of the step
+    audit_coefficient: float = 1.0
+    cumulative_capability: float = 0.0
+    bid_price: float = 0.0
+    permits_wanted: int = 0
 
 
 @dataclass
@@ -76,7 +83,13 @@ def execute_step(
 
     # Initialise per-agent outcome tracking
     for lab in labs:
-        outcome.agent_outcomes[lab.lab_id] = AgentOutcome(lab_id=lab.lab_id)
+        outcome.agent_outcomes[lab.lab_id] = AgentOutcome(
+            lab_id=lab.lab_id,
+            audit_coefficient=lab.current_audit_coefficient,
+            cumulative_capability=lab.cumulative_capability,
+            bid_price=0.0,
+            permits_wanted=0,
+        )
 
     # Partition labs: above vs below the regulatory threshold
     above = [lab for lab in labs if lab.planned_training_flops > flop_threshold]
@@ -101,7 +114,12 @@ def execute_step(
     if above:
         if flops_per_permit is None:
             # Binary mode: each lab bids for exactly 1 permit
-            bids = [(lab.lab_id, 1, lab.get_bid()) for lab in above]
+            bids = []
+            for lab in above:
+                bid_amt = lab.get_bid()
+                bids.append((lab.lab_id, 1, bid_amt))
+                outcome.agent_outcomes[lab.lab_id].bid_price = bid_amt
+                outcome.agent_outcomes[lab.lab_id].permits_wanted = 1
         else:
             # FLOP mode: bid for enough permits to cover the full planned run
             bids = []
@@ -109,6 +127,8 @@ def execute_step(
                 qty = max(1, math.ceil(lab.planned_training_flops / flops_per_permit))
                 bid_per = lab.economic_value / qty
                 bids.append((lab.lab_id, qty, bid_per))
+                outcome.agent_outcomes[lab.lab_id].bid_price = bid_per
+                outcome.agent_outcomes[lab.lab_id].permits_wanted = qty
 
         clearing_price, allocations = market.allocate(bids)
         outcome.clearing_price = clearing_price
@@ -214,13 +234,13 @@ def execute_step(
         ao.audited = True
 
         is_actually_compliant = ao.realized_excess <= 0
-        caught, caught_backcheck = auditor.audit_detection_channel(
+        caught, caught_source = auditor.audit_detection_channel(
             is_actually_compliant, p_w=p_w, p_m=p_m
         )
 
         if caught and not is_actually_compliant:
             ao.caught = True
-            ao.caught_backcheck = caught_backcheck
+            ao.caught_source = caught_source
             ao.penalty = lab.penalty_amount
 
             if lab.collateral_posted > 0:
@@ -239,11 +259,6 @@ def execute_step(
         for lab in labs:
             if lab.collateral_posted > 0:
                 lab.collateral_posted = 0.0
-
-    # ------------------------------------------------------------------
-    # Phase 5 — Value realization
-    # Labs that ran earn economic_value. Tracked via ao.ran.
-    # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
     # Phase 6 — Dynamic factor updates

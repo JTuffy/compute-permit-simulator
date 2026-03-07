@@ -1,5 +1,6 @@
 """Mesa model integration for the Compute Permit Simulator."""
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import mesa
@@ -8,9 +9,30 @@ from ..core.agents import Lab
 from ..core.enforcement import Auditor
 from ..core.market import SimpleClearingMarket
 from ..schemas import LabConfig, ScenarioConfig
+from ..schemas.enums import AuditSource
 
 if TYPE_CHECKING:
     from ..schemas import AgentSnapshot
+
+
+@dataclass
+class AgentStepState:
+    """Per-step state snapshot carried by a MesaLab wrapper.
+
+    Populated by the game loop after each ``execute_step`` call and read
+    by ``get_agent_snapshots()`` to build the UI/export data view.
+    """
+
+    audited: bool = False
+    caught: bool = False
+    caught_source: AuditSource | None = None
+    penalty: float = 0.0
+    collateral_seized: bool = False
+    ran: bool = False
+    audit_coefficient: float = 1.0
+    cumulative_capability: float = 0.0
+    bid_price: float = 0.0
+    permits_wanted: int = 0
 
 
 class MesaLab(mesa.Agent):
@@ -36,13 +58,7 @@ class MesaLab(mesa.Agent):
             planned_training_flops=planned_training_flops,
             penalty_amount=penalty_amount,
         )
-        self.last_audit_status = {
-            "audited": False,
-            "caught": False,
-            "penalty": 0.0,
-            "collateral_seized": False,
-            "ran": False,
-        }
+        self.last_step: AgentStepState = AgentStepState()
 
     def step(self) -> None:
         pass
@@ -131,13 +147,18 @@ class ComputePermitModel(mesa.Model):
 
         for agent in mesa_labs:
             ao = result.agent_outcomes[agent.domain_agent.lab_id]
-            agent.last_audit_status = {
-                "audited": ao.audited,
-                "caught": ao.caught,
-                "penalty": ao.penalty,
-                "collateral_seized": ao.collateral_seized,
-                "ran": ao.ran,
-            }
+            agent.last_step = AgentStepState(
+                audited=ao.audited,
+                caught=ao.caught,
+                caught_source=ao.caught_source,
+                penalty=ao.penalty,
+                collateral_seized=ao.collateral_seized,
+                ran=ao.ran,
+                audit_coefficient=ao.audit_coefficient,
+                cumulative_capability=ao.cumulative_capability,
+                bid_price=ao.bid_price,
+                permits_wanted=ao.permits_wanted,
+            )
 
         self.datacollector.collect(self)
 
@@ -150,9 +171,9 @@ class ComputePermitModel(mesa.Model):
         for agent in self.agents:
             if isinstance(agent, MesaLab):
                 d = agent.domain_agent
-                ran = agent.last_audit_status["ran"]
+                s = agent.last_step
 
-                used_training_flops = d.planned_training_flops if ran else 0.0
+                used_training_flops = d.planned_training_flops if s.ran else 0.0
 
                 if flops_per_permit is not None:
                     reported_training_flops = d.permits_held * flops_per_permit
@@ -170,11 +191,17 @@ class ComputePermitModel(mesa.Model):
                         reported_training_flops=reported_training_flops,
                         has_permit=d.has_permit,
                         is_compliant=d.is_compliant,
-                        was_audited=agent.last_audit_status["audited"],
-                        was_caught=agent.last_audit_status["caught"],
-                        penalty_amount=agent.last_audit_status["penalty"],
+                        was_audited=s.audited,
+                        was_caught=s.caught,
+                        caught_source=s.caught_source,
+                        penalty_amount=s.penalty,
                         economic_value=d.economic_value,
                         risk_profile=d.risk_profile,
+                        audit_coefficient=s.audit_coefficient,
+                        cumulative_capability=s.cumulative_capability,
+                        bid_price=s.bid_price,
+                        permits_wanted=s.permits_wanted,
+                        racing_factor=d.racing_factor,
                     )
                 )
         return snapshots

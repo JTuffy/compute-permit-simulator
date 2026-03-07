@@ -29,6 +29,12 @@ def create_agent_snapshot(
         "penalty_amount": 0.0,
         "economic_value": 100.0,
         "risk_profile": 1.0,
+        "caught_source": None,
+        "audit_coefficient": 1.0,
+        "cumulative_capability": 0.0,
+        "bid_price": 0.0,
+        "permits_wanted": 0,
+        "racing_factor": 1.0,
     }
     data = {**defaults, **kwargs}
     return AgentSnapshot(id=id, is_compliant=is_compliant, **data)
