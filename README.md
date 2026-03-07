@@ -86,5 +86,5 @@ GitLab CI runs `pytest`, `ruff`, and `mypy` on every commit and deploys the Sola
 
 ## 📚 Documentation
 
-For deep technical details on the architecture and mesa model structure, see:
-👉 [**Technical Documentation**](TECHNICAL_DOCUMENTATION.md)
+Scenario configuration reference: see `scenarios/basic/` for example JSON files
+and `src/compute_permit_sim/schemas/config.py` for annotated field definitions.

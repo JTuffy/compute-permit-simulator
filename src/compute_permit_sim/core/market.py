@@ -1,28 +1,9 @@
 """Market logic for compute permits.
 
 Implements a simple marginal-bid clearing mechanism.
-Tech spec section 4: "(1) Market Price Discovery -> (2) Permit Allocation"
-should be logically paired in the market module.
 """
 
 import random
-from typing import Protocol
-
-
-class MarketMechanism(Protocol):
-    """Protocol for a market mechanism."""
-
-    def clear_market(self, demands: list[float], supplies: list[float]) -> float:
-        """Calculate the clearing price based on demands and supplies.
-
-        Args:
-            demands: List of quantities demanded by agents (at 0 price, effectively).
-            supplies: List of quantities supplied (e.g. total cap).
-
-        Returns:
-            The market clearing price.
-        """
-        ...
 
 
 class SimpleClearingMarket:
@@ -38,14 +19,15 @@ class SimpleClearingMarket:
     """
 
     def __init__(self, permit_cap: float, fixed_price: float | None = None) -> None:
-        """Initialize the market.
-
+        """
         Args:
-            permit_cap: The total number of permits available (Q).
+            permit_cap: Total permits available (Q).
+            fixed_price: Optional fixed price; if set, all qualifying bidders pay
+                this price instead of the auction-cleared rate.
         """
         self.max_supply: float = permit_cap
         self.current_price: float = 0.0
-        self.fixed_price: float | None = None
+        self.fixed_price: float | None = fixed_price
 
     def set_fixed_price(self, price: float) -> None:
         """Set a fixed price for the market.

@@ -21,6 +21,7 @@ from compute_permit_sim.vis.components.system import (
     SimulationController,
     UrlManager,
 )
+from compute_permit_sim.vis.logging_config import configure_logging
 from compute_permit_sim.vis.panels.analysis import AnalysisPanel
 from compute_permit_sim.vis.panels.batch import BatchPanel
 from compute_permit_sim.vis.panels.batch_results import BatchResultsPanel
@@ -28,17 +29,8 @@ from compute_permit_sim.vis.panels.config import ConfigPanel
 from compute_permit_sim.vis.state.history import session_history
 from compute_permit_sim.vis.state.run_state import basic_run, mc_run, sweep_run
 
-# --- Logging Configuration ---
-logger = logging.getLogger("compute_permit_sim")
-logger.setLevel(logging.INFO)
-if logger.handlers:
-    logger.handlers.clear()
-
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(
-    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-)
-logger.addHandler(stream_handler)
+configure_logging()
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Vuetify theme — applied once at module load, cascades to all components

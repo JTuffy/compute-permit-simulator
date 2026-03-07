@@ -21,6 +21,7 @@ from __future__ import annotations
 import pandas as pd
 
 from compute_permit_sim.schemas.columns import ColumnNames
+from compute_permit_sim.schemas.data import StepResult
 
 # ---------------------------------------------------------------------------
 # Single-step (agents_df) transforms
@@ -102,7 +103,7 @@ def compute_net_payoff(agents_df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def compute_compliance_series(steps: list) -> list[tuple[int, float]]:
+def compute_compliance_series(steps: list[StepResult]) -> list[tuple[int, float]]:
     """Compute aggregate compliance rate at each step.
 
     Args:
@@ -116,7 +117,7 @@ def compute_compliance_series(steps: list) -> list[tuple[int, float]]:
     return [(s.step, calculate_compliance(s.agents)) for s in steps]
 
 
-def compute_price_series(steps: list) -> list[tuple[int, float]]:
+def compute_price_series(steps: list[StepResult]) -> list[tuple[int, float]]:
     """Extract clearing price at each step.
 
     Args:
@@ -128,7 +129,7 @@ def compute_price_series(steps: list) -> list[tuple[int, float]]:
     return [(s.step, s.market.price) for s in steps]
 
 
-def compute_audit_source_counts(steps: list) -> pd.DataFrame:
+def compute_audit_source_counts(steps: list[StepResult]) -> pd.DataFrame:
     """Count caught events by AuditSource across all steps.
 
     Args:
@@ -141,11 +142,9 @@ def compute_audit_source_counts(steps: list) -> pd.DataFrame:
     counts: dict[str, int] = {}
     for s in steps:
         for agent in s.agents:
-            source = getattr(agent, ColumnNames.CAUGHT_SOURCE, None)
+            source = agent.caught_source
             if source is not None:
-                # Accept both enum and string representations
-                label = source.value if hasattr(source, "value") else str(source)
-                counts[label] = counts.get(label, 0) + 1
+                counts[source.value] = counts.get(source.value, 0) + 1
     if not counts:
         return pd.DataFrame(columns=["source", "count"])
     return pd.DataFrame([{"source": k, "count": v} for k, v in sorted(counts.items())])
@@ -156,7 +155,7 @@ def compute_audit_source_counts(steps: list) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def aggregate_risk_scatter(steps: list) -> pd.DataFrame:
+def aggregate_risk_scatter(steps: list[StepResult]) -> pd.DataFrame:
     """Aggregate all per-step agent observations into one scatter-ready DataFrame.
 
     Concatenates agent snapshots from every step so the sim-wide scatter plot
@@ -186,7 +185,7 @@ def aggregate_risk_scatter(steps: list) -> pd.DataFrame:
     return pd.DataFrame(all_rows)
 
 
-def aggregate_audit_targeting(steps: list) -> dict:
+def aggregate_audit_targeting(steps: list[StepResult]) -> dict:
     """Aggregate audit targeting statistics across all steps.
 
     Returns the overall fraction of compliant and non-compliant labs
@@ -204,15 +203,13 @@ def aggregate_audit_targeting(steps: list) -> dict:
     ca = ct = na = nt = 0
     for s in steps:
         for a in s.agents:
-            audited = getattr(a, "was_audited", False)
-            compliant = getattr(a, "is_compliant", True)
-            if compliant:
+            if a.is_compliant:
                 ct += 1
-                if audited:
+                if a.was_audited:
                     ca += 1
             else:
                 nt += 1
-                if audited:
+                if a.was_audited:
                     na += 1
 
     return {
@@ -225,7 +222,7 @@ def aggregate_audit_targeting(steps: list) -> dict:
     }
 
 
-def aggregate_compliance_distribution(steps: list) -> pd.DataFrame:
+def aggregate_compliance_distribution(steps: list[StepResult]) -> pd.DataFrame:
     """Aggregate outcome + audit source across all steps into one DataFrame.
 
     Effectively concatenates agent outcomes from every step so the sim-wide

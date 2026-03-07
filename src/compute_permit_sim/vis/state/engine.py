@@ -4,5 +4,4 @@ from compute_permit_sim.vis.simulation import SimulationEngine
 from compute_permit_sim.vis.state.config import ui_config
 from compute_permit_sim.vis.state.history import session_history
 
-# active_sim removed — basic_run reactive in run_state.py is the new output signal
 engine = SimulationEngine(ui_config, session_history)

@@ -9,8 +9,7 @@ description: Python-specific conventions — tooling, typing, patterns, and proj
 
 ## Tooling
 
-Use `uv` for all Python environment and dependency operations
-or pipenv directly.
+Use `uv` for all Python environment and dependency operations.
 
 ```
 uv sync                    # install all dependencies
@@ -55,8 +54,10 @@ firings. Applies to reactive state management (Solara, RxPY, etc.) and event-dri
 - Mirror source layout: `tests/module/test_file.py` covers `src/module/file.py`.
 - Complex model construction belongs in a `factories.py` module — not inline in tests.
 - Filesystem tests: always use `tempfile` and `unittest.mock.patch` for path isolation.
-- Sync guard tests: if your codebase mirrors a schema into another layer (e.g. UI state),
-  maintain a test that detects when the two drift apart. Fail fast on schema changes.
+- **Sync guard tests:** if your codebase mirrors a schema into another layer (e.g. `UIConfig`
+  mirrors `ScenarioConfig`), write a test that catches drift immediately. Pattern: compare
+  `ScenarioConfig.model_fields` against the reactive field registry at test time. This
+  prevents a renamed schema field from silently producing stale values in the UI.
 - Do not chase coverage %. Test logic correctness and schema validation first.
 
 ## Refactor Triggers

@@ -25,7 +25,7 @@ mc:
 
 sweep:
 	uv run main.py --sweep-file sweep_pi0_lawless.json
-	 uv run main.py --sweep-file sweep_collateral_lawless.json
+	uv run main.py --sweep-file sweep_collateral_lawless.json
 
 list-sweeps:
 	@echo "Available sweep files:"
@@ -42,8 +42,6 @@ app: solara
 solara:
 	uv run solara run app.py
 
-heatmap:
-	uv run python -m compute_permit_sim.vis.heatmap
 
 lint:
 	uv run ruff check .

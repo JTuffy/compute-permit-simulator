@@ -13,7 +13,6 @@ Phases:
 import logging
 import random
 import threading
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from compute_permit_sim.schemas import SimulationRun
@@ -118,19 +117,3 @@ class SimulationEngine:
             self.config.selected_scenario.value = config.name or filename
         except Exception as e:
             logger.error("Error loading scenario %s: %s", filename, e)
-
-    def save_run(self, name_prefix: str = "run") -> str | None:
-        """Persist the selected run to a JSON file."""
-        run_to_save = self.history.selected_run.value
-        if not run_to_save:
-            logger.warning("save_run called with no selected run")
-            return None
-
-        run_dir = Path("runs") / run_to_save.id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        filepath = run_dir / "full_run.json"
-        with open(filepath, "w") as f:
-            f.write(run_to_save.model_dump_json(indent=2))
-
-        logger.info("Saved run to %s", filepath)
-        return str(run_dir)

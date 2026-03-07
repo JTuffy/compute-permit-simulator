@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Callable, NamedTuple
 
@@ -87,16 +88,12 @@ def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
 
         for ml in mesa_labs:
             d = ml.domain_agent
-            ao = ml.last_audit_status
+            s = ml.last_step
 
-            ran: bool = ao["ran"]
-            penalty: float = ao["penalty"]
-            collateral_seized: bool = ao.get("collateral_seized", False)
-
-            gross = d.economic_value if ran else 0.0
+            gross = d.economic_value if s.ran else 0.0
             permit_cost = clearing_price * d.permits_held
-            collateral_cost = config.collateral_amount if collateral_seized else 0.0
-            net = gross - permit_cost - penalty - collateral_cost
+            collateral_cost = config.collateral_amount if s.collateral_seized else 0.0
+            net = gross - permit_cost - s.penalty - collateral_cost
 
             all_payoffs.append(net)
             if d.is_compliant:
@@ -104,13 +101,13 @@ def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
             else:
                 violator_payoffs.append(net)
 
-            if ao["audited"]:
+            if s.audited:
                 total_audits += 1
                 if d.is_compliant:
                     audits_on_compliant += 1
                 else:
                     audits_on_violators += 1
-                    if ao["caught"]:
+                    if s.caught:
                         violations_caught += 1
 
     avg_compliance = sum(step_compliance) / len(step_compliance)
@@ -210,7 +207,22 @@ def run_monte_carlo(
     run_seeds = seeds if seeds is not None else list(range(n_runs))
     n_steps = config.steps
 
-    raw: list[_RunResult] = [_run_once(config, seed) for seed in run_seeds]
+    raw: list[_RunResult] = []
+    failed_seeds: list[int] = []
+    for seed in run_seeds:
+        try:
+            raw.append(_run_once(config, seed))
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger(__name__).warning(
+                "MC seed %d failed: %s", seed, exc, exc_info=True
+            )
+            failed_seeds.append(seed)
+
+    if not raw:
+        raise RuntimeError(
+            f"All {len(run_seeds)} seeds failed — check scenario config."
+        )
+
     actual_n = len(raw)
 
     # Per-seed compliance averages (for percentile computation)
@@ -284,4 +296,5 @@ def run_monte_carlo(
         ]
         if store_raw
         else [],
+        failed_seeds=failed_seeds,
     )

@@ -23,3 +23,15 @@ rules file (usually `project.md` or a workflow) indicating the script exists and
 to reach for it. This prevents re-inventing scripts across sessions.
 
 See `python.md` for tooling conventions (`uv run python scripts/...`).
+
+## 2026-03-07 — Reflect: four rule gaps found and patched
+
+Sessionfriction identified during prune-repo + cleanup work:
+
+- `python.md` Tooling section had a stray `or pipenv directly` sentence (stale merge artifact). Fixed.
+- `coding.md` Core Principles first line had multiple typos. Fixed.
+- `project.md` was missing three patterns established this session:
+  - **UIConfig mirror pattern** (`_reactive_field_names` registry + `_SPECIAL_FIELDS`)
+  - **Logging config** (`vis/logging_config.py` is canonical; never configure in `page.py`)
+  - **Schema field removal checklist** (grep callers, confirm never populated, no `list[dict]` placeholders)
+- `python.md` sync-guard test bullet was vague. Expanded with the concrete pattern: compare `model_fields` against the reactive registry at test time.

@@ -13,7 +13,6 @@ from typing import Literal
 import pandas as pd
 import solara
 
-from compute_permit_sim.vis.components.cards import MetricCard
 from compute_permit_sim.vis.components.charts import (
     AuditSourcePlot,
     AuditTargetingPlot,
@@ -64,23 +63,3 @@ class ChartFactory:
                 pass  # reserved
             with solara.Column():
                 pass  # reserved
-
-
-class MetricCardFactory:
-    """Factory for building metric display chips."""
-
-    @staticmethod
-    def create_compliance_card(compliance_value: float) -> None:
-        """Create a compliance metric card."""
-        color = "success" if compliance_value >= 0.8 else "warning"
-        MetricCard("Compliance", f"{compliance_value:.1%}", color_variant=color)
-
-    @staticmethod
-    def create_price_card(price_value: float) -> None:
-        """Create a price metric card."""
-        MetricCard("Market Price", f"${price_value:.2f}", color_variant="primary")
-
-    @staticmethod
-    def create_custom_metric(label: str, value: str, variant: str = "primary") -> None:
-        """Create a custom metric card."""
-        MetricCard(label, value, color_variant=variant)

@@ -40,15 +40,12 @@ def AnalysisPanel():
     step_idx, set_step_idx = solara.use_state(0, key=run_id)
     view_mode, set_view_mode = solara.use_state("Aggregate", key=f"vm-{run_id}")
 
-    def compute_series():
+    def compute_series() -> tuple[list[float], list[float], list[int]]:
         if run is None:
             return [], [], []
         compliance = [calculate_compliance(s.agents) for s in run.steps]
         prices = [s.market.price for s in run.steps]
-        caught = [
-            sum(1 for a in s.agents if getattr(a, "was_caught", False))
-            for s in run.steps
-        ]
+        caught = [sum(1 for a in s.agents if a.was_caught) for s in run.steps]
         return compliance, prices, caught
 
     compliance_series, price_series, caught_series = solara.use_memo(

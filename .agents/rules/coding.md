@@ -9,7 +9,7 @@ description: General coding conventions — language-agnostic principles for any
 
 ## Core Principles
 
-Think in terms of sytems. Think about designign interfaces. Consider how those itnerfaces might be scaled or expanded before you start. Consider making things shared, general, and how it shoul dbe professionally designed
+Think in terms of systems. Think about designing interfaces. Consider how those interfaces might be scaled or expanded before you start. Consider making things shared, general, and how it should be professionally designed.
 
 **Single source of truth.** If a value, label, or behaviour is defined in more than one
 place, there must be one canonical source (a constant, registry, or reactive). Before

@@ -154,7 +154,7 @@ def test_audit_capacity_constraint():
     model.step()
 
     # Verify exactly 2 agents were caught and fined
-    fined_agents = [a for a in model.agents if a.last_audit_status["penalty"] > 0]
+    fined_agents = [a for a in model.agents if a.last_step.penalty > 0]
     assert len(fined_agents) == 2
 
 
@@ -228,9 +228,9 @@ def test_collateral_seized_on_violation():
 
     # All agents should have collateral seized (caught cheating)
     for agent in model.agents:
-        if hasattr(agent, "last_audit_status"):
-            if agent.last_audit_status["caught"]:
-                assert agent.last_audit_status["collateral_seized"] is True
+        if hasattr(agent, "last_step"):
+            if agent.last_step.caught:
+                assert agent.last_step.collateral_seized is True
                 # Wealth should reflect: -collateral - penalty + economic_value
                 # Collateral NOT refunded (seized)
 
@@ -263,7 +263,7 @@ def test_collateral_refunded_when_compliant():
             # Collateral should be fully refunded (posted = 0 after step)
             assert agent.domain_agent.collateral_posted == 0.0
             # Collateral not seized
-            assert agent.last_audit_status["collateral_seized"] is False
+            assert agent.last_step.collateral_seized is False
 
 
 def test_zero_collateral_unchanged():

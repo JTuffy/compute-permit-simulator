@@ -166,6 +166,8 @@ class MonteCarloResult:
 
     # --- Raw per-seed data (optional, set store_raw=True in run_monte_carlo) ---
     raw_seeds: list[PerSeedResult] = field(default_factory=list)
+    # Seeds that raised exceptions during the run — non-empty signals data quality issues
+    failed_seeds: list[int] = field(default_factory=list)
     # Short unique identifier matching SimulationRun.sim_id convention
     id: str = field(default_factory=lambda: str(uuid4())[:8])
 

@@ -261,11 +261,6 @@ def execute_step(
                 lab.collateral_posted = 0.0
 
     # ------------------------------------------------------------------
-    # Phase 5 — Value realization
-    # Labs that ran earn economic_value. Tracked via ao.ran.
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
     # Phase 6 — Dynamic factor updates
     # ------------------------------------------------------------------
     audit_decay = config.audit.audit_decay_rate

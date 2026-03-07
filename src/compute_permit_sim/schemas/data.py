@@ -59,9 +59,6 @@ class StepResult(BaseModel):
         ..., description="Market state (price, volume, supply)"
     )
     agents: list[AgentSnapshot] = Field(..., description="List of all agent states")
-    audit: list[dict] = Field(
-        default_factory=list, description="Audit events this step"
-    )
 
     model_config = ConfigDict(frozen=True)
 

@@ -162,8 +162,6 @@ class Auditor:
                 caught             — True if any channel found a violation
                 caught_source      — The AuditSource that triggered, or None
         """
-        from compute_permit_sim.schemas.enums import AuditSource
-
         if is_compliant:
             # False positive: same sequential structure as non-compliant.
             # p_w/p_m don't apply (no real violation to find via those channels).

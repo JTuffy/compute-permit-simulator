@@ -51,6 +51,23 @@ This is the single source of truth for what the right pane displays.
 `session_history.scenario_name_map` is `Reactive[dict[str, str]]` (display name → filename).
 Use it in all dropdowns. Never call `list_scenarios()` directly in a UI component.
 
+## Mirrored Schema Layers (UIConfig Pattern)
+
+`UIConfig` in `vis/state/config.py` mirrors `ScenarioConfig` dynamically: it flattens
+nested sub-model fields into reactive attributes via `_create_reactive_fields()`. A
+`_reactive_field_names: frozenset[str]` registry is built at init and used for all
+runtime lookups — never `hasattr(self, name)`. Unknown fields raise `KeyError` immediately.
+`_SPECIAL_FIELDS` lists fields handled explicitly (seed, name, notes, description).
+
+When adding a new `ScenarioConfig` field: run `uv run pytest tests/vis/` first — the
+sync-guard test will catch any drift between the schema and UIConfig's reactive registry.
+
+## Logging
+
+All logging configuration lives in `vis/logging_config.py` (`configure_logging()`).
+`page.py` calls it once at startup. Do not add logging setup anywhere else — Solara
+reloads will re-run module-level code and accumulate duplicate handlers.
+
 ## UI Structure
 
 Each feature area has a sidebar panel (configuration) and a right-pane panel (results). Results panels follow a three-section structure:
@@ -88,6 +105,8 @@ Accept typed result objects, return `matplotlib.Figure`, never import Solara. Us
 ## Testing
 
 Schema sync tests detect drift between the schema and any mirrored layer (e.g. UI config). These tests live in `tests/vis/` and must be updated when adding new schema fields. Complex model construction uses shared factories in `tests/factories.py`.
+
+**Before removing a schema field:** grep `src/` and `tests/` for all references. Confirm the field is never populated or read. If the field is meant for future use but currently empty, remove it and re-add with a typed schema when the feature is scoped — `list[dict]` fields are not acceptable placeholders.
 
 ## Styling: Global vs. Scoped CSS
 
