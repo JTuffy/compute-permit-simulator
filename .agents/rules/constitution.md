@@ -3,7 +3,7 @@ trigger: always_on
 description: Meta-rule governing the rule system itself. Read first. Never modify this file — add amendments.md instead.
 ---
 
-# rules/main.md
+# rules/constitution.md
 
 <!-- This file is frozen. Do not edit it. Add top-level amendments to amendments.md. -->
 
@@ -22,7 +22,7 @@ Project conventions belong in sibling files, not here.
 
 | File | Update frequency | Purpose |
 |---|---|---|
-| `main.md` | **Never** — add `amendments.md` | Meta-strategy for the rule system |
+| `constitution.md` | **Never** — add `amendments.md` | Meta-strategy for the rule system |
 | `amendments.md` | Rarely — high-level only | Top-level notes that don't fit elsewhere |
 | `coding.md` / `python.md` | Rarely — durable patterns only | Language and coding conventions |
 | `project.md` | When project patterns change | Project-specific decisions and conventions |

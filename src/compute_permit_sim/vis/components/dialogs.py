@@ -14,11 +14,18 @@ def RunConfigDialog(
     title: str,
     metrics: RunMetrics | None = None,
     subtitle: str | None = None,
+    batch_summary: str | None = None,
 ):
     """Reusable ⓘ icon button → dialog showing config params + optional metrics.
 
-    Used by both RunHistoryItem (sidebar) and AnalysisSummary (results pane)
-    so there is exactly one copy of this UI.
+    Used by RunHistoryItem (sidebar), AnalysisSummary (results pane), and
+    BatchHistoryItem (via batch_summary param for type-specific stats) so there
+    is exactly one copy of this UI across all history types.
+
+    Args:
+        batch_summary: Optional pre-formatted Markdown block for batch-specific
+            stats (e.g. "N runs: 50, avg compliance: 82%"). Rendered after
+            the metrics block when provided.
     """
     show, set_show = solara.use_state(False)
 
@@ -60,6 +67,10 @@ def RunConfigDialog(
                             f"**Final Compliance:** {metrics.final_compliance:.1%}"
                         )
                         solara.Markdown(f"**Final Price:** ${metrics.final_price:.2f}")
+
+                if batch_summary:
+                    solara.Markdown("---")
+                    solara.Markdown(batch_summary)
 
             with solara.v.CardActions():
                 solara.v.Spacer()

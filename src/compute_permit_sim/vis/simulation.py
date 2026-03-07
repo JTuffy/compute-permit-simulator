@@ -19,7 +19,12 @@ from typing import TYPE_CHECKING
 from compute_permit_sim.schemas import SimulationRun
 from compute_permit_sim.services.config_manager import load_scenario
 from compute_permit_sim.services.simulation_runner import run_single
-from compute_permit_sim.vis.state.run_state import RunState, basic_run
+from compute_permit_sim.vis.state.run_state import (
+    RunState,
+    basic_run,
+    mc_run,
+    sweep_run,
+)
 
 if TYPE_CHECKING:
     from compute_permit_sim.vis.state.config import UIConfig
@@ -70,6 +75,13 @@ class SimulationEngine:
             run_seed,
             ui_seed is not None,
         )
+
+        # Clear any stale batch results so the page state machine routes to
+        # AnalysisPanel — not to BatchResultsPanel from a prior session.
+        from compute_permit_sim.schemas.batch import MonteCarloResult, SweepResult
+
+        mc_run.set(RunState[MonteCarloResult](phase="idle"))
+        sweep_run.set(RunState[SweepResult](phase="idle"))
 
         # One update → spinner appears
         basic_run.set(RunState[SimulationRun](phase="running"))

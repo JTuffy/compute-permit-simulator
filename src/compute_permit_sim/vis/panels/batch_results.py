@@ -1,65 +1,26 @@
 """Batch results panel — shown in the right pane after a batch/sweep run.
 
-Layout deliberately mirrors ``panels/analysis.py``:
-- ``solara.Card("Summary")`` with ``_MetricChip`` row + icon action buttons
-- Charts rendered inside ``solara.Card("Results")``
-- Same ``mdi-*`` icon-only ``FileDownload`` buttons as ``summary.py``
-
-No status text below the run button — success is evident from results appearing here.
+All shared display primitives (MetricChip, fig_to_png, DownloadCSV, …) come
+from ``vis/components/results.py`` — the single source of truth for result
+panel UI atoms across basic, Monte Carlo, and sweep views.
 """
 
 from __future__ import annotations
 
-import io
 from typing import Any
 
 import solara
 
+from compute_permit_sim.vis.components.charts.expandable import ExpandableChart
+from compute_permit_sim.vis.components.dialogs import RunConfigDialog
+from compute_permit_sim.vis.components.results import (
+    DownloadCSV,
+    DownloadExcel,
+    DownloadJSON,
+    MetricChip,
+    ResultsActions,
+)
 from compute_permit_sim.vis.state.run_state import mc_run, sweep_run
-
-# ---------------------------------------------------------------------------
-# Shared helpers (identical to summary.py private helpers)
-# ---------------------------------------------------------------------------
-
-
-@solara.component
-def _MetricChip(label: str, value: str) -> None:
-    """Small metric display chip — mirrors summary.py."""
-    solara.Markdown(f"**{label}:** {value}", style="white-space: nowrap;")
-
-
-def _fig_png(fig: Any) -> bytes:
-    """Render a Matplotlib figure to PNG bytes."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight")
-    buf.seek(0)
-    return buf.read()
-
-
-def _dl_csv(tooltip: str, data_fn: Any, filename: str) -> None:
-    """Icon-only CSV FileDownload matching summary.py export buttons."""
-    with solara.Tooltip(tooltip):
-        with solara.FileDownload(data=data_fn, filename=filename, mime_type="text/csv"):
-            solara.Button(icon_name="mdi-file-delimited-outline", icon=True, small=True)
-
-
-def _dl_png(tooltip: str, data_fn: Any, filename: str) -> None:
-    """Icon-only PNG FileDownload."""
-    with solara.Tooltip(tooltip):
-        with solara.FileDownload(
-            data=data_fn, filename=filename, mime_type="image/png"
-        ):
-            solara.Button(icon_name="mdi-file-image-outline", icon=True, small=True)
-
-
-def _dl_tex(tooltip: str, data_fn: Any, filename: str) -> None:
-    """Icon-only LaTeX FileDownload."""
-    with solara.Tooltip(tooltip):
-        with solara.FileDownload(
-            data=data_fn, filename=filename, mime_type="text/plain"
-        ):
-            solara.Button(icon_name="mdi-code-braces", icon=True, small=True)
-
 
 # ---------------------------------------------------------------------------
 # Monte Carlo results
@@ -69,10 +30,8 @@ def _dl_tex(tooltip: str, data_fn: Any, filename: str) -> None:
 @solara.component
 def _MCResultsView() -> Any:
     from compute_permit_sim.vis.export import (
-        export_mc_per_seed_to_csv,
-        export_mc_trajectory_to_csv,
         export_monte_carlo_to_csv,
-        export_monte_carlo_to_latex,
+        export_monte_carlo_to_excel,
     )
     from compute_permit_sim.vis.plotting import (
         plot_mc_audit_trajectory,
@@ -88,15 +47,11 @@ def _MCResultsView() -> Any:
 
     safe = result.scenario_name.lower().replace(" ", "_")
 
-    # Render figures once so downloads re-use the same bytes
+    # Figures computed once; ExpandableChart renders them inline + handles PNG download internally
     fig_comp = plot_mc_trajectory(result)
     fig_viol = plot_mc_violator_trajectory(result)
     fig_audit = plot_mc_audit_trajectory(result)
     fig_pay = plot_mc_payoff_comparison(result)
-    png_comp = _fig_png(fig_comp)
-    png_viol = _fig_png(fig_viol)
-    png_audit = _fig_png(fig_audit)
-    png_pay = _fig_png(fig_pay)
 
     with solara.Column(classes=["analysis-panel"]):
         # ── SECTION 1 : Summary card (mirrors AnalysisSummary) ──────────
@@ -106,66 +61,72 @@ def _MCResultsView() -> Any:
             ):
                 # Metric chips
                 with solara.Row(style="gap: 24px; flex-wrap: wrap; flex: 1;"):
-                    _MetricChip("Scenario", result.scenario_name)
-                    _MetricChip("Seeds", str(result.n_runs))
-                    _MetricChip(
+                    MetricChip("Scenario", result.scenario_name)
+                    MetricChip("Seeds", str(result.n_runs))
+                    MetricChip(
                         "Avg Compliance",
                         f"{result.avg_compliance.mean:.1%} \u00b1 {result.avg_compliance.std:.1%}",
                     )
-                    _MetricChip(
+                    MetricChip(
                         "P10\u2013P90",
                         f"[{result.p10_compliance:.1%}\u2013{result.p90_compliance:.1%}]",
                     )
-                    _MetricChip(
+                    MetricChip(
                         "Full Compliance",
                         f"{result.pct_runs_full_compliance:.0%} of seeds",
                     )
-                    _MetricChip("Audit Rate", f"{result.audit_rate.mean:.1%}")
+                    MetricChip("Audit Rate", f"{result.audit_rate.mean:.1%}")
 
-                # Action buttons — ordered to match basic panel (CSV → trajectory → per-seed → LaTeX)
-                with solara.Row(style="gap: 4px; align-items: center;"):
-                    _dl_csv(
+                with ResultsActions():
+                    RunConfigDialog(
+                        config=result.config,
+                        title=f"MC Run: {result.id}",
+                        batch_summary=(
+                            f"**{result.n_runs} Monte Carlo runs** · {result.scenario_name}  \n"
+                            f"Avg compliance: **{result.avg_compliance.mean:.1%}**"
+                            f" ±{result.avg_compliance.std:.1%}  \n"
+                            f"P10\u2013P90: {result.p10_compliance:.0%} \u2013 {result.p90_compliance:.0%}"
+                        ),
+                    )
+                    DownloadCSV(
                         "Download summary CSV",
-                        lambda r=result: export_monte_carlo_to_csv([r], output_path=""),
+                        lambda r=result: export_monte_carlo_to_csv([r], output_path=""),  # type: ignore[misc]
                         f"mc_summary_{safe}.csv",
                     )
-                    _dl_csv(
-                        "Download trajectory CSV",
-                        lambda r=result: export_mc_trajectory_to_csv(r, output_path=""),
-                        f"mc_trajectory_{safe}.csv",
+                    DownloadExcel(
+                        "Download Excel workbook",
+                        lambda r=result: export_monte_carlo_to_excel(r, output_path=""),  # type: ignore[misc]
+                        f"mc_{safe}.xlsx",
                     )
-                    if result.raw_seeds:
-                        _dl_csv(
-                            "Download per-seed CSV",
-                            lambda r=result: export_mc_per_seed_to_csv(
-                                r, output_path=""
-                            ),
-                            f"mc_per_seed_{safe}.csv",
-                        )
-                    _dl_tex(
-                        "Download LaTeX table",
-                        lambda r=result: export_monte_carlo_to_latex([r]).encode(
+                    DownloadJSON(
+                        "Download config JSON (for reproducibility)",
+                        lambda r=result: r.config.model_dump_json(indent=2).encode(
                             "utf-8"
-                        ),
-                        f"mc_table_{safe}.tex",
+                        ),  # type: ignore[misc]
+                        f"mc_config_{safe}.json",
                     )
 
-        # ── SECTION 2 : Results card (mirrors ResultsContent) ───────────
         with solara.Card("Results", style="margin-top: 0;"):
-            # Charts — each with an inline PNG download row attached above the image
-            with solara.Column(style="gap: 8px;"):
-                for png_bytes, tooltip, fname in [
-                    (png_comp, "Compliance trajectory", f"mc_compliance_{safe}.png"),
-                    (png_viol, "Violator count trajectory", f"mc_violators_{safe}.png"),
-                    (png_audit, "Audit rate chart", f"mc_audit_{safe}.png"),
-                    (png_pay, "Payoff comparison", f"mc_payoff_{safe}.png"),
-                ]:
-                    with solara.Column(style="gap: 0;"):
-                        with solara.Row(
-                            style="justify-content: flex-end; margin-bottom: 2px;"
-                        ):
-                            _dl_png(tooltip, lambda p=png_bytes: p, fname)
-                        solara.Image(png_bytes)
+            # Row 1: compliance, violator, audit — 3-column matching basic results panel
+            with solara.Columns([1, 1, 1]):
+                with solara.Column():
+                    ExpandableChart(
+                        fig_comp, download_filename=f"mc_compliance_{safe}.png"
+                    )
+                with solara.Column():
+                    ExpandableChart(
+                        fig_viol, download_filename=f"mc_violators_{safe}.png"
+                    )
+                with solara.Column():
+                    ExpandableChart(fig_audit, download_filename=f"mc_audit_{safe}.png")
+            # Row 2: payoff (reserved slots align with basic layout)
+            with solara.Columns([1, 1, 1]):
+                with solara.Column():
+                    ExpandableChart(fig_pay, download_filename=f"mc_payoff_{safe}.png")
+                with solara.Column():
+                    pass  # reserved
+                with solara.Column():
+                    pass  # reserved
 
         # ── SECTION 3 : Stats table ──────────────────────────────────────
         with solara.Card("Statistics", style="margin-top: 0;"):
@@ -255,7 +216,7 @@ def _MCResultsView() -> Any:
 
 @solara.component
 def _SweepResultsView() -> Any:
-    from compute_permit_sim.vis.export import export_sweep_to_csv
+    from compute_permit_sim.vis.export import export_sweep_to_csv, export_sweep_to_excel
     from compute_permit_sim.vis.plotting import plot_sweep_curve
 
     result = sweep_run.value.result
@@ -267,41 +228,52 @@ def _SweepResultsView() -> Any:
     safe_s = result.scenario_name.lower().replace(" ", "_")
     tp = result.tipping_point()
 
+    # Figure computed once; ExpandableChart handles inline render + PNG download internally
     fig = plot_sweep_curve(result, metric="avg_compliance")
-    png = _fig_png(fig)
 
     with solara.Column(classes=["analysis-panel"]):
-        # ── Summary card ────────────────────────────────────────────────
         with solara.Card("Summary", style="margin-bottom: 12px;"):
             with solara.Row(
                 style="align-items: center; justify-content: space-between; flex-wrap: wrap;"
             ):
                 with solara.Row(style="gap: 24px; flex-wrap: wrap; flex: 1;"):
-                    _MetricChip("Scenario", result.scenario_name)
-                    _MetricChip("Parameter", result.param_label)
-                    _MetricChip("Points", str(len(result.points)))
-                    _MetricChip(
+                    MetricChip("Scenario", result.scenario_name)
+                    MetricChip("Parameter", result.param_label)
+                    MetricChip("Points", str(len(result.points)))
+                    MetricChip(
                         "Tipping point",
                         f"{tp:.4f}" if tp is not None else "not reached",
                     )
-                with solara.Row(style="gap: 4px; align-items: center;"):
-                    _dl_csv(
+                with ResultsActions():
+                    RunConfigDialog(
+                        config=result.config,
+                        title=f"Sweep Run: {result.id}",
+                        batch_summary=(
+                            f"**{len(result.points)}-point sweep** · {result.scenario_name}  \n"
+                            f"Parameter: **{result.param_label}**  \n"
+                            f"Tipping point: {f'tp≈{tp:.3f}' if tp is not None else 'not reached'}"
+                        ),
+                    )
+                    DownloadCSV(
                         "Download sweep CSV",
-                        lambda r=result: export_sweep_to_csv(r, output_path=""),
+                        lambda r=result: export_sweep_to_csv(r, output_path=""),  # type: ignore[misc]
                         f"sweep_{safe_s}_{safe_p}.csv",
                     )
+                    DownloadExcel(
+                        "Download Excel workbook",
+                        lambda r=result: export_sweep_to_excel(r, output_path=""),  # type: ignore[misc]
+                        f"sweep_{safe_s}_{safe_p}.xlsx",
+                    )
+                    DownloadJSON(
+                        "Download config JSON (for reproducibility)",
+                        lambda r=result: r.config.model_dump_json(indent=2).encode(
+                            "utf-8"
+                        ),  # type: ignore[misc]
+                        f"sweep_config_{safe_s}_{safe_p}.json",
+                    )
 
-        # ── Results card ────────────────────────────────────────────────
         with solara.Card("Results", style="margin-top: 0;"):
-            with solara.Row(
-                style="gap: 4px; justify-content: flex-end; margin-bottom: 4px;"
-            ):
-                _dl_png(
-                    "Download sweep chart",
-                    lambda p=png: p,
-                    f"sweep_{safe_s}_{safe_p}.png",
-                )
-            solara.Image(png)
+            ExpandableChart(fig, download_filename=f"sweep_{safe_s}_{safe_p}.png")
 
         # ── Per-point table ──────────────────────────────────────────────
         with solara.Card("Per-Point Summary", style="margin-top: 0;"):

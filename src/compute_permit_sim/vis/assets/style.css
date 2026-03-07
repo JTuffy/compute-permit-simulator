@@ -262,6 +262,16 @@ footer {
     letter-spacing: 0 !important;
 }
 
+/* Truncate long labels (scenario names, MC descriptions) so they never
+ * expand the fixed-width sidebar. display:block is required for
+ * text-overflow to work inside a flex button. */
+.run-history-compact .v-btn .v-btn__content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
 
 /* ── 10. Utilities ────────────────────────────────────────────────────────── */
 
@@ -274,4 +284,107 @@ footer {
 /* Tighter markdown paragraph spacing in panels */
 .solara-markdown p {
     margin-bottom: 4px !important;
+}
+
+
+/* ── 11. Sidebar: Select / Dropdown ───────────────────────────────────────── */
+/*
+ * Vuetify's Select component text (the chosen value chip/text) is not covered
+ * by the general .sidebar-compact .v-label rule — it uses .v-select__selection.
+ * Setting the size here means per-component inline `style="font-size:..."` is
+ * no longer needed on any Select inside the sidebar.
+ */
+
+.sidebar-compact .v-select__selection--comma,
+.sidebar-compact .v-select__selections input {
+    font-size: 0.82rem !important;
+}
+
+
+/* ── 12. Sidebar Typography Utilities ─────────────────────────────────────── */
+/*
+ * Replaces hardcoded inline style= attributes for common text roles in panels.
+ * Use these classes instead of inline font-size/opacity/color attributes.
+ */
+
+/* Panel section headings (SCENARIO / BATCH ANALYSIS / RUN HISTORY) */
+.sidebar-section-label .solara-markdown p,
+.sidebar-section-label .md-text {
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    opacity: 0.60 !important;
+    margin: 0 !important;
+}
+
+/* Descriptive / hint text below inputs */
+.sidebar-hint-text .solara-markdown p,
+.sidebar-hint-text {
+    font-size: 0.72rem !important;
+    opacity: 0.55 !important;
+    margin-bottom: 4px !important;
+    white-space: normal !important;
+}
+
+/* Inline error / status messages */
+.sidebar-error-text {
+    font-size: 0.75rem !important;
+    color: var(--v-error-base, #ef5350) !important;
+    /* theme variable — no raw hex in Python */
+    margin-top: 4px !important;
+    white-space: normal !important;
+}
+
+/* Empty-state / muted text inside sidebar cards */
+.sidebar-empty-text {
+    font-size: 0.8rem !important;
+    opacity: 0.55 !important;
+}
+
+/* ── 12b. History Section Scroll Container ─────────────────────────────────── */
+
+/* Prevents the combined history section (batch + run) from growing the sidebar
+ * past the viewport. Applied via classes=["sidebar-history-section"]. */
+.sidebar-history-section {
+    max-height: 38vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    /* keeps scrollbar from clipping content */
+}
+
+
+/* ── 13. History Item Utilities ───────────────────────────────────────────── */
+
+/* Selected row highlight — used in RunHistoryItem and BatchHistoryItem */
+.history-item-selected {
+    background: rgba(66, 165, 245, 0.12) !important;
+    /* primary-400 at 12% */
+    border-radius: 4px !important;
+}
+
+/* Button text inside batch history items */
+.sidebar-compact .history-item-btn {
+    font-size: 0.75rem !important;
+    text-transform: none !important;
+    text-align: left !important;
+    padding: 0 !important;
+}
+
+/* Copy-link HTML button inside run history items.
+ * Applied via class= attribute on the injected <button> element.
+ * Avoids hardcoding hex colors in Python. */
+.history-link-btn {
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 6px !important;
+    color: var(--v-primary-base, #42a5f5) !important;
+    border-radius: 50% !important;
+    transition: background 0.2s !important;
+}
+
+.history-link-btn:hover {
+    background: rgba(66, 165, 245, 0.1) !important;
 }

@@ -26,6 +26,8 @@ from compute_permit_sim.schemas.sweep_params import (
     generate_values,
     params_for_category,
 )
+from compute_permit_sim.vis.components.history import UnifiedHistoryList
+from compute_permit_sim.vis.components.results import SidebarLabel
 from compute_permit_sim.vis.state.run_state import RunState, mc_run, sweep_run
 
 # Pre-built lookup map (module-level constant — registry never changes at runtime)
@@ -69,6 +71,16 @@ def _run_mc_background(scenario_name: str, n_runs: int) -> None:
         _mc_status.set(f"Running {n_runs} seeds on {config.name}...")
         result = run_monte_carlo(config, n_runs=n_runs)
 
+        # Store aggregate MC result in batch history for re-viewing from sidebar.
+        # NOTE: raw_seeds are PerSeedResult (scalar summaries), not SimulationRun
+        # objects — they cannot be added to run_history. The batch history list
+        # (session_history.batch_results) is the correct mechanism for MC results.
+        from compute_permit_sim.vis.state.history import (
+            session_history,  # noqa: PLC0415
+        )
+
+        session_history.add_batch_result(result)
+
         # Set result + phase=ready atomically; page.py sees one transition.
         mc_run.set(RunState[MonteCarloResult](phase="ready", result=result))
         _mc_status.set(
@@ -111,7 +123,14 @@ def _run_sweep_background(
         )
 
         tp = result.tipping_point()
-        tp_str = f" | tipping point \u2248 {tp:.3f}" if tp is not None else ""
+        tp_str = f" | tipping point ≈ {tp:.3f}" if tp is not None else ""
+
+        # Store sweep result in batch history for re-viewing from sidebar
+        from compute_permit_sim.vis.state.history import (
+            session_history,  # noqa: PLC0415
+        )
+
+        session_history.add_batch_result(result)
 
         # Set result + phase=ready atomically.
         sweep_run.set(RunState[SweepResult](phase="ready", result=result))
@@ -152,13 +171,15 @@ def _MonteCarloCard(scenario_names: list[str]) -> Any:
 
     with solara.Card(title="Monte Carlo", style="margin-bottom: 8px;"):
         if not scenario_names:
-            solara.Text("No scenarios found.", style="font-size: 0.8rem; opacity: 0.6;")
+            with solara.Column(classes=["sidebar-empty-text"]):
+                solara.Text("No scenarios found.")
             return
         solara.Select(
             label="Scenario",
             values=scenario_names,
             value=selected,
             on_value=set_selected,
+            dense=True,
         )
         solara.SliderInt(
             label=f"Replications: {n_runs}",
@@ -176,12 +197,9 @@ def _MonteCarloCard(scenario_names: list[str]) -> Any:
             disabled=is_running or not selected,
             small=True,
         )
-        # Only show status on error (success is evident from results appearing)
         if status and ("Error" in status or "not found" in status):
-            solara.Text(
-                status,
-                style="font-size: 0.78rem; color: #ef5350; margin-top: 4px; white-space: normal;",
-            )
+            with solara.Column(classes=["sidebar-error-text"]):
+                solara.Text(status)
 
 
 @solara.component
@@ -270,7 +288,8 @@ def _SweepCard(scenario_names: list[str]) -> Any:
 
     with solara.Card(title="Parameter Sweep", style="margin-bottom: 8px;"):
         if not scenario_names:
-            solara.Text("No scenarios found.", style="font-size: 0.8rem; opacity: 0.6;")
+            with solara.Column(classes=["sidebar-empty-text"]):
+                solara.Text("No scenarios found.")
             return
 
         solara.Select(
@@ -278,12 +297,14 @@ def _SweepCard(scenario_names: list[str]) -> Any:
             values=scenario_names,
             value=selected_scenario,
             on_value=set_selected_scenario,
+            dense=True,
         )
         solara.Select(
             label="Category",
             values=all_categories,
             value=selected_category,
             on_value=on_category_change,
+            dense=True,
         )
         param_labels = [p.label for p in params_in_cat]
         param_label_to_path = {p.label: p.path for p in params_in_cat}
@@ -302,17 +323,15 @@ def _SweepCard(scenario_names: list[str]) -> Any:
             values=param_labels,
             value=current_label,
             on_value=on_param_label_change,
+            dense=True,
         )
 
         # Description hint
         if current_param:
-            solara.Text(
-                current_param.description,
-                style="font-size: 0.72rem; opacity: 0.55; margin-bottom: 4px; white-space: normal;",
-            )
+            with solara.Column(classes=["sidebar-hint-text"]):
+                solara.Text(current_param.description)
 
-        # Range inputs
-        with solara.Row():
+        with solara.Row(style="gap: 4px;"):
             solara.InputFloat(
                 label=f"Min ({current_param.unit if current_param else ''})",
                 value=min_val,
@@ -338,20 +357,21 @@ def _SweepCard(scenario_names: list[str]) -> Any:
             step=5,
         )
 
-        # Compact simulation count
+        # Preview count / error
         if preview_error:
-            solara.Text(preview_error, style="font-size: 0.78rem; color: #ef5350;")
+            with solara.Column(classes=["sidebar-error-text"]):
+                solara.Text(preview_error)
         elif preview_pts > 0:
             total = preview_pts * n_runs
-            solara.Text(
-                f"{total:,} total simulations ({preview_pts} pts × {n_runs})",
-                style="font-size: 0.76rem; opacity: 0.55; margin-bottom: 4px;",
-            )
+            with solara.Column(classes=["sidebar-hint-text"]):
+                solara.Text(
+                    f"{total:,} total simulations ({preview_pts} pts × {n_runs})"
+                )
 
         solara.Button(
             "Running..." if is_running else "Run Sweep",
             on_click=on_run,
-            color="secondary",
+            color="primary",
             block=True,
             disabled=is_running
             or not selected_scenario
@@ -359,14 +379,11 @@ def _SweepCard(scenario_names: list[str]) -> Any:
             or preview_pts == 0,
             small=True,
         )
-        # Only show status on error
         if status and (
             "Error" in status or "not found" in status or "Invalid" in status
         ):
-            solara.Text(
-                status,
-                style="font-size: 0.78rem; color: #ef5350; margin-top: 4px; white-space: normal;",
-            )
+            with solara.Column(classes=["sidebar-error-text"]):
+                solara.Text(status)
 
 
 # ---------------------------------------------------------------------------
@@ -377,15 +394,18 @@ def _SweepCard(scenario_names: list[str]) -> Any:
 @solara.component
 def BatchPanel() -> Any:
     """Sidebar panel with Monte Carlo and Parameter Sweep configurators."""
-    from compute_permit_sim.vis.state.history import session_history
+    from compute_permit_sim.vis.state.history import session_history  # noqa: PLC0415
 
     # Use the same name map as LoadScenarioDialog for consistency
     scenario_names = sorted(session_history.scenario_name_map.value.keys())
 
     with solara.Column(classes=["sidebar-compact"]):
-        solara.Markdown(
-            "**BATCH ANALYSIS**",
-            style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 8px;",
-        )
+        SidebarLabel("**BATCH ANALYSIS**")
         _MonteCarloCard(scenario_names=scenario_names)
         _SweepCard(scenario_names=scenario_names)
+
+        # ── History — batch results + individual runs in one stream ────────
+        solara.Markdown("---")
+        with solara.Column(classes=["sidebar-history-section"]):
+            SidebarLabel("**HISTORY**")
+            UnifiedHistoryList()

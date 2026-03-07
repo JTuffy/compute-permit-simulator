@@ -97,6 +97,7 @@ def run_sweep(
         scenario_name=base_config.name,
         param_path=param_path,
         param_label=label,
+        config=base_config,
         points=points,
     )
 

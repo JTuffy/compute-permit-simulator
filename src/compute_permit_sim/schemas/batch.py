@@ -9,6 +9,9 @@ from __future__ import annotations
 import math
 import statistics
 from dataclasses import dataclass, field
+from uuid import uuid4
+
+from compute_permit_sim.schemas.config import ScenarioConfig
 
 
 class BatchColumnNames:
@@ -133,6 +136,8 @@ class MonteCarloResult:
     scenario_name: str
     n_runs: int
     seeds: list[int]
+    # Base config used for the run — required for config dialog + save-as-template
+    config: ScenarioConfig
 
     # --- Aggregate compliance ---
     avg_compliance: MetricStats  # mean over all steps, then over seeds
@@ -161,6 +166,8 @@ class MonteCarloResult:
 
     # --- Raw per-seed data (optional, set store_raw=True in run_monte_carlo) ---
     raw_seeds: list[PerSeedResult] = field(default_factory=list)
+    # Short unique identifier matching SimulationRun.sim_id convention
+    id: str = field(default_factory=lambda: str(uuid4())[:8])
 
 
 @dataclass(frozen=True)
@@ -178,7 +185,11 @@ class SweepResult:
     scenario_name: str
     param_path: str  # e.g. "audit.base_prob"
     param_label: str  # human-readable, e.g. "Base Audit Rate π₀"
+    # Base config the sweep started from — required for config dialog + save-as-template
+    config: ScenarioConfig
     points: list[SweepPoint] = field(default_factory=list)
+    # Short unique identifier matching SimulationRun.sim_id convention
+    id: str = field(default_factory=lambda: str(uuid4())[:8])
 
     def compliance_series(self) -> list[tuple[float, float, float]]:
         """Returns list of (param_value, mean_compliance, std_compliance)."""

@@ -687,3 +687,125 @@ def export_sweep_to_csv(
         output_path = f"outputs/sweep_{safe_s}_{safe_p}.csv"
     df.to_csv(output_path, index=False)
     return output_path
+
+
+def export_monte_carlo_to_excel(
+    result: MonteCarloResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a MonteCarloResult to an Excel workbook.
+
+    Sheet 1 — ``Summary``: one row with aggregate statistics.
+    Sheet 2 — ``Per Seed``: one row per seed (if ``raw_seeds`` is populated).
+
+    Args:
+        result: The ``MonteCarloResult`` to export.
+        output_path: ``None`` = auto-generate path, ``""`` = return bytes.
+    """
+    import io as _io
+
+    summary_rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.N_RUNS: result.n_runs,
+            _BCN.AVG_COMPLIANCE_MEAN: result.avg_compliance.mean,
+            _BCN.AVG_COMPLIANCE_STD: result.avg_compliance.std,
+            _BCN.FINAL_COMPLIANCE_MEAN: result.final_compliance.mean,
+            _BCN.P10_COMPLIANCE: result.p10_compliance,
+            _BCN.P90_COMPLIANCE: result.p90_compliance,
+            _BCN.PCT_RUNS_FULL_COMPLIANCE: result.pct_runs_full_compliance,
+            _BCN.AVG_PRICE_MEAN: result.avg_price.mean,
+            _BCN.AVG_PRICE_STD: result.avg_price.std,
+            _BCN.AVG_NET_PAYOFF_MEAN: result.avg_net_payoff.mean,
+            _BCN.AVG_NET_PAYOFF_STD: result.avg_net_payoff.std,
+            _BCN.AUDIT_RATE_MEAN: result.audit_rate.mean,
+            _BCN.AUDIT_RATE_STD: result.audit_rate.std,
+            _BCN.FALSE_POSITIVE_RATE_MEAN: result.false_positive_rate.mean,
+            _BCN.DETECTION_RATE_MEAN: result.detection_rate.mean,
+        }
+    ]
+    df_summary = _pd.DataFrame(summary_rows)
+
+    if output_path == "":
+        buf = _io.BytesIO()
+        with _pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df_summary.to_excel(writer, sheet_name="Summary", index=False)
+            if result.raw_seeds:
+                seed_rows = [
+                    {
+                        _BCN.SEED: s.seed,
+                        _BCN.AVG_COMPLIANCE_MEAN: s.avg_compliance,
+                        _BCN.FINAL_COMPLIANCE_MEAN: s.final_compliance,
+                        _BCN.AVG_PRICE_MEAN: s.avg_price,
+                        _BCN.AVG_NET_PAYOFF_MEAN: s.avg_net_payoff,
+                        _BCN.AUDIT_RATE_MEAN: s.audit_rate,
+                        _BCN.FALSE_POSITIVE_RATE_MEAN: s.false_positive_rate,
+                        _BCN.DETECTION_RATE_MEAN: s.detection_rate,
+                    }
+                    for s in result.raw_seeds
+                ]
+                _pd.DataFrame(seed_rows).to_excel(
+                    writer, sheet_name="Per Seed", index=False
+                )
+        buf.seek(0)
+        return buf.read()
+
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe = result.scenario_name.lower().replace(" ", "_")
+        output_path = f"outputs/mc_{safe}.xlsx"
+    with _pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df_summary.to_excel(writer, sheet_name="Summary", index=False)
+    return output_path
+
+
+def export_sweep_to_excel(
+    result: SweepResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a SweepResult to an Excel workbook.
+
+    Single sheet — ``Sweep``: one row per sweep point.
+
+    Args:
+        result: The ``SweepResult`` to export.
+        output_path: ``None`` = auto-generate path, ``""`` = return bytes.
+    """
+    import io as _io
+
+    rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.PARAM_PATH: result.param_path,
+            _BCN.PARAM_VALUE: pt.param_value,
+            _BCN.N_RUNS: pt.result.n_runs,
+            _BCN.AVG_COMPLIANCE_MEAN: pt.result.avg_compliance.mean,
+            _BCN.AVG_COMPLIANCE_STD: pt.result.avg_compliance.std,
+            _BCN.P10_COMPLIANCE: pt.result.p10_compliance,
+            _BCN.P90_COMPLIANCE: pt.result.p90_compliance,
+            _BCN.AVG_PRICE_MEAN: pt.result.avg_price.mean,
+            _BCN.AVG_PRICE_STD: pt.result.avg_price.std,
+            _BCN.AVG_NET_PAYOFF_MEAN: pt.result.avg_net_payoff.mean,
+            _BCN.AUDIT_RATE_MEAN: pt.result.audit_rate.mean,
+            _BCN.FALSE_POSITIVE_RATE_MEAN: pt.result.false_positive_rate.mean,
+            _BCN.DETECTION_RATE_MEAN: pt.result.detection_rate.mean,
+        }
+        for pt in result.points
+    ]
+    df = _pd.DataFrame(rows)
+
+    if output_path == "":
+        buf = _io.BytesIO()
+        with _pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Sweep", index=False)
+        buf.seek(0)
+        return buf.read()
+
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe_s = result.scenario_name.lower().replace(" ", "_")
+        safe_p = result.param_path.replace(".", "_")
+        output_path = f"outputs/sweep_{safe_s}_{safe_p}.xlsx"
+    with _pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="Sweep", index=False)
+    return output_path

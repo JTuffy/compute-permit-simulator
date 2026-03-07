@@ -7,3 +7,19 @@ description: Top-level amendments — for high-level notes that don't fit in oth
 
 <!-- Add dated, signed entries below when a top-level note is warranted.
      Keep each entry short. This file should stay mostly empty. -->
+
+## 2026-03-07 — One-off scripts live in scripts/ or agent_workspace/
+
+When you write a helper or reference script (data exploration, migration, benchmark,
+experiment runner), place it in one of two locations:
+
+- **`scripts/`** — committed, reusable across sessions. Use when the script is worth
+  preserving (e.g. a data transform that might be re-run, a batch runner used repeatedly).
+- **`agent_workspace/`** — gitignored, ephemeral. Use for one-off investigation scripts
+  you don't expect to reuse.
+
+After writing a reusable script to `scripts/`, add a one-line note in the most relevant
+rules file (usually `project.md` or a workflow) indicating the script exists and when
+to reach for it. This prevents re-inventing scripts across sessions.
+
+See `python.md` for tooling conventions (`uv run python scripts/...`).

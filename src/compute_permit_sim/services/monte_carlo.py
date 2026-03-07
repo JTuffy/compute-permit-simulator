@@ -231,6 +231,7 @@ def run_monte_carlo(
         scenario_name=config.name,
         n_runs=actual_n,
         seeds=list(run_seeds),
+        config=config,
         avg_compliance=MetricStats.from_values([r.avg_compliance for r in raw]),
         final_compliance=MetricStats.from_values([r.final_compliance for r in raw]),
         p10_compliance=_percentile(per_seed_compliance, 10),
