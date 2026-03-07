@@ -169,7 +169,7 @@ def _MonteCarloCard(scenario_names: list[str]) -> Any:
             daemon=True,
         ).start()
 
-    with solara.Card(title="Monte Carlo", style="margin-bottom: 8px;"):
+    with solara.Card(title="Monte Carlo"):
         if not scenario_names:
             with solara.Column(classes=["sidebar-empty-text"]):
                 solara.Text("No scenarios found.")
@@ -286,7 +286,7 @@ def _SweepCard(scenario_names: list[str]) -> Any:
             daemon=True,
         ).start()
 
-    with solara.Card(title="Parameter Sweep", style="margin-bottom: 8px;"):
+    with solara.Card(title="Parameter Sweep"):
         if not scenario_names:
             with solara.Column(classes=["sidebar-empty-text"]):
                 solara.Text("No scenarios found.")

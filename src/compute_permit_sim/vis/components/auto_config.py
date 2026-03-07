@@ -238,6 +238,26 @@ def AutoConfigView(
                     else:
                         solara.Checkbox(label=label, value=current_val, disabled=True)
 
+                # 'text' is an explicit string format; also guard: if the
+                # runtime value is actually a str, never pass it to InputFloat
+                # (Vuetify numeric validation fires → broken label + error msg).
+                elif fmt == "text" or isinstance(current_val, str):
+                    if not readonly and is_reactive:
+                        solara.InputText(
+                            label=label,
+                            value=str(current_val) if current_val is not None else "",
+                            on_value=make_setter(val, str),
+                            dense=True,
+                            disabled=disabled,
+                        )
+                    elif current_val is not None:
+                        solara.InputText(
+                            label=label,
+                            value=str(current_val),
+                            dense=True,
+                            disabled=True,
+                        )
+
                 else:  # float, currency, scientific
                     if not readonly and is_reactive:
                         solara.InputText(

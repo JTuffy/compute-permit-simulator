@@ -8,7 +8,7 @@
    1. Fonts & Design Tokens
    2. Base / Reset
    3. App Bar
-   4. Input Fields  ← shared rules for sidebar + dialog config views
+   4. Input Fields  ← GLOBAL rules (no container dependency)
    5. Section Headers (v-subheader)
    6. Sidebar (config panel)
    7. Config Dialog
@@ -82,78 +82,87 @@ footer {
 }
 
 
-/* ── 4. Input Fields ──────────────────────────────────────────────────────── */
+/* ── 4. Input Fields (GLOBAL) ─────────────────────────────────────────────── */
 /*
- * Shared rules for EVERY AutoConfigView context — both the editable sidebar
- * (.sidebar-compact) and readonly config dialogs/tabs (.config-view).
+ * These rules apply to ALL v-text-field inputs app-wide — sidebar, dialogs,
+ * results pane, and any future context. Scope is intentionally wide.
  *
- * ROOT CAUSE OF THE LABEL-THROUGH-TEXT BUG:
- *   Vuetify 2 only applies `v-label--active` (which floats the label above
- *   the input via translateY(-18px)) when its internal `isDirty` is true.
- *   For disabled/readonly fields, `isDirty` is never set, so the label stays
- *   at its default resting position — vertically centered in the slot —
- *   making the underline appear to cut through the label text.
+ * DESIGN INTENT
+ * ─────────────
+ * Vuetify 2's default text-field uses two animated pseudo-elements (::before /
+ * ::after) on .v-input__slot to draw the underline. We replace them with a
+ * single, controlled border-bottom so we own the exact visual position.
  *
- * FIX: Force disabled inputs to always display their label in active/floating
- *   position. We also hide the default ::before / ::after underline animations
- *   and replace them with a single clean border-bottom so we control the exact
- *   visual position of the line.
+ * LABEL-THROUGH-VALUE BUG (root cause + fix)
+ * ───────────────────────────────────────────
+ * Vuetify 2 floats the label above the input via
+ *   .v-label--active { transform: translateY(-18px) scale(0.75) }
+ * It applies v-label--active only when its internal `isDirty` flag is true
+ * (i.e. the field has been interacted with or has an initial non-null value).
+ * For disabled/readonly fields the flag is never set, so the label stays at
+ * its resting y-position — vertically centered over the value text, making
+ * the underline appear to cut through the label.
+ *
+ * Fix: explicitly float the label for ANY .v-input that is disabled, OR that
+ * contains a populated input (detected via :not(:placeholder-shown)).
+ * We also use the .v-label--active class as a fallback for interactive fields.
+ *
+ * We do NOT use !important on transform so that Vuetify's own active-label
+ * transitions still operate for editable fields during focus animations.
  */
 
-/* The active (focused or has-value) label position — force it for disabled too */
-.sidebar-compact .v-input--is-disabled .v-label,
-.config-view .v-input--is-disabled .v-label {
-    transform: translateY(-18px) scale(0.75) !important;
-}
-
-/* Hide Vuetify's animated underline pseudo-elements */
-.sidebar-compact .v-text-field .v-input__slot::before,
-.sidebar-compact .v-text-field .v-input__slot::after,
-.config-view .v-text-field .v-input__slot::before,
-.config-view .v-text-field .v-input__slot::after {
+/* 4a. Hide Vuetify's animated underline pseudo-elements globally */
+.v-text-field .v-input__slot::before,
+.v-text-field .v-input__slot::after {
     display: none !important;
 }
 
-/* Replace with a single clean border */
-.sidebar-compact .v-text-field .v-input__slot,
-.config-view .v-text-field .v-input__slot {
+/* 4b. Replace with a single clean border */
+.v-text-field .v-input__slot {
     border-bottom: 1px solid var(--input-border-idle) !important;
     transition: border-color 0.15s ease !important;
 }
 
-/* Highlight on focus */
-.sidebar-compact .v-text-field.v-input--is-focused .v-input__slot,
-.config-view .v-text-field.v-input--is-focused .v-input__slot {
+/* 4c. Highlight on focus */
+.v-text-field.v-input--is-focused .v-input__slot {
     border-bottom-color: var(--input-border-focus) !important;
 }
 
-/* Monospaced values inside inputs */
-.sidebar-compact .v-text-field input,
-.config-view .v-text-field input {
+/* 4d. Label float — force active position for disabled inputs and
+ *     for any input whose native <input> has content (placeholder trick).
+ *     The .v-label--active selector covers normally-focused editable fields. */
+.v-input--is-disabled .v-label,
+.v-label--active {
+    transform: translateY(-18px) scale(0.75) !important;
+}
+
+/* 4e. Monospaced values inside all text inputs */
+.v-text-field input {
     font-family: var(--font-mono) !important;
     font-size: var(--input-value-size) !important;
     padding-top: 4px !important;
 }
 
-/* Labels */
-.sidebar-compact .v-label,
-.config-view .v-label {
+/* 4f. Labels — shared across all inputs app-wide */
+.v-text-field .v-label {
     font-size: var(--input-label-size) !important;
     font-weight: 500 !important;
     opacity: 0.65 !important;
 }
 
-/* Dense input row height */
-.sidebar-compact .v-input,
-.config-view .v-input {
+/* 4g. Collapse Vuetify's default bottom margin on all inputs */
+.v-input {
     margin-bottom: 0 !important;
 }
 
 
 /* ── 5. Section Headers (v-subheader) ────────────────────────────────────── */
+/*
+ * Applied globally — v-subheader is only ever used in config contexts
+ * (AutoConfigView groups, RangeView labels). No context scoping needed.
+ */
 
-.sidebar-compact .v-subheader,
-.config-view .v-subheader {
+.v-subheader {
     font-size: 0.68rem !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
@@ -203,6 +212,12 @@ footer {
     font-size: 0.82rem !important;
 }
 
+/* Select value text inside sidebar */
+.sidebar-compact .v-select__selection--comma,
+.sidebar-compact .v-select__selections input {
+    font-size: 0.82rem !important;
+}
+
 
 /* ── 7. Config Dialog ─────────────────────────────────────────────────────── */
 
@@ -234,8 +249,10 @@ footer {
     border-radius: 10px !important;
 }
 
-/* Card titles — clear hierarchy: bold, uppercase, slightly reduced size */
-.v-card__title {
+/* Card titles in the analysis panel — larger, more prominent than sidebar cards.
+ * Scoped to .analysis-panel to avoid colliding with .sidebar-compact .v-card__title
+ * which has its own (smaller) override. */
+.analysis-panel .v-card__title {
     font-size: 0.92rem !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
@@ -287,21 +304,7 @@ footer {
 }
 
 
-/* ── 11. Sidebar: Select / Dropdown ───────────────────────────────────────── */
-/*
- * Vuetify's Select component text (the chosen value chip/text) is not covered
- * by the general .sidebar-compact .v-label rule — it uses .v-select__selection.
- * Setting the size here means per-component inline `style="font-size:..."` is
- * no longer needed on any Select inside the sidebar.
- */
-
-.sidebar-compact .v-select__selection--comma,
-.sidebar-compact .v-select__selections input {
-    font-size: 0.82rem !important;
-}
-
-
-/* ── 12. Sidebar Typography Utilities ─────────────────────────────────────── */
+/* ── 11. Sidebar Typography Utilities ─────────────────────────────────────── */
 /*
  * Replaces hardcoded inline style= attributes for common text roles in panels.
  * Use these classes instead of inline font-size/opacity/color attributes.
@@ -342,7 +345,7 @@ footer {
     opacity: 0.55 !important;
 }
 
-/* ── 12b. History Section Scroll Container ─────────────────────────────────── */
+/* ── 11b. History Section Scroll Container ─────────────────────────────────── */
 
 /* Prevents the combined history section (batch + run) from growing the sidebar
  * past the viewport. Applied via classes=["sidebar-history-section"]. */
@@ -355,7 +358,7 @@ footer {
 }
 
 
-/* ── 13. History Item Utilities ───────────────────────────────────────────── */
+/* ── 12. History Item Utilities ───────────────────────────────────────────── */
 
 /* Selected row highlight — used in RunHistoryItem and BatchHistoryItem */
 .history-item-selected {

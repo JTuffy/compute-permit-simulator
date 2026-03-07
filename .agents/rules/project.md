@@ -88,3 +88,16 @@ Accept typed result objects, return `matplotlib.Figure`, never import Solara. Us
 ## Testing
 
 Schema sync tests detect drift between the schema and any mirrored layer (e.g. UI config). These tests live in `tests/vis/` and must be updated when adding new schema fields. Complex model construction uses shared factories in `tests/factories.py`.
+
+## Styling: Global vs. Scoped CSS
+
+**Input field rules are globally scoped** in `style.css` — they target `.v-text-field` directly, not through `.sidebar-compact` or `.config-view`. This is intentional: Vuetify 2 underline/label bugs must be corrected everywhere, not just in known container classes.
+
+**When adding new CSS:**
+- Input field corrections (label float, underline, font) → global, no container selector
+- Section headers (`v-subheader`) → global (only ever used in config contexts)
+- Layout/density adjustments (card padding, tab sizing) → `.sidebar-compact` or `.config-view` scope is fine
+- **Do not split** the same visual rule across both `.sidebar-compact` and `.config-view` — fix it globally and remove the duplication
+
+The two-scope system (`.sidebar-compact` + `.config-view`) exists only for layout/density rules that genuinely differ between the sidebar and dialog contexts. Any rule that appears under both selectors with the same value should be promoted to global scope.
+

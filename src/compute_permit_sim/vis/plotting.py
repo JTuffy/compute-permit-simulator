@@ -12,6 +12,8 @@ Design rules:
 
 from __future__ import annotations
 
+import textwrap
+
 import matplotlib
 import pandas as pd
 from matplotlib.axes import Axes
@@ -23,6 +25,20 @@ from compute_permit_sim.vis.constants import CHART_COLOR_MAP, OUTCOME_COLORS
 
 # Ensure non-interactive backend for thread safety in Solara/Exports
 matplotlib.use("Agg")
+
+
+# ---------------------------------------------------------------------------
+# Text helpers
+# ---------------------------------------------------------------------------
+
+
+def _wrap(text: str, width: int = 48) -> str:
+    """Wrap *text* to at most *width* characters per line.
+
+    Applied to all dynamic strings (scenario names, parameter labels) used
+    in chart titles and axis labels so they never overflow figure bounds.
+    """
+    return textwrap.fill(text, width=width)
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +95,10 @@ def plot_time_series(
     ax.plot(data, label=label, color=color, linewidth=2.5, alpha=0.9)
 
     ax.set_xlabel("Step", fontsize=11, fontweight="500")
-    ax.set_ylabel(ylabel or label, fontsize=11, fontweight="500")
+    ax.set_ylabel(_wrap(ylabel or label), fontsize=11, fontweight="500")
 
     if title:
-        ax.set_title(title, fontsize=12, fontweight="600")
+        ax.set_title(_wrap(title), fontsize=12, fontweight="600")
     ax.legend(loc="best", framealpha=0.9, fontsize=10)
     if ylim:
         ax.set_ylim(bottom=ylim[0], top=ylim[1])
@@ -138,9 +154,9 @@ def plot_scatter(
         colors = [CHART_COLOR_MAP.get("blue", "#2196F3")] * len(df)
 
     ax.scatter(x, y, c=colors, alpha=0.7, edgecolors="w", s=80)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    ax.set_xlabel(_wrap(xlabel))
+    ax.set_ylabel(_wrap(ylabel))
+    ax.set_title(_wrap(title))
     return fig, ax
 
 
@@ -218,7 +234,7 @@ def plot_compliance_distribution(
             )
 
     ax.set_ylabel("Number of Labs")
-    ax.set_title(title)
+    ax.set_title(_wrap(title))
     ax.set_ylim(0, max(bar_values) * 1.3 if max(bar_values) > 0 else 5)
     ax.tick_params(axis="x", labelsize=8)
     fig.tight_layout()
@@ -259,7 +275,7 @@ def plot_audit_coefficient_distribution(
     )
     ax.set_xlabel("Audit Coefficient c(i)")
     ax.set_ylabel("Number of Labs")
-    ax.set_title(title)
+    ax.set_title(_wrap(title))
     ax.legend(fontsize=9)
     fig.tight_layout()
     return fig
@@ -319,7 +335,7 @@ def plot_audit_targeting(
         )
 
     ax.set_ylabel("Audit Rate (%)")
-    ax.set_title(title, fontsize=12, fontweight="600")
+    ax.set_title(_wrap(title), fontsize=12, fontweight="600")
     ax.set_ylim(0, max(rates) * 1.3 if max(rates) > 0 else 10)
     ax.yaxis.grid(True, alpha=0.25)  # y-only grid overrides create_figure default
     fig.tight_layout()
@@ -390,7 +406,7 @@ def plot_audit_source_distribution(
             )
 
     ax.set_ylabel("Labs Caught")
-    ax.set_title(title, fontsize=12, fontweight="600")
+    ax.set_title(_wrap(title), fontsize=12, fontweight="600")
     ax.set_ylim(0, max(values) * 1.3 if max(values) > 0 else 5)
     ax.yaxis.grid(True, alpha=0.25)
     fig.tight_layout()
@@ -439,7 +455,9 @@ def plot_mc_trajectory(result) -> "Figure":
     ax.set_xlabel("Simulation Step")
     ax.set_ylabel("Compliance Rate")
     ax.set_title(
-        f"Compliance Trajectory — {result.scenario_name} ({result.n_runs} seeds)",
+        _wrap(
+            f"Compliance Trajectory — {result.scenario_name} ({result.n_runs} seeds)"
+        ),
         fontsize=11,
         fontweight="600",
     )
@@ -489,7 +507,9 @@ def plot_mc_violator_trajectory(result) -> "Figure":
     ax.set_xlabel("Simulation Step")
     ax.set_ylabel("Number of Violators")
     ax.set_title(
-        f"Violator Count Trajectory — {result.scenario_name} ({result.n_runs} seeds)",
+        _wrap(
+            f"Violator Count Trajectory — {result.scenario_name} ({result.n_runs} seeds)"
+        ),
         fontsize=11,
         fontweight="600",
     )
@@ -537,7 +557,7 @@ def plot_mc_audit_trajectory(result) -> "Figure":
     ax.set_xlabel("Simulation Step")
     ax.set_ylabel("Audit Rate")
     ax.set_title(
-        f"Audit Rate — {result.scenario_name} ({result.n_runs} seeds)",
+        _wrap(f"Audit Rate — {result.scenario_name} ({result.n_runs} seeds)"),
         fontsize=11,
         fontweight="600",
     )
@@ -613,7 +633,7 @@ def plot_mc_payoff_comparison(result) -> "Figure":
     ax.axhline(0, color="#999", linewidth=0.8)
     ax.set_ylabel("Avg Net Payoff per Lab-Step (M$)")
     ax.set_title(
-        f"Payoff: Compliant vs. Violating — {result.scenario_name}",
+        _wrap(f"Payoff: Compliant vs. Violating — {result.scenario_name}"),
         fontsize=11,
         fontweight="600",
     )
@@ -672,9 +692,9 @@ def plot_sweep_curve(result, metric: str = "avg_compliance") -> "Figure":
     else:
         ax.set_ylabel(metric.replace("_", " ").title())
 
-    ax.set_xlabel(result.param_label)
+    ax.set_xlabel(_wrap(result.param_label, width=40))
     ax.set_title(
-        f"Sensitivity: {result.param_label} — {result.scenario_name}",
+        _wrap(f"Sensitivity: {result.param_label} — {result.scenario_name}"),
         fontsize=11,
         fontweight="600",
     )
