@@ -34,6 +34,7 @@ def create_agent_snapshot(
         "cumulative_capability": 0.0,
         "bid_price": 0.0,
         "permits_wanted": 0,
+        "racing_factor": 1.0,
     }
     data = {**defaults, **kwargs}
     return AgentSnapshot(id=id, is_compliant=is_compliant, **data)

@@ -13,9 +13,9 @@ from compute_permit_sim.vis.state.run_state import basic_run
 
 
 @solara.component
-def ParamView(config: ScenarioConfig) -> solara.Element:
-    """Read-only view of a ScenarioConfig."""
-    return AutoConfigView(schema=ScenarioConfig, model=config, readonly=True)
+def ParamView(config: ScenarioConfig):
+    """Read-only configuration view."""
+    AutoConfigView(schema=ScenarioConfig, model=config, readonly=True)
 
 
 @solara.component

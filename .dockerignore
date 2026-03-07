@@ -8,3 +8,13 @@ outputs
 .coverage
 htmlcov
 .DS_Store
+
+# Agent workspace and scripts — ephemeral research, never in production image
+agent_workspace/
+scripts/
+
+# Dev-only directories
+tests/
+.agents/
+.vscode/
+.claude

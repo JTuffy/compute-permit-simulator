@@ -72,7 +72,7 @@ def AnalysisSummary(
 
                 if run is not None:
                     from compute_permit_sim.vis.export import (
-                        export_run_to_csv,
+                        export_run_summary_to_csv,
                         export_run_to_excel,
                     )
 
@@ -84,8 +84,8 @@ def AnalysisSummary(
                         f"{fname}.xlsx",
                     )
                     DownloadCSV(
-                        "Export to CSV",
-                        lambda: export_run_to_csv(run, output_path=""),
+                        "Export summary to CSV",
+                        lambda: export_run_summary_to_csv(run, output_path=""),
                         f"{fname}.csv",
                     )
                     DownloadJSON(

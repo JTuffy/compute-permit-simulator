@@ -38,6 +38,7 @@ def RiskScatterPlot(
     mode: Literal["aggregate", "step"],
     agents_df: pd.DataFrame | None = None,
     steps: list | None = None,
+    download_filename: str | None = None,
 ) -> None:
     """Scatter of Reported (X) vs True (Y) compute usage, colored by compliance.
 
@@ -74,7 +75,7 @@ def RiskScatterPlot(
         )
         ax.plot([0, max_val], [0, max_val], "k--", alpha=0.5, label="Honesty (y=x)")
         ax.legend()
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
     else:
         # Aggregate mode — pool all (step, agent) observations
@@ -142,7 +143,7 @@ def RiskScatterPlot(
         )
         ax.legend(fontsize=7, loc="upper left")
         fig.tight_layout()
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
 
 @solara.component
@@ -150,6 +151,7 @@ def ComplianceDistributionPlot(
     mode: Literal["aggregate", "step"],
     agents_df: pd.DataFrame | None = None,
     steps: list | None = None,
+    download_filename: str | None = None,
 ) -> None:
     """Bar chart: Compliant / Uncaught / per-source Caught counts.
 
@@ -168,7 +170,7 @@ def ComplianceDistributionPlot(
         fig = plot_compliance_distribution(
             df, title="Compliance Distribution (This Step)"
         )
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
     else:
         # Aggregate mode
@@ -182,7 +184,7 @@ def ComplianceDistributionPlot(
         fig = plot_compliance_distribution(
             df, title="Compliance Distribution (Full Run)"
         )
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
 
 @solara.component
@@ -190,6 +192,7 @@ def AuditSourcePlot(
     mode: Literal["aggregate", "step"],
     agents_df: pd.DataFrame | None = None,
     steps: list | None = None,
+    download_filename: str | None = None,
 ) -> None:
     """Bar chart: caught labs by detection channel (direct/backcheck/whistleblower/monitoring).
 
@@ -206,7 +209,7 @@ def AuditSourcePlot(
         fig = plot_audit_source_distribution(
             caught_only, title="Caught by Channel (This Step)"
         )
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
     else:
         # Aggregate mode
@@ -218,4 +221,4 @@ def AuditSourcePlot(
             solara.Markdown("*No agent data.*")
             return
         fig = plot_audit_source_distribution(df, title="Caught by Channel (Full Run)")
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)

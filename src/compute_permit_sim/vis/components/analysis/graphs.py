@@ -115,7 +115,7 @@ def ResultsContent(
                             ylabel="Rate (0–1)",
                             ylim=(-0.05, 1.05),
                         )
-                        ExpandableChart(fig)
+                        ExpandableChart(fig, download_filename="compliance_rate.png")
                     else:
                         solara.Markdown("*No compliance data yet*")
 
@@ -128,7 +128,7 @@ def ResultsContent(
                             title="Permit Price",
                             ylabel="Price ($)",
                         )
-                        ExpandableChart(fig)
+                        ExpandableChart(fig, download_filename="permit_price.png")
                     else:
                         solara.Markdown("*No price data yet*")
 
@@ -141,22 +141,38 @@ def ResultsContent(
                             title="Labs Caught per Step",
                             ylabel="Count",
                         )
-                        ExpandableChart(fig)
+                        ExpandableChart(fig, download_filename="labs_caught.png")
                     else:
                         solara.Markdown("*No enforcement data yet*")
 
             if steps:
                 with solara.Columns([1, 1, 1]):
                     with solara.Column():
-                        RiskScatterPlot(mode="aggregate", steps=steps)
+                        RiskScatterPlot(
+                            mode="aggregate",
+                            steps=steps,
+                            download_filename="risk_scatter.png",
+                        )
                     with solara.Column():
-                        AuditTargetingPlot(mode="aggregate", steps=steps)
+                        AuditTargetingPlot(
+                            mode="aggregate",
+                            steps=steps,
+                            download_filename="audit_targeting.png",
+                        )
                     with solara.Column():
-                        ComplianceDistributionPlot(mode="aggregate", steps=steps)
+                        ComplianceDistributionPlot(
+                            mode="aggregate",
+                            steps=steps,
+                            download_filename="compliance_distribution.png",
+                        )
 
                 with solara.Columns([1, 1, 1]):
                     with solara.Column():
-                        AuditSourcePlot(mode="aggregate", steps=steps)
+                        AuditSourcePlot(
+                            mode="aggregate",
+                            steps=steps,
+                            download_filename="audit_sources.png",
+                        )
                     with solara.Column():
                         pass  # reserved
                     with solara.Column():

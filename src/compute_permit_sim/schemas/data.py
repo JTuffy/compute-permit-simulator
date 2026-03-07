@@ -38,6 +38,9 @@ class AgentSnapshot(BaseModel):
     )
     bid_price: float = Field(..., description="Willingness to pay per permit this step")
     permits_wanted: int = Field(..., description="Permits requested at this step")
+    racing_factor: float = Field(
+        ..., description="Dynamic racing urgency multiplier (c_r) this step"
+    )
 
     model_config = ConfigDict(frozen=True)
 

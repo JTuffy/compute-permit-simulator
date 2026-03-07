@@ -1,8 +1,26 @@
 """Export functionality for simulation runs (Excel and CSV).
 
 Exports run data to:
-1. Excel with multiple sheets (Config, Summary, Agent Details, Graphs)
-2. CSV with flattened step-by-step agent data and full configuration context.
+1. Excel with multiple sheets (Config, Summary, [Per Seed / Trajectory / Sweep], Graphs)
+2. CSV — summary row per run, or detailed step×agent rows for research.
+
+Public API
+----------
+Basic runs:
+    export_run_to_excel        — Excel workbook with charts
+    export_run_summary_to_csv  — one summary row (matches MC/sweep shape)
+    export_run_steps_to_csv    — step×agent rows for detailed analysis
+
+Monte Carlo:
+    export_monte_carlo_to_excel     — Excel with Config/Summary/Per Seed/Trajectory/Graphs
+    export_monte_carlo_to_csv       — one summary row per scenario
+    export_mc_per_seed_to_csv       — one row per seed (requires store_raw=True)
+    export_mc_trajectory_to_csv     — per-step compliance mean/std
+    export_monte_carlo_to_latex     — LaTeX tabular
+
+Sweep:
+    export_sweep_to_excel  — Excel with Config/Sweep/Graphs
+    export_sweep_to_csv    — one row per parameter value
 """
 
 import io
@@ -115,18 +133,54 @@ def export_run_to_excel(run, output_path: str | None = None) -> str | bytes:
     return output_path
 
 
-def export_run_to_csv(run, output_path: str | None = None) -> str | bytes:
-    """Export a simulation run to a CSV file with step-wise agent data.
+def export_run_summary_to_csv(run, output_path: str | None = None) -> "str | bytes":
+    """Export a summary of a single simulation run as a one-row CSV.
 
-    Each row represents one agent at one simulation step.
-    Config parameters are NOT included — use the Excel export for full config.
+    Shape matches MC/sweep summary exports: one row, all key metrics as columns.
+    Suitable for concatenating across many runs for batch comparison.
 
     Args:
-        run: The simulation run to export.
-        output_path: File path to write to (None=auto, ""=bytes).
+        run: The SimulationRun to summarise.
+        output_path: ``None`` = auto-generate path, ``""`` = return bytes.
 
     Returns:
-        str (path) if written to file, bytes if output_path was "".
+        str (path) if written to file, bytes if output_path was ``""``.
+    """
+    metrics = run.metrics
+    row: dict = {
+        "run_id": run.id,
+        "scenario": run.config.name if run.config else "",
+        "seed": run.config.seed if run.config else None,
+        "steps": len(run.steps),
+        "n_agents": run.config.n_agents if run.config else None,
+    }
+    if metrics:
+        for field_name in RunMetrics.model_fields:
+            row[field_name] = getattr(metrics, field_name)
+
+    df = pd.DataFrame([row])
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        os.makedirs("outputs", exist_ok=True)
+        fname = run.sim_id if run.sim_id else run.id
+        output_path = f"outputs/simulation_run_{fname}_summary.csv"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+
+def export_run_steps_to_csv(run, output_path: str | None = None) -> "str | bytes":
+    """Export step×agent rows — one row per agent per simulation step.
+
+    Detailed research export; use ``export_run_summary_to_csv`` for
+    one-click results comparison across runs.
+
+    Args:
+        run: The SimulationRun to export.
+        output_path: ``None`` = auto-generate path, ``""`` = return bytes.
+
+    Returns:
+        str (path) if written to file, bytes if output_path was ``""``.
     """
     rows = []
     for step_res in run.steps:
@@ -142,17 +196,18 @@ def export_run_to_csv(run, output_path: str | None = None) -> str | bytes:
             rows.append(row)
 
     df = pd.DataFrame(rows) if rows else pd.DataFrame()
-
     if output_path == "":
         return df.to_csv(index=False).encode("utf-8")
-
     if output_path is None:
         os.makedirs("outputs", exist_ok=True)
         fname = run.sim_id if run.sim_id else run.id
-        output_path = f"outputs/simulation_run_{fname}.csv"
-
+        output_path = f"outputs/simulation_run_{fname}_steps.csv"
     df.to_csv(output_path, index=False)
     return output_path
+
+
+# Keep old name as an alias for any callers that predate the rename.
+export_run_to_csv = export_run_steps_to_csv
 
 
 def _get_field_label(model_class, field_name: str) -> str:
@@ -693,69 +748,187 @@ def export_monte_carlo_to_excel(
     result: MonteCarloResult,
     output_path: str | None = None,
 ) -> "str | bytes":
-    """Export a MonteCarloResult to an Excel workbook.
+    """Export a MonteCarloResult to a formatted Excel workbook.
 
-    Sheet 1 — ``Summary``: one row with aggregate statistics.
-    Sheet 2 — ``Per Seed``: one row per seed (if ``raw_seeds`` is populated).
+    Sheets:
+      ``Config``      — base scenario configuration used for the run
+      ``Summary``     — one row of aggregate statistics
+      ``Per Seed``    — one row per seed (if ``raw_seeds`` populated)
+      ``Trajectory``  — per-step compliance mean/std from ``step_compliance``
+      ``Graphs``      — embedded matplotlib: compliance trajectory + distribution
 
     Args:
         result: The ``MonteCarloResult`` to export.
         output_path: ``None`` = auto-generate path, ``""`` = return bytes.
     """
-    import io as _io
-
-    summary_rows = [
-        {
-            _BCN.SCENARIO: result.scenario_name,
-            _BCN.N_RUNS: result.n_runs,
-            _BCN.AVG_COMPLIANCE_MEAN: result.avg_compliance.mean,
-            _BCN.AVG_COMPLIANCE_STD: result.avg_compliance.std,
-            _BCN.FINAL_COMPLIANCE_MEAN: result.final_compliance.mean,
-            _BCN.P10_COMPLIANCE: result.p10_compliance,
-            _BCN.P90_COMPLIANCE: result.p90_compliance,
-            _BCN.PCT_RUNS_FULL_COMPLIANCE: result.pct_runs_full_compliance,
-            _BCN.AVG_PRICE_MEAN: result.avg_price.mean,
-            _BCN.AVG_PRICE_STD: result.avg_price.std,
-            _BCN.AVG_NET_PAYOFF_MEAN: result.avg_net_payoff.mean,
-            _BCN.AVG_NET_PAYOFF_STD: result.avg_net_payoff.std,
-            _BCN.AUDIT_RATE_MEAN: result.audit_rate.mean,
-            _BCN.AUDIT_RATE_STD: result.audit_rate.std,
-            _BCN.FALSE_POSITIVE_RATE_MEAN: result.false_positive_rate.mean,
-            _BCN.DETECTION_RATE_MEAN: result.detection_rate.mean,
-        }
-    ]
-    df_summary = _pd.DataFrame(summary_rows)
-
-    if output_path == "":
-        buf = _io.BytesIO()
-        with _pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df_summary.to_excel(writer, sheet_name="Summary", index=False)
-            if result.raw_seeds:
-                seed_rows = [
-                    {
-                        _BCN.SEED: s.seed,
-                        _BCN.AVG_COMPLIANCE_MEAN: s.avg_compliance,
-                        _BCN.FINAL_COMPLIANCE_MEAN: s.final_compliance,
-                        _BCN.AVG_PRICE_MEAN: s.avg_price,
-                        _BCN.AVG_NET_PAYOFF_MEAN: s.avg_net_payoff,
-                        _BCN.AUDIT_RATE_MEAN: s.audit_rate,
-                        _BCN.FALSE_POSITIVE_RATE_MEAN: s.false_positive_rate,
-                        _BCN.DETECTION_RATE_MEAN: s.detection_rate,
-                    }
-                    for s in result.raw_seeds
-                ]
-                _pd.DataFrame(seed_rows).to_excel(
-                    writer, sheet_name="Per Seed", index=False
-                )
-        buf.seek(0)
-        return buf.read()
-
-    if output_path is None:
-        _os.makedirs("outputs", exist_ok=True)
+    return_bytes = output_path == ""
+    output: io.BytesIO | str
+    if return_bytes:
+        output = io.BytesIO()
+    elif output_path is None:
+        os.makedirs("outputs", exist_ok=True)
         safe = result.scenario_name.lower().replace(" ", "_")
         output_path = f"outputs/mc_{safe}.xlsx"
-    with _pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        df_summary.to_excel(writer, sheet_name="Summary", index=False)
+        output = output_path
+    else:
+        output = output_path
+
+    workbook = xlsxwriter.Workbook(output)
+    header_fmt = workbook.add_format(
+        {"bold": True, "bg_color": "#2196F3", "font_color": "white", "border": 1}
+    )
+    data_fmt = workbook.add_format({"border": 1})
+    num_fmt = workbook.add_format({"border": 1, "num_format": "0.0000"})
+    pct_fmt = workbook.add_format({"border": 1, "num_format": "0.0%"})
+
+    try:
+        # === Config sheet ===
+        if result.config is not None:
+            cfg_sheet = workbook.add_worksheet("Config")
+            _write_config_sheet(cfg_sheet, result.config, header_fmt, data_fmt)
+
+        # === Summary sheet ===
+        summary_sheet = workbook.add_worksheet("Summary")
+        summary_sheet.set_column("A:A", 32)
+        summary_sheet.set_column("B:C", 16)
+        row = 0
+        summary_sheet.write(row, 0, "Metric", header_fmt)
+        summary_sheet.write(row, 1, "Mean", header_fmt)
+        summary_sheet.write(row, 2, "Std", header_fmt)
+        row += 1
+        _mc_summary_rows = [
+            ("Scenario", result.scenario_name, ""),
+            ("N Runs", result.n_runs, ""),
+            ("Failed Seeds", len(result.failed_seeds), ""),
+            ("Avg Compliance", result.avg_compliance.mean, result.avg_compliance.std),
+            (
+                "Final Compliance",
+                result.final_compliance.mean,
+                result.final_compliance.std,
+            ),
+            ("P10 Compliance", result.p10_compliance, ""),
+            ("P90 Compliance", result.p90_compliance, ""),
+            ("% Full Compliance", result.pct_runs_full_compliance, ""),
+            ("Avg Price (M$)", result.avg_price.mean, result.avg_price.std),
+            (
+                "Avg Net Payoff (M$)",
+                result.avg_net_payoff.mean,
+                result.avg_net_payoff.std,
+            ),
+            (
+                "Payoff Compliant (M$)",
+                result.payoff_compliant.mean,
+                result.payoff_compliant.std,
+            ),
+            (
+                "Payoff Violator (M$)",
+                result.payoff_violator.mean,
+                result.payoff_violator.std,
+            ),
+            ("Audit Rate", result.audit_rate.mean, result.audit_rate.std),
+            (
+                "False Positive Rate",
+                result.false_positive_rate.mean,
+                result.false_positive_rate.std,
+            ),
+            ("Detection Rate", result.detection_rate.mean, result.detection_rate.std),
+        ]
+        for label, mean_val, std_val in _mc_summary_rows:
+            is_pct = (
+                isinstance(mean_val, float)
+                and "rate" in label.lower()
+                or "compliance" in label.lower()
+            )
+            fmt = (
+                pct_fmt
+                if is_pct and isinstance(mean_val, float)
+                else num_fmt
+                if isinstance(mean_val, float)
+                else data_fmt
+            )
+            std_fmt = (
+                pct_fmt
+                if is_pct and isinstance(std_val, float)
+                else num_fmt
+                if isinstance(std_val, float)
+                else data_fmt
+            )
+            summary_sheet.write(row, 0, label, data_fmt)
+            summary_sheet.write(row, 1, mean_val, fmt)
+            if std_val != "":
+                summary_sheet.write(row, 2, std_val, std_fmt)
+            row += 1
+
+        # === Per Seed sheet ===
+        if result.raw_seeds:
+            seed_sheet = workbook.add_worksheet("Per Seed")
+            seed_headers = [
+                "Seed",
+                "Avg Compliance",
+                "Final Compliance",
+                "Avg Price",
+                "Avg Net Payoff",
+                "Payoff Compliant",
+                "Payoff Violator",
+                "Audit Rate",
+                "False Positive Rate",
+                "Detection Rate",
+            ]
+            for col, h in enumerate(seed_headers):
+                seed_sheet.write(0, col, h, header_fmt)
+                seed_sheet.set_column(col, col, 16)
+            for r_idx, s in enumerate(result.raw_seeds):
+                vals = [
+                    s.seed,
+                    s.avg_compliance,
+                    s.final_compliance,
+                    s.avg_price,
+                    s.avg_net_payoff,
+                    s.avg_payoff_compliant,
+                    s.avg_payoff_violator,
+                    s.audit_rate,
+                    s.false_positive_rate,
+                    s.detection_rate,
+                ]
+                for col, v in enumerate(vals):
+                    seed_sheet.write(
+                        r_idx + 1, col, v, num_fmt if isinstance(v, float) else data_fmt
+                    )
+
+        # === Trajectory sheet ===
+        if result.step_compliance:
+            traj_sheet = workbook.add_worksheet("Trajectory")
+            traj_headers = [
+                "Step",
+                "Compliance Mean",
+                "Compliance Std",
+                "Violators Mean",
+                "Violators Std",
+            ]
+            for col, h in enumerate(traj_headers):
+                traj_sheet.write(0, col, h, header_fmt)
+                traj_sheet.set_column(col, col, 16)
+            for step_i, (sc, sv) in enumerate(
+                zip(result.step_compliance, result.step_n_violators)
+            ):
+                traj_sheet.write(step_i + 1, 0, step_i + 1, data_fmt)
+                traj_sheet.write(step_i + 1, 1, sc.mean, num_fmt)
+                traj_sheet.write(step_i + 1, 2, sc.std, num_fmt)
+                traj_sheet.write(step_i + 1, 3, sv.mean, num_fmt)
+                traj_sheet.write(step_i + 1, 4, sv.std, num_fmt)
+
+        # === Graphs sheet ===
+        graphs_sheet = workbook.add_worksheet("Graphs")
+        _write_mc_graphs_sheet(graphs_sheet, result, workbook)
+
+    finally:
+        workbook.close()
+
+    if return_bytes:
+        assert isinstance(output, io.BytesIO)
+        output.seek(0)
+        return output.read()
+    assert output_path is not None
     return output_path
 
 
@@ -763,49 +936,206 @@ def export_sweep_to_excel(
     result: SweepResult,
     output_path: str | None = None,
 ) -> "str | bytes":
-    """Export a SweepResult to an Excel workbook.
+    """Export a SweepResult to a formatted Excel workbook.
 
-    Single sheet — ``Sweep``: one row per sweep point.
+    Sheets:
+      ``Config``  — base scenario configuration used for the run
+      ``Sweep``   — one row per parameter value with aggregate stats
+      ``Graphs``  — embedded matplotlib: compliance vs param + audit plot
 
     Args:
         result: The ``SweepResult`` to export.
         output_path: ``None`` = auto-generate path, ``""`` = return bytes.
     """
-    import io as _io
-
-    rows = [
-        {
-            _BCN.SCENARIO: result.scenario_name,
-            _BCN.PARAM_PATH: result.param_path,
-            _BCN.PARAM_VALUE: pt.param_value,
-            _BCN.N_RUNS: pt.result.n_runs,
-            _BCN.AVG_COMPLIANCE_MEAN: pt.result.avg_compliance.mean,
-            _BCN.AVG_COMPLIANCE_STD: pt.result.avg_compliance.std,
-            _BCN.P10_COMPLIANCE: pt.result.p10_compliance,
-            _BCN.P90_COMPLIANCE: pt.result.p90_compliance,
-            _BCN.AVG_PRICE_MEAN: pt.result.avg_price.mean,
-            _BCN.AVG_PRICE_STD: pt.result.avg_price.std,
-            _BCN.AVG_NET_PAYOFF_MEAN: pt.result.avg_net_payoff.mean,
-            _BCN.AUDIT_RATE_MEAN: pt.result.audit_rate.mean,
-            _BCN.FALSE_POSITIVE_RATE_MEAN: pt.result.false_positive_rate.mean,
-            _BCN.DETECTION_RATE_MEAN: pt.result.detection_rate.mean,
-        }
-        for pt in result.points
-    ]
-    df = _pd.DataFrame(rows)
-
-    if output_path == "":
-        buf = _io.BytesIO()
-        with _pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="Sweep", index=False)
-        buf.seek(0)
-        return buf.read()
-
-    if output_path is None:
-        _os.makedirs("outputs", exist_ok=True)
+    return_bytes = output_path == ""
+    output: io.BytesIO | str
+    if return_bytes:
+        output = io.BytesIO()
+    elif output_path is None:
+        os.makedirs("outputs", exist_ok=True)
         safe_s = result.scenario_name.lower().replace(" ", "_")
         safe_p = result.param_path.replace(".", "_")
         output_path = f"outputs/sweep_{safe_s}_{safe_p}.xlsx"
-    with _pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="Sweep", index=False)
+        output = output_path
+    else:
+        output = output_path
+
+    workbook = xlsxwriter.Workbook(output)
+    header_fmt = workbook.add_format(
+        {"bold": True, "bg_color": "#2196F3", "font_color": "white", "border": 1}
+    )
+    data_fmt = workbook.add_format({"border": 1})
+    num_fmt = workbook.add_format({"border": 1, "num_format": "0.0000"})
+
+    try:
+        # === Config sheet ===
+        if result.config is not None:
+            cfg_sheet = workbook.add_worksheet("Config")
+            _write_config_sheet(cfg_sheet, result.config, header_fmt, data_fmt)
+
+        # === Sweep sheet ===
+        sweep_sheet = workbook.add_worksheet("Sweep")
+        sweep_headers = [
+            result.param_label or result.param_path,
+            "N Runs",
+            "Avg Compliance",
+            "Compliance Std",
+            "P10 Compliance",
+            "P90 Compliance",
+            "Avg Price",
+            "Avg Net Payoff",
+            "Audit Rate",
+            "Detection Rate",
+        ]
+        for col, h in enumerate(sweep_headers):
+            sweep_sheet.write(0, col, h, header_fmt)
+            sweep_sheet.set_column(col, col, 16)
+
+        for row_i, pt in enumerate(result.points):
+            vals = [
+                pt.param_value,
+                pt.result.n_runs,
+                pt.result.avg_compliance.mean,
+                pt.result.avg_compliance.std,
+                pt.result.p10_compliance,
+                pt.result.p90_compliance,
+                pt.result.avg_price.mean,
+                pt.result.avg_net_payoff.mean,
+                pt.result.audit_rate.mean,
+                pt.result.detection_rate.mean,
+            ]
+            for col, v in enumerate(vals):
+                sweep_sheet.write(
+                    row_i + 1, col, v, num_fmt if isinstance(v, float) else data_fmt
+                )
+
+        # === Graphs sheet ===
+        graphs_sheet = workbook.add_worksheet("Graphs")
+        _write_sweep_graphs_sheet(graphs_sheet, result, workbook)
+
+    finally:
+        workbook.close()
+
+    if return_bytes:
+        assert isinstance(output, io.BytesIO)
+        output.seek(0)
+        return output.read()
+    assert output_path is not None
     return output_path
+
+
+# ---------------------------------------------------------------------------
+# Internal graph helpers for MC and Sweep Excel sheets
+# ---------------------------------------------------------------------------
+
+
+def _write_mc_graphs_sheet(sheet, result: MonteCarloResult, workbook) -> None:
+    """Embed compliance trajectory and distribution charts into the Graphs sheet."""
+    import matplotlib
+
+    matplotlib.use("Agg")  # ensure non-interactive backend in export context
+    import matplotlib.pyplot as plt
+
+    if not result.step_compliance:
+        sheet.write(0, 0, "No trajectory data available")
+        return
+
+    # Chart 1: Compliance trajectory with ±1 SD band
+    steps_x = list(range(1, len(result.step_compliance) + 1))
+    means = [s.mean for s in result.step_compliance]
+    stds = [s.std for s in result.step_compliance]
+    lower = [max(0.0, m - s) for m, s in zip(means, stds)]
+    upper = [min(1.0, m + s) for m, s in zip(means, stds)]
+
+    fig1, ax1 = plt.subplots(figsize=(7, 4))
+    ax1.plot(steps_x, means, color="#1976D2", linewidth=2, label="Mean")
+    ax1.fill_between(steps_x, lower, upper, alpha=0.2, color="#1976D2", label="±1 SD")
+    ax1.set_xlabel("Step")
+    ax1.set_ylabel("Compliance Rate")
+    ax1.set_ylim(-0.05, 1.05)
+    ax1.set_title(f"Compliance Trajectory — {result.scenario_name}")
+    ax1.legend(fontsize=8)
+    fig1.tight_layout()
+
+    sheet.write(0, 0, "Compliance Trajectory (Mean ± 1 SD)")
+    sheet.insert_image(
+        1, 0, "compliance_trajectory.png", {"image_data": _fig_to_bytes(fig1)}
+    )
+    plt.close(fig1)
+
+    # Chart 2: Final compliance distribution across seeds
+    if result.raw_seeds:
+        compliances = [s.final_compliance for s in result.raw_seeds]
+        fig2, ax2 = plt.subplots(figsize=(5, 4))
+        ax2.hist(
+            compliances,
+            bins=min(15, len(compliances)),
+            color="#43A047",
+            edgecolor="white",
+            alpha=0.85,
+        )
+        ax2.set_xlabel("Final Compliance Rate")
+        ax2.set_ylabel("Count")
+        ax2.set_title("Seed Distribution: Final Compliance")
+        fig2.tight_layout()
+        sheet.write(0, 9, "Final Compliance Distribution (Seeds)")
+        sheet.insert_image(
+            1, 9, "compliance_dist.png", {"image_data": _fig_to_bytes(fig2)}
+        )
+        plt.close(fig2)
+
+
+def _write_sweep_graphs_sheet(sheet, result: SweepResult, workbook) -> None:
+    """Embed compliance vs parameter chart and audit rate chart into the Graphs sheet."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    if not result.points:
+        sheet.write(0, 0, "No sweep data available")
+        return
+
+    param_values = [pt.param_value for pt in result.points]
+    comp_means = [pt.result.avg_compliance.mean for pt in result.points]
+    comp_stds = [pt.result.avg_compliance.std for pt in result.points]
+    lower = [max(0.0, m - s) for m, s in zip(comp_means, comp_stds)]
+    upper = [min(1.0, m + s) for m, s in zip(comp_means, comp_stds)]
+    audit_means = [pt.result.audit_rate.mean for pt in result.points]
+
+    param_label = result.param_label or result.param_path
+
+    # Chart 1: Compliance vs param with shaded CI band
+    fig1, ax1 = plt.subplots(figsize=(7, 4))
+    ax1.plot(
+        param_values, comp_means, color="#1976D2", linewidth=2, marker="o", markersize=5
+    )
+    ax1.fill_between(param_values, lower, upper, alpha=0.2, color="#1976D2")
+    ax1.set_xlabel(param_label)
+    ax1.set_ylabel("Avg Compliance Rate")
+    ax1.set_ylim(-0.05, 1.05)
+    ax1.set_title(f"Compliance vs {param_label}")
+    fig1.tight_layout()
+    sheet.write(0, 0, f"Avg Compliance vs {param_label} (Mean ± 1 SD)")
+    sheet.insert_image(
+        1, 0, "sweep_compliance.png", {"image_data": _fig_to_bytes(fig1)}
+    )
+    plt.close(fig1)
+
+    # Chart 2: Audit rate vs param
+    fig2, ax2 = plt.subplots(figsize=(5, 4))
+    ax2.plot(
+        param_values,
+        audit_means,
+        color="#E53935",
+        linewidth=2,
+        marker="o",
+        markersize=5,
+    )
+    ax2.set_xlabel(param_label)
+    ax2.set_ylabel("Avg Audit Rate")
+    ax2.set_title(f"Audit Rate vs {param_label}")
+    fig2.tight_layout()
+    sheet.write(0, 9, f"Audit Rate vs {param_label}")
+    sheet.insert_image(1, 9, "sweep_audit.png", {"image_data": _fig_to_bytes(fig2)})
+    plt.close(fig2)

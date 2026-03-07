@@ -24,6 +24,7 @@ def AuditTargetingPlot(
     mode: Literal["aggregate", "step"],
     agents_df: pd.DataFrame | None = None,
     steps: list | None = None,
+    download_filename: str | None = None,
 ) -> None:
     """Bar chart: audit rate for Compliant vs Non-Compliant labs.
 
@@ -62,7 +63,7 @@ def AuditTargetingPlot(
             n_noncompliant=len(noncompliant),
             title="Audit Targeting (This Step)",
         )
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)
 
     else:
         # Aggregate mode — pool all steps
@@ -77,4 +78,4 @@ def AuditTargetingPlot(
             n_noncompliant=stats["noncompliant_total"],
             title="Audit Targeting (Full Run)",
         )
-        ExpandableChart(fig)
+        ExpandableChart(fig, download_filename=download_filename)

@@ -201,6 +201,7 @@ class ComputePermitModel(mesa.Model):
                         cumulative_capability=s.cumulative_capability,
                         bid_price=s.bid_price,
                         permits_wanted=s.permits_wanted,
+                        racing_factor=d.racing_factor,
                     )
                 )
         return snapshots

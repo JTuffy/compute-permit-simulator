@@ -22,5 +22,8 @@ uv.lock
 # IDE settings
 .vscode/
 
+# Agent workspace — ephemeral research scripts and outputs (gitignored)
+agent_workspace/
+
 # Other
 .claude
