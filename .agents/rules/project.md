@@ -122,6 +122,8 @@ The two-scope system (`.sidebar-compact` + `.config-view`) exists only for layou
 
 ## Research Tooling
 
+**Always read `agent_workspace/research/synthesis.md` before starting any experiment** — it is the single source of truth for what the model's behavior is known to be. Run `/synthesize-research` after each session to keep it current.
+
 The simulation services are all headless (no Solara dependency) and callable directly from Python scripts. Use them from `agent_workspace/research/<session>/` experiment scripts.
 
 **Available service functions:**

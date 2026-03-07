@@ -44,21 +44,29 @@ Research outputs go under `agent_workspace/research/<session>/`.
 
 Before running experiments, orient yourself:
 
-1. **Read `parameter_reference.md`** (if it exists in `docs/`) to understand each
-   parameter, its default, and its expected sensitivity range.
+1. **Read `agent_workspace/research/synthesis.md`** first — this is the single source
+   of truth for what is already known. It tells you what has been confirmed, what the
+   interesting regime is, and which open questions remain. Do not repeat experiments
+   that are already answered there.
 
-2. **Check `agent_workspace/research/`** for existing experiment scripts and findings
-   from previous sessions. Build on them rather than starting from scratch.
+2. **Check the previous session folder** (`agent_workspace/research/*/findings.md`)
+   for the most recent raw findings, in case the synthesis hasn't been updated yet.
 
 3. **Load the default scenario** as your baseline. All experiments should be expressed
    as deltas from it so results are comparable.
 
    > [!IMPORTANT]
-   > The **default `ScenarioConfig` is degenerate** (100% compliance at all tested
-   > audit probabilities). The permit cap is generous enough that agents have no
-   > reason to violate. Always start from a **margin scenario** where agents are
-   > economically near-indifferent. Use `agent_workspace/research/scenarios/` for
-   > these — see `research_margin_baseline.json` as the canonical starting point.
+   > The **default `ScenarioConfig` is degenerate** (100% compliance). More broadly,
+   > **any config where `permit_cap ≥ n_agents` is degenerate** — agents can always
+   > obtain a permit, so compliance costs nothing regardless of enforcement parameters.
+   > The interesting regime is **`permit_cap < n_agents`** (forced scarcity). Compliance
+   > tracks the Q/N ratio approximately linearly: `avg_compliance ≈ cap / n_agents`.
+   > Always start from `research_margin_baseline.json` with a tightened cap (e.g. cap=10,
+   > n_agents=15) as the canonical interesting starting point.
+   >
+   > **`detection_rate = nan` is a diagnostic signal**, not missing data. It means zero
+   > violations occurred — which confirms a degenerate config. Treat it as a hard
+   > signal to rethink the parameter regime, not as an experiment result.
 
 4. **Check the service API** — experiments call services directly (no Solara dependency):
    ```python
