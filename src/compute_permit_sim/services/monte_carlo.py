@@ -48,8 +48,8 @@ class _RunResult(NamedTuple):
 
     # Audit burden
     audit_rate: float
-    false_positive_rate: float
-    detection_rate: float  # NaN if 0 audited violators
+    compliant_audit_fraction: float  # audits on compliant / total audits
+    detection_rate_given_audit: float  # NaN if 0 audited violators
 
 
 def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
@@ -135,10 +135,10 @@ def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
         avg_payoff_compliant=avg_payoff_compliant,
         avg_payoff_violator=avg_payoff_violator,
         audit_rate=total_audits / total_lab_steps if total_lab_steps else 0.0,
-        false_positive_rate=(
+        compliant_audit_fraction=(
             audits_on_compliant / total_audits if total_audits else 0.0
         ),
-        detection_rate=(
+        detection_rate_given_audit=(
             violations_caught / audits_on_violators
             if audits_on_violators
             else float("nan")
@@ -269,14 +269,18 @@ def run_monte_carlo(
             else MetricStats.nan()
         ),
         audit_rate=MetricStats.from_values([r.audit_rate for r in raw]),
-        false_positive_rate=MetricStats.from_values(
-            [r.false_positive_rate for r in raw]
+        compliant_audit_fraction=MetricStats.from_values(
+            [r.compliant_audit_fraction for r in raw]
         ),
-        detection_rate=(
+        detection_rate_given_audit=(
             MetricStats.from_values(
-                [r.detection_rate for r in raw if not math.isnan(r.detection_rate)]
+                [
+                    r.detection_rate_given_audit
+                    for r in raw
+                    if not math.isnan(r.detection_rate_given_audit)
+                ]
             )
-            if any(not math.isnan(r.detection_rate) for r in raw)
+            if any(not math.isnan(r.detection_rate_given_audit) for r in raw)
             else MetricStats.nan()
         ),
         raw_seeds=[
@@ -289,8 +293,8 @@ def run_monte_carlo(
                 avg_payoff_compliant=r.avg_payoff_compliant,
                 avg_payoff_violator=r.avg_payoff_violator,
                 audit_rate=r.audit_rate,
-                false_positive_rate=r.false_positive_rate,
-                detection_rate=r.detection_rate,
+                compliant_audit_fraction=r.compliant_audit_fraction,
+                detection_rate_given_audit=r.detection_rate_given_audit,
             )
             for s, r in zip(run_seeds, raw)
         ]

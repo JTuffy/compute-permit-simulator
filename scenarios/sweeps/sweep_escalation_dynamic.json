@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_6_enforcement_cycles.json",
+    "param_path": "audit.audit_escalation",
+    "param_label": "Audit Escalation Factor \u0394",
+    "min_val": 0.0,
+    "max_val": 3.0,
+    "interval": 0.25,
+    "n_runs": 50
+}

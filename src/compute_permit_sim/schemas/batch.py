@@ -58,10 +58,10 @@ class BatchColumnNames:
     AUDIT_RATE = "audit_rate"
     AUDIT_RATE_MEAN = "audit_rate_mean"
     AUDIT_RATE_STD = "audit_rate_std"
-    FALSE_POSITIVE_RATE_MEAN = "false_positive_rate_mean"
-    FALSE_POSITIVE_RATE_STD = "false_positive_rate_std"
-    DETECTION_RATE_MEAN = "detection_rate_mean"
-    DETECTION_RATE_STD = "detection_rate_std"
+    COMPLIANT_AUDIT_FRACTION_MEAN = "compliant_audit_fraction_mean"
+    COMPLIANT_AUDIT_FRACTION_STD = "compliant_audit_fraction_std"
+    DETECTION_RATE_GIVEN_AUDIT_MEAN = "detection_rate_given_audit_mean"
+    DETECTION_RATE_GIVEN_AUDIT_STD = "detection_rate_given_audit_std"
 
 
 @dataclass(frozen=True)
@@ -81,8 +81,8 @@ class PerSeedResult:
     avg_payoff_compliant: float  # NaN if no compliant labs
     avg_payoff_violator: float  # NaN if no violators
     audit_rate: float
-    false_positive_rate: float
-    detection_rate: float  # NaN if no audited violators
+    compliant_audit_fraction: float  # audits on compliant / total audits
+    detection_rate_given_audit: float  # NaN if no audited violators
 
 
 @dataclass(frozen=True)
@@ -161,8 +161,10 @@ class MonteCarloResult:
 
     # --- Audit burden ---
     audit_rate: MetricStats  # audits / total lab-steps
-    false_positive_rate: MetricStats  # audits on compliant / total audits
-    detection_rate: MetricStats  # caught / audits on violators
+    compliant_audit_fraction: MetricStats  # audits on compliant / total audits
+    detection_rate_given_audit: (
+        MetricStats  # caught / audits on violators (given audit)
+    )
 
     # --- Raw per-seed data (optional, set store_raw=True in run_monte_carlo) ---
     raw_seeds: list[PerSeedResult] = field(default_factory=list)
