@@ -1,13 +1,12 @@
 # Makefile for Compute Permit Simulator
 
-.PHONY: run viz app heatmap solara lint format test check clean help figure-data
+.PHONY: run viz app heatmap solara lint format test check clean help
 
 help:
 	@echo "Available commands:"
 	@echo "  make run           - Run the simulation once (all scenarios)"
 	@echo "  make mc            - Monte Carlo: 50 runs per scenario, exports CSV + LaTeX table"
 	@echo "  make sweep         - Sensitivity sweeps (pi_0 and collateral on minimal scenario)"
-	@echo "  make figure-data   - Generate documents/figures/ CSVs for paper plots (200 runs)"
 	@echo "  make paper-results - Run MC + sweep and print LaTeX table to stdout"
 	@echo "  make app           - Run the Solara interactive dashboard (alias: viz)"
 	@echo "  make lint          - Run linters (ruff check)"
@@ -27,9 +26,6 @@ mc:
 sweep:
 	uv run main.py --sweep-file sweep_pi0_lawless.json
 	uv run main.py --sweep-file sweep_collateral_lawless.json
-
-figure-data:
-	uv run scripts/generate_figure_data.py
 
 list-sweeps:
 	@echo "Available sweep files:"
