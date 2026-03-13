@@ -94,7 +94,7 @@ def load_sweep(filename: str) -> SweepConfig:
         }
 
     Args:
-        filename: Name of the sweep file (e.g. 'sweep_pi0_lawless.json').
+        filename: Name of the sweep file (e.g. 'sweep_pi0_minimal.json').
 
     Returns:
         Validated SweepConfig dataclass.

@@ -24,8 +24,8 @@ mc:
 	uv run main.py --monte-carlo 50
 
 sweep:
-	uv run main.py --sweep-file sweep_pi0_lawless.json
-	uv run main.py --sweep-file sweep_collateral_lawless.json
+	uv run main.py --sweep-file sweep_pi0_minimal.json
+	uv run main.py --sweep-file sweep_collateral_minimal.json
 
 list-sweeps:
 	@echo "Available sweep files:"

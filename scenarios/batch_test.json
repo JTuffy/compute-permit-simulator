@@ -1,6 +1,6 @@
 {
-  "name": "Dynamic Escalation (Time-Dependent)",
-  "description": "Demonstrates shifting deterrence via feedback loops: labs start non-compliant, get caught, and face escalating audit probabilities and reputation costs. Initial cheating gives way to compliance as enforcement ratchets up.",
+  "name": "Feedback-Driven Compliance",
+  "description": "Demonstrates that feedback mechanisms (reputation, audit escalation) can drive compliance even under moderate enforcement.",
   "notes": "",
   "n_agents": 20,
   "steps": 40,
