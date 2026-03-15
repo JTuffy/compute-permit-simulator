@@ -109,3 +109,51 @@ def test_export_run_to_excel_creates_file(sample_run: SimulationRun) -> None:
         # Header row is parsed, we expect 2 agents
         assert len(df_agents) == 2
         assert "Agent's base economic value (v_i)" in df_agents.columns
+
+
+# ---------------------------------------------------------------------------
+# Grid sweep export tests
+# ---------------------------------------------------------------------------
+
+
+def test_export_grid_sweep_to_csv_bytes() -> None:
+    """CSV export returns bytes with n_x * n_y rows and expected columns."""
+    from compute_permit_sim.vis.export import export_grid_sweep_to_csv
+    from tests.factories import create_grid_sweep_result
+
+    n_x, n_y = 3, 2
+    result = create_grid_sweep_result(n_x=n_x, n_y=n_y)
+    csv_bytes = export_grid_sweep_to_csv(result, output_path="")
+    assert isinstance(csv_bytes, bytes)
+
+    import io
+
+    df = pd.read_csv(io.BytesIO(csv_bytes))
+    assert len(df) == n_x * n_y
+    required_cols = {
+        "param_x_path",
+        "param_x_value",
+        "param_y_path",
+        "param_y_value",
+        "n_runs",
+        "compliance_rate",
+    }
+    assert required_cols.issubset(set(df.columns))
+
+
+def test_export_grid_sweep_to_excel_bytes() -> None:
+    """Excel export returns non-empty bytes with Config, Grid, and Heatmap sheets."""
+    from compute_permit_sim.vis.export import export_grid_sweep_to_excel
+    from tests.factories import create_grid_sweep_result
+
+    result = create_grid_sweep_result(n_x=2, n_y=2)
+    xlsx_bytes = export_grid_sweep_to_excel(result, output_path="")
+    assert isinstance(xlsx_bytes, bytes)
+    assert len(xlsx_bytes) > 0
+
+    import io
+
+    with pd.ExcelFile(io.BytesIO(xlsx_bytes)) as xl:
+        assert "Config" in xl.sheet_names
+        assert "Grid" in xl.sheet_names
+        assert "Heatmap" in xl.sheet_names

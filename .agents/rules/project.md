@@ -100,7 +100,28 @@ All export functions return `bytes` for Solara's `FileDownload`. Key functions:
 
 ## Plots (`vis/plotting.py`)
 
-Accept typed result objects, return `matplotlib.Figure`, never import Solara. Use `fig_to_png(fig)` from `results.py` to convert to bytes for downloads. Standard figsize `(7, 4)`.
+**Before writing any matplotlib code**, check this inventory. If the function you need exists here, call it. If it doesn't exist, add it here following the `create_figure()` style — then use it from both scripts and the UI.
+
+All functions accept typed result objects, return `matplotlib.Figure`, never import Solara. Use `fig_to_png(fig)` from `results.py` to convert to bytes for downloads.
+
+| Function | Input | Use for |
+|---|---|---|
+| `plot_sweep_curve(result, metric, reference_lines)` | `SweepResult` | 1D sweep line chart with tipping point + optional scenario markers |
+| `plot_sweep_heatmap(grid, x_values, y_values, ...)` | 2D `list[list[float]]` | 2D compliance heatmap (joint sensitivity) |
+| `plot_mc_trajectory(result)` | `MonteCarloResult` | Compliance mean ± SD over steps |
+| `plot_mc_violator_trajectory(result)` | `MonteCarloResult` | Violator count mean ± SD over steps |
+| `plot_mc_audit_trajectory(result)` | `MonteCarloResult` | Audit rate band over steps |
+| `plot_mc_payoff_comparison(result)` | `MonteCarloResult` | Compliant vs. violating lab payoff bar chart |
+| `plot_compliance_distribution(df)` | agents DataFrame | Bar chart: Compliant / Uncaught / Caught-by-source |
+| `plot_audit_source_distribution(df)` | agents DataFrame | Bar chart: labs caught per AuditSource channel |
+| `plot_audit_targeting(rates, counts, ...)` | scalar rates | Compliant vs. non-compliant audit rate bar |
+| `plot_audit_coefficient_distribution(df)` | agents DataFrame | Histogram of per-lab audit coefficients |
+| `plot_time_series(data, label, color_key)` | `pd.Series` | Generic single-series step chart |
+| `plot_scatter(df, x_col, y_col, ...)` | DataFrame | Scatter with compliance coloring |
+
+All figures are created via `create_figure()` (standardized style, `Agg` backend). Never call `plt.figure()` or `plt.subplots()` in scripts.
+
+**Committed figure scripts** — see `scripts/README.md` for an index of existing scripts. Always check there before re-creating a script.
 
 ## Testing
 

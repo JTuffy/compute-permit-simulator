@@ -86,3 +86,103 @@ class TestRunSweep:
         cfg = self._base()
         result = run_sweep(cfg, "audit.base_prob", [0.1], n_runs=2)
         assert result.param_label == "audit.base_prob"
+
+
+class TestRunGridSweep:
+    def _base(self) -> ScenarioConfig:
+        return ScenarioConfig(n_agents=4, steps=3)
+
+    def test_grid_shape(self) -> None:
+        from compute_permit_sim.services.sweep import run_grid_sweep
+
+        x_values = [0.05, 0.10, 0.15]
+        y_values = [0.0, 10.0]
+        result = run_grid_sweep(
+            self._base(),
+            "audit.base_prob",
+            "collateral_amount",
+            x_values,
+            y_values,
+            n_runs=2,
+        )
+        assert len(result.grid) == len(y_values)
+        assert all(len(row) == len(x_values) for row in result.grid)
+
+    def test_grid_values_in_range(self) -> None:
+        from compute_permit_sim.services.sweep import run_grid_sweep
+
+        result = run_grid_sweep(
+            self._base(),
+            "audit.base_prob",
+            "collateral_amount",
+            [0.05, 0.20],
+            [0.0, 5.0],
+            n_runs=2,
+        )
+        for row in result.grid:
+            for v in row:
+                assert 0.0 <= v <= 1.0
+
+    def test_metadata(self) -> None:
+        from compute_permit_sim.services.sweep import run_grid_sweep
+
+        cfg = ScenarioConfig(name="GridTest", n_agents=2, steps=2)
+        result = run_grid_sweep(
+            cfg,
+            "audit.base_prob",
+            "collateral_amount",
+            [0.1],
+            [0.0],
+            param_x_label="X Label",
+            param_y_label="Y Label",
+            n_runs=2,
+        )
+        assert result.scenario_name == "GridTest"
+        assert result.param_x_path == "audit.base_prob"
+        assert result.param_y_path == "collateral_amount"
+        assert result.param_x_label == "X Label"
+        assert result.param_y_label == "Y Label"
+        assert result.n_runs == 2
+
+    def test_compliance_at(self) -> None:
+        from compute_permit_sim.services.sweep import run_grid_sweep
+
+        x_vals = [0.05, 0.20]
+        y_vals = [0.0, 10.0]
+        result = run_grid_sweep(
+            self._base(),
+            "audit.base_prob",
+            "collateral_amount",
+            x_vals,
+            y_vals,
+            n_runs=2,
+        )
+        for x in x_vals:
+            for y in y_vals:
+                val = result.compliance_at(x, y)
+                assert val is not None
+                assert 0.0 <= val <= 1.0
+        # Non-existent cell returns None
+        assert result.compliance_at(0.99, 99.0) is None
+
+    def test_reproducible(self) -> None:
+        from compute_permit_sim.services.sweep import run_grid_sweep
+
+        seeds = [0, 1, 2]
+        r1 = run_grid_sweep(
+            self._base(),
+            "audit.base_prob",
+            "collateral_amount",
+            [0.05],
+            [0.0],
+            seeds=seeds,
+        )
+        r2 = run_grid_sweep(
+            self._base(),
+            "audit.base_prob",
+            "collateral_amount",
+            [0.05],
+            [0.0],
+            seeds=seeds,
+        )
+        assert abs(r1.grid[0][0] - r2.grid[0][0]) < 1e-10

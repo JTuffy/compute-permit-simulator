@@ -15,6 +15,7 @@ from __future__ import annotations
 import textwrap
 
 import matplotlib
+import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -642,15 +643,22 @@ def plot_mc_payoff_comparison(result) -> "Figure":
     return fig
 
 
-def plot_sweep_curve(result, metric: str = "avg_compliance") -> "Figure":
+def plot_sweep_curve(
+    result,
+    metric: str = "avg_compliance",
+    reference_lines: list[tuple[float, str, str]] | None = None,
+) -> "Figure":
     """Plot a 1D parameter sweep curve: param value on X, metric on Y.
 
     Renders the mean as a line with ± 1 SD shading. Annotates the tipping
-    point (first value where compliance ≥ 95 %) if present.
+    point (first value where compliance ≥ 95 %) if present.
 
     Args:
         result: A ``SweepResult`` instance.
         metric: Attribute name on ``MonteCarloResult`` to plot (default: avg_compliance).
+        reference_lines: Optional list of ``(x_value, label, color)`` tuples
+            for annotating known calibration points (e.g. scenario pa values).
+            Each draws a vertical dotted line with a small text label.
 
     Returns:
         Matplotlib Figure.
@@ -670,19 +678,7 @@ def plot_sweep_curve(result, metric: str = "avg_compliance") -> "Figure":
 
     color = CHART_COLOR_MAP.get("compliant", "#42A5F5")
     ax.plot(xs, means, color=color, linewidth=2, marker="o", markersize=5, label="Mean")
-    ax.fill_between(xs, lows, highs, alpha=0.18, color=color, label="± 1 SD")
-
-    tp = result.tipping_point(threshold=0.95)
-    if tp is not None:
-        ax.axvline(tp, color="#FFA726", linewidth=1.5, linestyle="--")
-        ax.annotate(
-            f"Tipping ≈ {tp:.3f}",
-            xy=(tp, 0.95),
-            xytext=(tp, 0.70),
-            fontsize=8,
-            color="#FFA726",
-            arrowprops={"arrowstyle": "->", "color": "#FFA726"},
-        )
+    ax.fill_between(xs, lows, highs, alpha=0.18, color=color, label="\u00b1 1 SD")
 
     is_compliance = "compliance" in metric
     if is_compliance:
@@ -694,10 +690,130 @@ def plot_sweep_curve(result, metric: str = "avg_compliance") -> "Figure":
 
     ax.set_xlabel(_wrap(result.param_label, width=40))
     ax.set_title(
-        _wrap(f"Sensitivity: {result.param_label} — {result.scenario_name}"),
+        _wrap(f"Sensitivity: {result.param_label} \u2014 {result.scenario_name}"),
         fontsize=11,
         fontweight="600",
     )
     ax.legend(fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
+def plot_sweep_heatmap(
+    compliance_grid: list[list[float]],
+    x_values: list[float],
+    y_values: list[float],
+    x_param_label: str = "Base Audit Rate \u03c0\u2080",
+    y_param_label: str = "Collateral K (M$)",
+    x_tick_labels: list[str] | None = None,
+    y_tick_labels: list[str] | None = None,
+    title: str | None = None,
+    highlight: tuple[float, float] | None = None,
+    highlight_label: str = "Calibration",
+) -> "Figure":
+    """Heatmap of average compliance over a 2D parameter grid.
+
+    Renders each cell with its mean compliance rate as a shaded colour and an
+    inline percentage annotation. Designed for joint-sensitivity analysis
+    (e.g. pa x K grid) and re-usable for any two-parameter sweep.
+
+    Args:
+        compliance_grid: 2D list ``[y_idx][x_idx]`` of mean compliance fractions.
+        x_values: Parameter values along the x-axis (e.g. audit rates).
+        y_values: Parameter values along the y-axis (e.g. collateral amounts).
+        x_param_label: Human-readable x-axis label.
+        y_param_label: Human-readable y-axis label.
+        x_tick_labels: Optional custom tick labels for x-axis; defaults to
+            auto-formatted ``x_values`` as percentages.
+        y_tick_labels: Optional custom tick labels for y-axis; defaults to
+            auto-formatted ``y_values`` as dollar amounts.
+        title: Optional chart title.
+        highlight: Optional ``(x_val, y_val)`` calibration point to outline
+            with a red border.
+        highlight_label: Label shown adjacent to the highlighted cell.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    import matplotlib.patches as mpatches
+
+    fig, ax = create_figure(figsize=(7, 5))
+    data = np.array(compliance_grid)  # shape: (n_y, n_x)
+
+    im = ax.imshow(
+        data,
+        aspect="auto",
+        origin="lower",
+        cmap="Blues",
+        vmin=0.0,
+        vmax=1.0,
+        interpolation="nearest",
+    )
+
+    # Colorbar with shared percent formatter
+    cbar = fig.colorbar(
+        im, ax=ax, format=matplotlib.ticker.PercentFormatter(xmax=1), shrink=0.85
+    )
+    cbar.set_label("Mean Compliance Rate", fontsize=10)
+
+    # Tick labels — default to % for x (audit rate) and $M for y (collateral)
+    xt_labels = x_tick_labels or [f"{v:.0%}" for v in x_values]
+    yt_labels = y_tick_labels or [f"${v:.0f}M" for v in y_values]
+    ax.set_xticks(range(len(x_values)))
+    ax.set_xticklabels(xt_labels, fontsize=8, rotation=45, ha="right")
+    ax.set_yticks(range(len(y_values)))
+    ax.set_yticklabels(yt_labels, fontsize=8)
+
+    # Per-cell compliance annotation
+    for yi in range(len(y_values)):
+        for xi in range(len(x_values)):
+            val = float(data[yi, xi])
+            text_color = "white" if val > 0.65 else "#333333"
+            ax.text(
+                xi,
+                yi,
+                f"{val:.0%}",
+                ha="center",
+                va="center",
+                fontsize=7,
+                color=text_color,
+                fontweight="500",
+            )
+
+    # Optional highlight: red border around a calibration cell
+    if highlight is not None:
+        hx_val, hy_val = highlight
+        hx_idx = min(range(len(x_values)), key=lambda i: abs(x_values[i] - hx_val))
+        hy_idx = min(range(len(y_values)), key=lambda i: abs(y_values[i] - hy_val))
+        rect = mpatches.FancyBboxPatch(
+            (hx_idx - 0.45, hy_idx - 0.45),
+            0.9,
+            0.9,
+            boxstyle="square,pad=0",
+            linewidth=2.5,
+            edgecolor=CHART_COLOR_MAP.get("violator", "#EF5350"),
+            facecolor="none",
+            zorder=3,
+        )
+        ax.add_patch(rect)
+        ax.text(
+            hx_idx,
+            hy_idx + 0.52,
+            highlight_label,
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            color=CHART_COLOR_MAP.get("violator", "#EF5350"),
+            fontweight="bold",
+            zorder=4,
+        )
+
+    ax.set_xlabel(_wrap(x_param_label, width=40), fontsize=11, fontweight="500")
+    ax.set_ylabel(_wrap(y_param_label, width=30), fontsize=11, fontweight="500")
+    if title:
+        ax.set_title(_wrap(title), fontsize=11, fontweight="600")
+
+    # Suppress grid — imshow cells provide visual separation
+    ax.grid(False)
     fig.tight_layout()
     return fig

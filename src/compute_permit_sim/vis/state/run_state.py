@@ -25,7 +25,11 @@ import solara
 from pydantic import BaseModel, ConfigDict
 
 from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.schemas.batch import MonteCarloResult, SweepResult
+from compute_permit_sim.schemas.batch import (
+    GridSweepResult,
+    MonteCarloResult,
+    SweepResult,
+)
 
 T = TypeVar("T")
 
@@ -68,4 +72,9 @@ mc_run: solara.Reactive[RunState[MonteCarloResult]] = solara.reactive(
 #: Parameter sweep batch run state
 sweep_run: solara.Reactive[RunState[SweepResult]] = solara.reactive(
     RunState[SweepResult]()
+)
+
+#: 2D grid sweep batch run state
+grid_run: solara.Reactive[RunState[GridSweepResult]] = solara.reactive(
+    RunState[GridSweepResult]()
 )

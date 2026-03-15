@@ -27,12 +27,13 @@ def UnifiedHistoryList() -> None:
     (BatchHistoryList + RunHistoryList) pattern which caused double-nested
     ``run-history-compact`` for batch items and mismatched styling.
     """
-    from compute_permit_sim.vis.state.run_state import mc_run, sweep_run
+    from compute_permit_sim.vis.state.run_state import grid_run, mc_run, sweep_run
 
     batch_results = session_history.batch_results.value
     run_history = session_history.run_history.value
     mc_current = mc_run.value.result
     sweep_current = sweep_run.value.result
+    grid_current = grid_run.value.result
 
     # Use Markdown for empty state — matches RunHistoryList convention and avoids
     # alternating root container types (Column A vs Column B) which reacton rejects.
@@ -42,7 +43,11 @@ def UnifiedHistoryList() -> None:
 
     with solara.Column(classes=["run-history-compact"]):
         for result in batch_results:
-            is_current = (result is mc_current) or (result is sweep_current)
+            is_current = (
+                (result is mc_current)
+                or (result is sweep_current)
+                or (result is grid_current)
+            )
             BatchHistoryItem(result, is_current)
         for run in run_history:
             is_selected = (session_history.selected_run.value is not None) and (

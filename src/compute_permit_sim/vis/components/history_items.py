@@ -11,7 +11,11 @@ import solara
 import solara.lab
 
 from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.schemas.batch import MonteCarloResult, SweepResult
+from compute_permit_sim.schemas.batch import (
+    GridSweepResult,
+    MonteCarloResult,
+    SweepResult,
+)
 from compute_permit_sim.services.config_manager import save_scenario
 from compute_permit_sim.vis.components.dialogs import RunConfigDialog
 from compute_permit_sim.vis.components.results import DownloadCSV, DownloadExcel
@@ -143,12 +147,17 @@ def RunHistoryItem(run: SimulationRun, is_selected: bool) -> None:
 
 @solara.component
 def BatchHistoryItem(result: BatchResult, is_current: bool) -> None:
-    """One-line history row for an MC or Sweep batch result.
+    """One-line history row for an MC, Sweep, or Grid Sweep batch result.
 
-    Mirrors ``RunHistoryItem`` exactly: type-icon | ⓘ | id-label | save | Excel | CSV | JSON.
-    The short ``result.id`` is displayed as the label; full details are in the ⓘ dialog.
+    Mirrors ``RunHistoryItem`` exactly: type-icon | \u24d8 | id-label | save | Excel | CSV | JSON.
+    The short ``result.id`` is displayed as the label; full details are in the \u24d8 dialog.
     """
-    from compute_permit_sim.vis.state.run_state import RunState, mc_run, sweep_run
+    from compute_permit_sim.vis.state.run_state import (
+        RunState,
+        grid_run,
+        mc_run,
+        sweep_run,
+    )
 
     if isinstance(result, MonteCarloResult):
         type_icon = "mdi-chart-bell-curve-cumulative"
@@ -181,7 +190,7 @@ def BatchHistoryItem(result: BatchResult, is_current: bool) -> None:
 
             return export_monte_carlo_to_excel(result, output_path="")
 
-    else:  # SweepResult
+    elif isinstance(result, SweepResult):
         type_icon = "mdi-trending-up"
         dialog_title = f"Sweep Run: {result.id}"
         tp = result.tipping_point()
@@ -216,6 +225,42 @@ def BatchHistoryItem(result: BatchResult, is_current: bool) -> None:
             )
 
             return export_sweep_to_excel(result, output_path="")
+
+    else:  # GridSweepResult
+        type_icon = "mdi-view-grid"
+        dialog_title = f"Grid Sweep: {result.id}"
+        safe_s = result.scenario_name.lower().replace(" ", "_")
+        safe_x = result.param_x_path.replace(".", "_")
+        safe_y = result.param_y_path.replace(".", "_")
+        batch_summary = (
+            f"**{len(result.x_values)}×{len(result.y_values)} grid sweep**"
+            f" · {result.scenario_name}  \n"
+            f"X: **{result.param_x_label}**  \n"
+            f"Y: **{result.param_y_label}**  \n"
+            f"Compliance: {result.compliance_min:.1%}–{result.compliance_max:.1%}"
+        )
+        csv_fname = f"grid_{safe_s}_{safe_x}_x_{safe_y}_{result.id}.csv"
+        xlsx_fname = f"grid_{safe_s}_{safe_x}_x_{safe_y}_{result.id}.xlsx"
+
+        def view() -> None:
+            session_history.selected_run.value = None  # clear basic run highlight
+            mc_run.set(RunState[MonteCarloResult](phase="idle"))
+            sweep_run.set(RunState[SweepResult](phase="idle"))
+            grid_run.set(RunState[GridSweepResult](phase="ready", result=result))
+
+        def dl_csv() -> bytes | str:
+            from compute_permit_sim.vis.export import (
+                export_grid_sweep_to_csv,  # noqa: PLC0415
+            )
+
+            return export_grid_sweep_to_csv(result, output_path="")
+
+        def dl_excel() -> bytes | str:
+            from compute_permit_sim.vis.export import (
+                export_grid_sweep_to_excel,  # noqa: PLC0415
+            )
+
+            return export_grid_sweep_to_excel(result, output_path="")
 
     # use_state calls must be unconditional (Solara hook rules) — always before any return
     show_save, set_show_save = solara.use_state(False)

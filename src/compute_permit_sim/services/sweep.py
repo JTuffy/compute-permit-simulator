@@ -18,7 +18,7 @@ Usage:
 
 from __future__ import annotations
 
-from compute_permit_sim.schemas.batch import SweepPoint, SweepResult
+from compute_permit_sim.schemas.batch import GridSweepResult, SweepPoint, SweepResult
 from compute_permit_sim.schemas.config import ScenarioConfig
 from compute_permit_sim.services.monte_carlo import run_monte_carlo
 
@@ -140,6 +140,121 @@ def run_sweep_from_registry(
         param_path=param.path,
         values=values,
         param_label=param.label,
+        n_runs=n_runs,
+        seeds=seeds,
+    )
+
+
+def run_grid_sweep(
+    base_config: ScenarioConfig,
+    param_x_path: str,
+    param_y_path: str,
+    x_values: list[float],
+    y_values: list[float],
+    param_x_label: str | None = None,
+    param_y_label: str | None = None,
+    n_runs: int = 20,
+    seeds: list[int] | None = None,
+) -> GridSweepResult:
+    """Run a 2D joint-sensitivity sweep over two parameters.
+
+    Each (x, y) cell is evaluated with ``n_runs`` Monte Carlo replications.
+    Results are stored as ``grid[y_idx][x_idx] = mean_compliance``.
+
+    All seeds are shared across all cells so that parameter variation, not
+    noise, drives differences between cells.
+
+    Args:
+        base_config: Base scenario configuration.
+        param_x_path: Dot-path for the x-axis parameter, e.g. ``"audit.base_prob"``.
+        param_y_path: Dot-path for the y-axis parameter, e.g. ``"collateral_amount"``.
+        x_values: Ordered x-axis values.
+        y_values: Ordered y-axis values.
+        param_x_label: Human-readable x-axis label; defaults to ``param_x_path``.
+        param_y_label: Human-readable y-axis label; defaults to ``param_y_path``.
+        n_runs: MC replications per cell. Ignored if ``seeds`` is provided.
+        seeds: Explicit seeds; overrides ``n_runs`` if given.
+
+    Returns:
+        :class:`~compute_permit_sim.schemas.batch.GridSweepResult` with the 2D
+        compliance grid and axis metadata.
+    """
+    label_x = param_x_label or param_x_path
+    label_y = param_y_label or param_y_path
+    run_seeds = seeds if seeds is not None else list(range(n_runs))
+
+    # grid[y_idx][x_idx] = mean compliance
+    grid: list[list[float]] = []
+    for y in y_values:
+        row: list[float] = []
+        for x in x_values:
+            cfg = override_config(base_config, param_x_path, x)
+            cfg = override_config(cfg, param_y_path, y)
+            mc = run_monte_carlo(cfg, seeds=run_seeds)
+            row.append(mc.avg_compliance.mean)
+        grid.append(row)
+
+    return GridSweepResult(
+        scenario_name=base_config.name,
+        param_x_path=param_x_path,
+        param_x_label=label_x,
+        param_y_path=param_y_path,
+        param_y_label=label_y,
+        config=base_config,
+        x_values=list(x_values),
+        y_values=list(y_values),
+        grid=grid,
+        n_runs=len(run_seeds),
+    )
+
+
+def run_grid_sweep_from_registry(
+    base_config: ScenarioConfig,
+    param_x_path: str,
+    param_y_path: str,
+    x_min: float | None = None,
+    x_max: float | None = None,
+    x_step: float | None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    y_step: float | None = None,
+    n_runs: int = 20,
+    seeds: list[int] | None = None,
+) -> GridSweepResult:
+    """Run a 2D grid sweep using registry defaults for both axis ranges.
+
+    Looks up each path in ``SWEEPABLE_PARAMS`` to fill in default
+    min/max/step values.  Any supplied arguments override those defaults.
+
+    Args:
+        base_config: Base scenario configuration.
+        param_x_path: Dot-path registered in ``SWEEPABLE_PARAMS`` for x-axis.
+        param_y_path: Dot-path registered in ``SWEEPABLE_PARAMS`` for y-axis.
+        x_min/x_max/x_step: Override registry defaults for x-axis.
+        y_min/y_max/y_step: Override registry defaults for y-axis.
+        n_runs: MC replications per cell.
+        seeds: Explicit seeds (overrides n_runs if provided).
+
+    Returns:
+        :class:`~compute_permit_sim.schemas.batch.GridSweepResult`.
+
+    Raises:
+        KeyError: If either path is not in the registry.
+    """
+    from compute_permit_sim.schemas.sweep_params import generate_values, get_param
+
+    px = get_param(param_x_path)
+    py = get_param(param_y_path)
+    x_values = generate_values(px, min_val=x_min, max_val=x_max, step=x_step)
+    y_values = generate_values(py, min_val=y_min, max_val=y_max, step=y_step)
+    return run_grid_sweep(
+        base_config,
+        param_x_path=px.path,
+        param_y_path=py.path,
+        x_values=x_values,
+        y_values=y_values,
+        param_x_label=px.label,
+        param_y_label=py.label,
         n_runs=n_runs,
         seeds=seeds,
     )
