@@ -817,3 +817,18 @@ def plot_sweep_heatmap(
     ax.grid(False)
     fig.tight_layout()
     return fig
+
+
+def save_figure(fig: Figure, path: str, dpi: int = 150) -> None:
+    """Save a Figure to *path* using canonical export settings.
+
+    Single source of truth for dpi and bbox behaviour across all scripts and
+    agent_workspace callers.  Never call ``fig.savefig(...)`` directly in
+    workspace scripts — use this instead.
+
+    Args:
+        fig:  A ``matplotlib.figure.Figure`` returned by any plotting function.
+        path: Destination file path (PNG recommended).
+        dpi:  Resolution; default 150 for paper-quality output.
+    """
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
