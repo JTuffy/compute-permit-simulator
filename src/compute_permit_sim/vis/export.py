@@ -534,10 +534,10 @@ def export_monte_carlo_to_csv(
             _BCN.PAYOFF_VIOLATOR_STD: r.payoff_violator.std,
             _BCN.AUDIT_RATE_MEAN: r.audit_rate.mean,
             _BCN.AUDIT_RATE_STD: r.audit_rate.std,
-            _BCN.FALSE_POSITIVE_RATE_MEAN: r.false_positive_rate.mean,
-            _BCN.FALSE_POSITIVE_RATE_STD: r.false_positive_rate.std,
-            _BCN.DETECTION_RATE_MEAN: r.detection_rate.mean,
-            _BCN.DETECTION_RATE_STD: r.detection_rate.std,
+            _BCN.COMPLIANT_AUDIT_FRACTION_MEAN: r.compliant_audit_fraction.mean,
+            _BCN.COMPLIANT_AUDIT_FRACTION_STD: r.compliant_audit_fraction.std,
+            _BCN.CATCH_RATE_MEAN: r.catch_rate.mean,
+            _BCN.CATCH_RATE_STD: r.catch_rate.std,
         }
         for r in results
     ]
@@ -585,8 +585,8 @@ def export_mc_per_seed_to_csv(
             _BCN.PAYOFF_COMPLIANT_MEAN: s.avg_payoff_compliant,
             _BCN.PAYOFF_VIOLATOR_MEAN: s.avg_payoff_violator,
             _BCN.AUDIT_RATE_MEAN: s.audit_rate,
-            _BCN.FALSE_POSITIVE_RATE_MEAN: s.false_positive_rate,
-            _BCN.DETECTION_RATE_MEAN: s.detection_rate,
+            _BCN.COMPLIANT_AUDIT_FRACTION_MEAN: s.compliant_audit_fraction,
+            _BCN.CATCH_RATE_MEAN: s.catch_rate,
         }
         for s in result.raw_seeds
     ]
@@ -731,8 +731,8 @@ def export_sweep_to_csv(
             _BCN.PAYOFF_VIOLATOR_MEAN: pt.result.payoff_violator.mean,
             _BCN.AUDIT_RATE_MEAN: pt.result.audit_rate.mean,
             _BCN.AUDIT_RATE_STD: pt.result.audit_rate.std,
-            _BCN.FALSE_POSITIVE_RATE_MEAN: pt.result.false_positive_rate.mean,
-            _BCN.DETECTION_RATE_MEAN: pt.result.detection_rate.mean,
+            _BCN.COMPLIANT_AUDIT_FRACTION_MEAN: pt.result.compliant_audit_fraction.mean,
+            _BCN.CATCH_RATE_MEAN: pt.result.catch_rate.mean,
         }
         for pt in result.points
     ]
@@ -964,10 +964,10 @@ def export_monte_carlo_to_excel(
             ("Audit Rate", result.audit_rate.mean, result.audit_rate.std),
             (
                 "False Positive Rate",
-                result.false_positive_rate.mean,
-                result.false_positive_rate.std,
+                result.compliant_audit_fraction.mean,
+                result.compliant_audit_fraction.std,
             ),
-            ("Detection Rate", result.detection_rate.mean, result.detection_rate.std),
+            ("Detection Rate", result.catch_rate.mean, result.catch_rate.std),
         ]
         for label, mean_val, std_val in _mc_summary_rows:
             is_pct = (
@@ -1023,8 +1023,8 @@ def export_monte_carlo_to_excel(
                     s.avg_payoff_compliant,
                     s.avg_payoff_violator,
                     s.audit_rate,
-                    s.false_positive_rate,
-                    s.detection_rate,
+                    s.compliant_audit_fraction,
+                    s.catch_rate,
                 ]
                 for col, v in enumerate(vals):
                     seed_sheet.write(
@@ -1138,7 +1138,7 @@ def export_sweep_to_excel(
                 pt.result.avg_price.mean,
                 pt.result.avg_net_payoff.mean,
                 pt.result.audit_rate.mean,
-                pt.result.detection_rate.mean,
+                pt.result.catch_rate.mean,
             ]
             for col, v in enumerate(vals):
                 sweep_sheet.write(

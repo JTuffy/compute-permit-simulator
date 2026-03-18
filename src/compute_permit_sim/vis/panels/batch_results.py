@@ -100,9 +100,9 @@ def _MCResultsView() -> Any:
                     )
                     DownloadJSON(
                         "Download config JSON (for reproducibility)",
-                        lambda r=result: r.config.model_dump_json(indent=2).encode(
+                        lambda r=result: r.config.model_dump_json(indent=2).encode(  # type: ignore[misc]
                             "utf-8"
-                        ),  # type: ignore[misc]
+                        ),
                         f"mc_config_{safe}.json",
                     )
 
@@ -182,16 +182,16 @@ def _MCResultsView() -> Any:
                     "\u2014",
                 ),
                 (
-                    "False Positive Rate",
-                    f"{result.false_positive_rate.mean:.1%}",
-                    f"{result.false_positive_rate.std:.1%}",
+                    "Compliant Audit Fraction",
+                    f"{result.compliant_audit_fraction.mean:.1%}",
+                    f"{result.compliant_audit_fraction.std:.1%}",
                     "\u2014",
                     "\u2014",
                 ),
                 (
-                    "Detection Rate",
-                    f"{result.detection_rate.mean:.1%}",
-                    f"{result.detection_rate.std:.1%}",
+                    "Catch Rate (given audit)",
+                    f"{result.catch_rate.mean:.1%}",
+                    f"{result.catch_rate.std:.1%}",
                     "\u2014",
                     "\u2014",
                 ),
@@ -266,9 +266,9 @@ def _SweepResultsView() -> Any:
                     )
                     DownloadJSON(
                         "Download config JSON (for reproducibility)",
-                        lambda r=result: r.config.model_dump_json(indent=2).encode(
+                        lambda r=result: r.config.model_dump_json(indent=2).encode(  # type: ignore[misc]
                             "utf-8"
-                        ),  # type: ignore[misc]
+                        ),
                         f"sweep_config_{safe_s}_{safe_p}.json",
                     )
 

@@ -16,18 +16,28 @@ class SimpleClearingMarket:
     Attributes:
         max_supply: Total permits available (Q).
         current_price: The most recent clearing price.
+        _rng: Seeded RNG for deterministic permit lottery (fixed-price mode).
     """
 
-    def __init__(self, permit_cap: float, fixed_price: float | None = None) -> None:
+    def __init__(
+        self,
+        permit_cap: float,
+        fixed_price: float | None = None,
+        rng: random.Random | None = None,
+    ) -> None:
         """
         Args:
             permit_cap: Total permits available (Q).
             fixed_price: Optional fixed price; if set, all qualifying bidders pay
                 this price instead of the auction-cleared rate.
+            rng: Seeded RNG for reproducible permit lottery in fixed-price
+                over-subscription. Defaults to the global random module when
+                None — callers should always pass the model-level RNG.
         """
         self.max_supply: float = permit_cap
         self.current_price: float = 0.0
         self.fixed_price: float | None = fixed_price
+        self._rng: random.Random | None = rng
 
     def set_fixed_price(self, price: float) -> None:
         """Set a fixed price for the market.
@@ -125,8 +135,11 @@ class SimpleClearingMarket:
                 for lab_id, qty in qualifying:
                     allocations[lab_id] = qty
             else:
-                # Over-subscribed: randomly sample up to permit_cap units
-                winners = random.sample(fp_units, available)
+                # Over-subscribed: randomly sample up to permit_cap units.
+                # Use the model-level RNG for reproducibility; fall back to
+                # global random only in non-Mesa (standalone test) contexts.
+                _rng = self._rng if self._rng is not None else random
+                winners = _rng.sample(fp_units, available)
                 for lab_id in winners:
                     allocations[lab_id] += 1
 

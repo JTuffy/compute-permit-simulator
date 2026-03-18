@@ -88,7 +88,9 @@ class ComputePermitModel(mesa.Model):
         self.config = config
         self.running = True
 
-        self.market = SimpleClearingMarket(permit_cap=config.market.permit_cap)
+        self.market = SimpleClearingMarket(
+            permit_cap=config.market.permit_cap, rng=self.random
+        )
         if config.market.fixed_price is not None:
             self.market.set_fixed_price(config.market.fixed_price)
         self.auditor = Auditor(config.audit, rng=self.random)
