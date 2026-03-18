@@ -28,13 +28,11 @@ class BatchColumnNames:
     STEP = "step"
     PARAM_PATH = "param_path"
     PARAM_VALUE = "param_value"
-    N_RUNS = "n_runs"
-
-    # 2-D grid sweep — per-axis identifiers
     PARAM_X_PATH = "param_x_path"
     PARAM_X_VALUE = "param_x_value"
     PARAM_Y_PATH = "param_y_path"
     PARAM_Y_VALUE = "param_y_value"
+    N_RUNS = "n_runs"
 
     # Compliance
     COMPLIANCE_RATE = "compliance_rate"
@@ -66,8 +64,8 @@ class BatchColumnNames:
     AUDIT_RATE_STD = "audit_rate_std"
     COMPLIANT_AUDIT_FRACTION_MEAN = "compliant_audit_fraction_mean"
     COMPLIANT_AUDIT_FRACTION_STD = "compliant_audit_fraction_std"
-    CATCH_RATE_MEAN = "catch_rate_mean"
-    CATCH_RATE_STD = "catch_rate_std"
+    DETECTION_RATE_GIVEN_AUDIT_MEAN = "detection_rate_given_audit_mean"
+    DETECTION_RATE_GIVEN_AUDIT_STD = "detection_rate_given_audit_std"
 
 
 @dataclass(frozen=True)
@@ -87,8 +85,8 @@ class PerSeedResult:
     avg_payoff_compliant: float  # NaN if no compliant labs
     avg_payoff_violator: float  # NaN if no violators
     audit_rate: float
-    compliant_audit_fraction: float
-    catch_rate: float  # NaN if no audited violators
+    compliant_audit_fraction: float  # audits on compliant / total audits
+    detection_rate_given_audit: float  # NaN if no audited violators
 
 
 @dataclass(frozen=True)
@@ -168,7 +166,9 @@ class MonteCarloResult:
     # --- Audit burden ---
     audit_rate: MetricStats  # audits / total lab-steps
     compliant_audit_fraction: MetricStats  # audits on compliant / total audits
-    catch_rate: MetricStats  # caught / audits on violators
+    detection_rate_given_audit: (
+        MetricStats  # caught / audits on violators (given audit)
+    )
 
     # --- Raw per-seed data (optional, set store_raw=True in run_monte_carlo) ---
     raw_seeds: list[PerSeedResult] = field(default_factory=list)
@@ -207,48 +207,18 @@ class SweepResult:
         ]
 
     def tipping_point(self, threshold: float = 0.95) -> float | None:
-        """Return the boundary param value where mean avg_compliance crosses threshold.
-
-        Direction-aware: detects whether compliance rises or falls with the
-        parameter and returns the appropriate boundary.
-
-        - Upward sweep (compliance rises with param, e.g. audit rate):
-          returns first param_value where compliance >= threshold.
-        - Downward sweep (compliance falls with param, e.g. permit price):
-          returns last param_value where compliance >= threshold,
-          i.e. the ceiling before compliance drops below threshold.
+        """Return first param value where mean avg_compliance >= threshold.
 
         Args:
-            threshold: Compliance fraction to consider as the boundary
-                (default 0.95).
+            threshold: Compliance fraction to consider as 'achieved' (default 0.95).
 
         Returns:
-            Boundary param_value, or None if compliance never reaches threshold.
+            First param_value meeting the threshold, or None if never reached.
         """
-        if not self.points:
-            return None
-
-        means = [pt.result.avg_compliance.mean for pt in self.points]
-
-        # Detect direction: compare first and last point
-        # Use a simple heuristic: if the last mean < first mean, it's a downward sweep.
-        is_downward = means[-1] < means[0]
-
-        if is_downward:
-            # Last point where compliance is still at or above the threshold
-            result = None
-            for pt in self.points:
-                if pt.result.avg_compliance.mean >= threshold:
-                    result = pt.param_value
-                else:
-                    break  # First drop below threshold — stop here
-            return result
-        else:
-            # First point where compliance reaches or exceeds the threshold
-            for pt in self.points:
-                if pt.result.avg_compliance.mean >= threshold:
-                    return pt.param_value
-            return None
+        for pt in self.points:
+            if pt.result.avg_compliance.mean >= threshold:
+                return pt.param_value
+        return None
 
 
 @dataclass(frozen=True)

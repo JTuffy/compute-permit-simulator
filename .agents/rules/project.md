@@ -159,7 +159,7 @@ The simulation services are all headless (no Solara dependency) and callable dir
 | `override_config(cfg, path, value)` | `schemas.sweep_params` | Mutate one field on a frozen config |
 
 **Key result fields** (both `run_single` → `SimulationRun` and `run_monte_carlo` → `MonteCarloResult`):
-- `metrics.avg_compliance`, `metrics.final_compliance`, `metrics.detection_rate`
+- `metrics.avg_compliance`, `metrics.final_compliance`, `metrics.detection_rate_given_audit`
 - MC only: `.avg_compliance.mean/.std`, `.step_compliance` (per-step), `.raw_seeds` (if `store_raw=True`)
 
 **Session folder contract** — every `/researcher` invocation produces a `YYYY-MM-DD_slug/` folder under `agent_workspace/research/` containing:

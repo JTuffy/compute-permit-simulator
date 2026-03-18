@@ -48,8 +48,8 @@ class _RunResult(NamedTuple):
 
     # Audit burden
     audit_rate: float
-    compliant_audit_fraction: float
-    catch_rate: float  # NaN if 0 audited violators
+    compliant_audit_fraction: float  # audits on compliant / total audits
+    detection_rate_given_audit: float  # NaN if 0 audited violators
 
 
 def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
@@ -138,7 +138,7 @@ def _run_once(config: ScenarioConfig, seed: int) -> _RunResult:
         compliant_audit_fraction=(
             audits_on_compliant / total_audits if total_audits else 0.0
         ),
-        catch_rate=(
+        detection_rate_given_audit=(
             violations_caught / audits_on_violators
             if audits_on_violators
             else float("nan")
@@ -272,11 +272,15 @@ def run_monte_carlo(
         compliant_audit_fraction=MetricStats.from_values(
             [r.compliant_audit_fraction for r in raw]
         ),
-        catch_rate=(
+        detection_rate_given_audit=(
             MetricStats.from_values(
-                [r.catch_rate for r in raw if not math.isnan(r.catch_rate)]
+                [
+                    r.detection_rate_given_audit
+                    for r in raw
+                    if not math.isnan(r.detection_rate_given_audit)
+                ]
             )
-            if any(not math.isnan(r.catch_rate) for r in raw)
+            if any(not math.isnan(r.detection_rate_given_audit) for r in raw)
             else MetricStats.nan()
         ),
         raw_seeds=[
@@ -290,7 +294,7 @@ def run_monte_carlo(
                 avg_payoff_violator=r.avg_payoff_violator,
                 audit_rate=r.audit_rate,
                 compliant_audit_fraction=r.compliant_audit_fraction,
-                catch_rate=r.catch_rate,
+                detection_rate_given_audit=r.detection_rate_given_audit,
             )
             for s, r in zip(run_seeds, raw)
         ]

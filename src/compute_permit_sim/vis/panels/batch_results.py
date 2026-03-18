@@ -20,7 +20,7 @@ from compute_permit_sim.vis.components.results import (
     MetricChip,
     ResultsActions,
 )
-from compute_permit_sim.vis.state.run_state import grid_run, mc_run, sweep_run
+from compute_permit_sim.vis.state.run_state import mc_run, sweep_run
 
 # ---------------------------------------------------------------------------
 # Monte Carlo results
@@ -189,9 +189,9 @@ def _MCResultsView() -> Any:
                     "\u2014",
                 ),
                 (
-                    "Catch Rate (given audit)",
-                    f"{result.catch_rate.mean:.1%}",
-                    f"{result.catch_rate.std:.1%}",
+                    "Detection Rate (given audit)",
+                    f"{result.detection_rate_given_audit.mean:.1%}",
+                    f"{result.detection_rate_given_audit.std:.1%}",
                     "\u2014",
                     "\u2014",
                 ),
@@ -306,115 +306,6 @@ def _SweepResultsView() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Grid sweep results
-# ---------------------------------------------------------------------------
-
-
-@solara.component
-def _GridSweepResultsView() -> Any:
-    from compute_permit_sim.vis.export import (
-        export_grid_sweep_to_csv,
-        export_grid_sweep_to_excel,
-    )
-    from compute_permit_sim.vis.plotting import plot_sweep_heatmap
-
-    result = grid_run.value.result
-    if result is None:
-        solara.Text("No grid sweep result to display.")
-        return
-
-    safe_s = result.scenario_name.lower().replace(" ", "_")
-    safe_x = result.param_x_path.replace(".", "_")
-    safe_y = result.param_y_path.replace(".", "_")
-
-    fig = plot_sweep_heatmap(
-        compliance_grid=result.grid,
-        x_values=result.x_values,
-        y_values=result.y_values,
-        x_param_label=result.param_x_label,
-        y_param_label=result.param_y_label,
-        title=f"Compliance Heatmap — {result.scenario_name}",
-    )
-
-    with solara.Column(classes=["analysis-panel"]):
-        with solara.Card("Summary", style="margin-bottom: 12px;"):
-            with solara.Row(
-                style="align-items: center; justify-content: space-between; flex-wrap: wrap;"
-            ):
-                with solara.Row(style="gap: 24px; flex-wrap: wrap; flex: 1;"):
-                    MetricChip("Scenario", result.scenario_name)
-                    MetricChip("X-axis", result.param_x_label)
-                    MetricChip("Y-axis", result.param_y_label)
-                    MetricChip(
-                        "Grid size",
-                        f"{len(result.x_values)}\u00d7{len(result.y_values)}",
-                    )
-                    MetricChip("Seeds per cell", str(result.n_runs))
-                    MetricChip(
-                        "Compliance range",
-                        f"{result.compliance_min:.1%}\u2013{result.compliance_max:.1%}",
-                    )
-
-                with ResultsActions():
-                    RunConfigDialog(
-                        config=result.config,
-                        title=f"Grid Sweep: {result.id}",
-                        batch_summary=(
-                            f"**{len(result.x_values)}\u00d7{len(result.y_values)} grid sweep**"
-                            f" \u00b7 {result.scenario_name}  \n"
-                            f"X: **{result.param_x_label}**  \n"
-                            f"Y: **{result.param_y_label}**  \n"
-                            f"Compliance range: "
-                            f"{result.compliance_min:.1%}\u2013{result.compliance_max:.1%}"
-                        ),
-                    )
-                    DownloadCSV(
-                        "Download grid CSV",
-                        lambda r=result: export_grid_sweep_to_csv(  # type: ignore[misc]
-                            r, output_path=""
-                        ),
-                        f"grid_{safe_s}_{safe_x}_x_{safe_y}.csv",
-                    )
-                    DownloadExcel(
-                        "Download Excel workbook",
-                        lambda r=result: export_grid_sweep_to_excel(  # type: ignore[misc]
-                            r, output_path=""
-                        ),
-                        f"grid_{safe_s}_{safe_x}_x_{safe_y}.xlsx",
-                    )
-                    DownloadJSON(
-                        "Download config JSON (for reproducibility)",
-                        lambda r=result: r.config.model_dump_json(  # type: ignore[misc]
-                            indent=2
-                        ).encode("utf-8"),
-                        f"grid_config_{safe_s}.json",
-                    )
-
-        with solara.Card("Results", style="margin-top: 0;"):
-            ExpandableChart(
-                fig,
-                download_filename=f"grid_{safe_s}_{safe_x}_x_{safe_y}.png",
-            )
-
-        with solara.Card("Per-Cell Compliance", style="margin-top: 0;"):
-            # Header: blank corner + x-axis values
-            x_hdrs = [result.param_x_label] + [f"{x:.4g}" for x in result.x_values]
-            header = "| " + " | ".join(x_hdrs) + " |"
-            sep = "|" + "|".join(["---"] * len(x_hdrs)) + "|"
-            # One row per y value — compliance as percentage
-            data_rows = []
-            for y_idx, y in enumerate(result.y_values):
-                cells = [f"{y:.4g}"] + [
-                    f"{result.grid[y_idx][x_idx]:.1%}"
-                    for x_idx in range(len(result.x_values))
-                ]
-                data_rows.append("| " + " | ".join(cells) + " |")
-            y_label_row = f"*Y: {result.param_y_label}*"
-            solara.Markdown(y_label_row)
-            solara.Markdown("\n".join([header, sep] + data_rows))
-
-
-# ---------------------------------------------------------------------------
 # Top-level
 # ---------------------------------------------------------------------------
 
@@ -423,19 +314,16 @@ def _GridSweepResultsView() -> Any:
 def BatchResultsPanel() -> Any:
     """Right-pane panel for batch results.
 
-    Reads result directly from mc_run / sweep_run / grid_run RunState singletons.
+    Reads result directly from mc_run / sweep_run RunState singletons.
     Page-level state machine in page.py ensures this panel is only rendered
     when a result is ready — no spinner gate needed here.
     """
     mc = mc_run.value
     sw = sweep_run.value
-    gr = grid_run.value
 
     if mc.is_ready and mc.result is not None:
         _MCResultsView()
     elif sw.is_ready and sw.result is not None:
         _SweepResultsView()
-    elif gr.is_ready and gr.result is not None:
-        _GridSweepResultsView()
     else:
         solara.Text("No batch results to display.")

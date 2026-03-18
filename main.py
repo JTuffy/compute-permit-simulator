@@ -3,7 +3,7 @@
 Usage:
     make run                         # single run, all scenarios
     make mc                          # Monte Carlo (50 runs per scenario)
-    make sweep                       # π₀ × K sensitivity sweep on Lawless
+    make sweep                       # π₀ × K sensitivity sweep on Minimal
     make paper-results               # MC + sweep, outputs LaTeX snippet
 
     uv run main.py --runs 1          # single run (default)
@@ -233,7 +233,7 @@ def _parse_args() -> argparse.Namespace:
         "--sweep-file",
         metavar="SWEEP_FILE",
         type=str,
-        help="Run a sweep from a JSON file in scenarios/sweeps/ (e.g. sweep_pi0_lawless.json).",
+        help="Run a sweep from a JSON file in scenarios/sweeps/ (e.g. sweep_pi0_minimal.json).",
     )
 
     parser.add_argument(

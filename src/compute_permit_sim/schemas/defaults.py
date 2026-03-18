@@ -79,7 +79,7 @@ DEFAULT_SIGNAL_EXPONENT = 1.0
 # Stage 2: AUDIT OUTCOME — given audit, does it find a violation?
 #   p_catch_if_audited = (1 - FNR) + FNR × backcheck_prob
 DEFAULT_AUDIT_FALSE_POS_RATE = 0.0  # alpha: P(false alarm | compliant firm audited)
-DEFAULT_AUDIT_FALSE_NEG_RATE = 0.40  # beta: 40% miss rate in Lawless env
+DEFAULT_AUDIT_FALSE_NEG_RATE = 0.40  # beta: 40% miss rate in Minimal env
 # Penalty structure:
 DEFAULT_AUDIT_PENALTY_AMOUNT = 200.0  # M$: flat penalty (default/fallback)
 DEFAULT_AUDIT_BACKCHECK_PROB = 0.0  # p_b: historical audit discovery rate
@@ -93,7 +93,7 @@ DEFAULT_AUDIT_MONITORING_PROB = (
 # Seized on verified violation; returned otherwise. 0 = disabled.
 # Reference: Christoph (2026) Section 2.5, Proposition 3
 #   P_eff = min(K + phi, L) where K = collateral, phi = ex post fine, L = liability
-DEFAULT_COLLATERAL_AMOUNT = 0.0  # M$: Lawless = 0 collateral
+DEFAULT_COLLATERAL_AMOUNT = 0.0  # M$: Minimal = 0 collateral
 
 # --- Market Defaults ---
 DEFAULT_MARKET_PERMIT_CAP = 20.0  # Number of permits available
@@ -118,7 +118,7 @@ DEFAULT_LAB_RACING_FACTOR = 1.0  # c_r: 1.0 = no racing pressure
 # Reputation sensitivity: perceived reputation cost if caught (M$)
 DEFAULT_LAB_REPUTATION_SENSITIVITY = 0.0  # R: brand/trust damage
 # Audit coefficient: firm-specific audit rate scaling (dimensionless)
-DEFAULT_LAB_AUDIT_COEFFICIENT = 0.8  # c(i): Lawless = 0.8 evasion factor
+DEFAULT_LAB_AUDIT_COEFFICIENT = 0.8  # c(i): Minimal = 0.8 evasion factor
 # --- Dynamic Factor Defaults ---
 # All default to 0.0 (static behavior). Set > 0 to activate.
 #
