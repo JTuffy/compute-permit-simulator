@@ -1,14 +1,14 @@
 {
-    "name": "Dynamic Escalation (Time-Dependent)",
-    "description": "Demonstrates shifting deterrence via feedback loops: labs start non-compliant, get caught, and face escalating audit probabilities and reputation costs. Initial cheating gives way to compliance as enforcement ratchets up.",
-    "steps": 40,
+    "name": "Feedback-Driven Compliance",
+    "description": "Demonstrates that even modest enforcement can drive near-full compliance when reputation costs accumulate permanently. Base audit rate is only 20%, penalty is moderate ($50M), and audit escalation is weak (0.5). Despite these soft parameters, reputation sensitivity (10.0) ensures that after a few catches each lab's perceived burden exceeds its gain, producing a monotonic ratchet to ~97% compliance by step 50.",
+    "steps": 50,
     "n_agents": 20,
     "audit": {
-        "base_prob": 0.3,
+        "base_prob": 0.20,
         "signal_dependent": false,
         "false_negative_rate": 0.05,
-        "penalty_amount": 100.0,
-        "audit_escalation": 1.5,
+        "penalty_amount": 50.0,
+        "audit_escalation": 0.5,
         "audit_decay_rate": 0.1
     },
     "lab": {

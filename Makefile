@@ -6,7 +6,7 @@ help:
 	@echo "Available commands:"
 	@echo "  make run           - Run the simulation once (all scenarios)"
 	@echo "  make mc            - Monte Carlo: 50 runs per scenario, exports CSV + LaTeX table"
-	@echo "  make sweep         - Sensitivity sweep: π₀ on Lawless scenario"
+	@echo "  make sweep         - Sensitivity sweeps (pi_0 and collateral on minimal scenario)"
 	@echo "  make paper-results - Run MC + sweep and print LaTeX table to stdout"
 	@echo "  make app           - Run the Solara interactive dashboard (alias: viz)"
 	@echo "  make lint          - Run linters (ruff check)"
@@ -24,8 +24,8 @@ mc:
 	uv run main.py --monte-carlo 50
 
 sweep:
-	uv run main.py --sweep-file sweep_pi0_lawless.json
-	uv run main.py --sweep-file sweep_collateral_lawless.json
+	uv run main.py --sweep-file sweep_pi0_minimal.json
+	uv run main.py --sweep-file sweep_collateral_minimal.json
 
 list-sweeps:
 	@echo "Available sweep files:"

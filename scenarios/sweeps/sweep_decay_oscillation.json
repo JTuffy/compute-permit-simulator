@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_5_enforcement_cycles.json",
+    "param_path": "audit.audit_decay_rate",
+    "param_label": "Audit Decay Rate \u03b4",
+    "min_val": 0.0,
+    "max_val": 0.90,
+    "interval": 0.10,
+    "n_runs": 50
+}

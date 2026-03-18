@@ -1,6 +1,6 @@
 """Core game loop — pure business logic for one simulation step.
 
-Orchestrates the six-phase turn sequence:
+Orchestrates the seven-phase turn sequence:
     0. Collateral posting (above-threshold labs only)
     1. Trading (bids + market allocation, above-threshold labs only)
     2. Compliance decisions (above-threshold labs with excess only)
@@ -130,7 +130,7 @@ def execute_step(
                 outcome.agent_outcomes[lab.lab_id].bid_price = bid_per
                 outcome.agent_outcomes[lab.lab_id].permits_wanted = qty
 
-        clearing_price, allocations = market.allocate(bids)
+        clearing_price, allocations = market.allocate(bids, rng=_rng)
         outcome.clearing_price = clearing_price
 
         for lab in above:

@@ -67,8 +67,9 @@ class AuditConfig(BaseModel):
 
     2. AUDIT OUTCOME: Whether an audit catches a violator (if one exists)
        - false_positive_rate (alpha): P(false alarm | compliant firm audited)
-       - false_negative_rate (beta): P(miss | non-compliant firm audited)
-       - p_catch = (1 - beta) + beta × backcheck_prob
+       - false_negative_rate (beta): P(miss | non-compliant firm, direct pass)
+       - p_catch = 1 - beta × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
+         where p_w = whistleblower_prob, p_m = monitoring_prob
     """
 
     base_prob: float = Field(

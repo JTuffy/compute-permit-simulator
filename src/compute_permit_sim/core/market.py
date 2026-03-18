@@ -68,7 +68,9 @@ class SimpleClearingMarket:
         return clearing_price
 
     def allocate(
-        self, bids: list[tuple[int, int, float]]
+        self,
+        bids: list[tuple[int, int, float]],
+        rng: random.Random | None = None,
     ) -> tuple[float, dict[int, int]]:
         """Resolve price and allocate permits via uniform-price auction.
 
@@ -126,7 +128,7 @@ class SimpleClearingMarket:
                     allocations[lab_id] = qty
             else:
                 # Over-subscribed: randomly sample up to permit_cap units
-                winners = random.sample(fp_units, available)
+                winners = (rng or random).sample(fp_units, available)
                 for lab_id in winners:
                     allocations[lab_id] += 1
 

@@ -1,0 +1,31 @@
+{
+    "name": "Enforcement Cycles",
+    "description": "Audit-coefficient escalation with fast decay produces persistent enforcement cycles. Labs start with low audit coefficient (c_base=0.3): initial detection probability ~32%, expected penalty ~$31.8M < gain ~$80M so labs cheat. On catch, coefficient spikes by +2.0 (to ~2.3, detection ~95%): lab complies. But 60% per-step decay rapidly returns coefficient toward 0.3: after 2 steps coefficient ~0.62 (detection ~61%, expected penalty ~$61M < $80M) so lab cheats again. Cycle period ~4-5 steps per lab. No reputation escalation — pure audit-coefficient dynamics. Requires signal_dependent=True so the coefficient affects detection probability.",
+    "steps": 60,
+    "n_agents": 20,
+    "audit": {
+        "base_prob": 0.05,
+        "signal_dependent": true,
+        "false_negative_rate": 0.05,
+        "penalty_amount": 100.0,
+        "audit_escalation": 2.0,
+        "audit_decay_rate": 0.60
+    },
+    "lab": {
+        "compute_capacity_min": 1e26,
+        "compute_capacity_max": 1e26,
+        "economic_value_min": 75.0,
+        "economic_value_max": 90.0,
+        "capability_value": 0.0,
+        "racing_factor": 0.0,
+        "risk_profile_min": 1.0,
+        "risk_profile_max": 1.0,
+        "reputation_sensitivity": 0.0,
+        "reputation_escalation_factor": 0.0,
+        "audit_coefficient": 0.3
+    },
+    "market": {
+        "permit_cap": 5.0
+    },
+    "collateral_amount": 0.0
+}

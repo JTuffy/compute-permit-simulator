@@ -64,7 +64,7 @@ Before running experiments, orient yourself:
    > Always start from `research_margin_baseline.json` with a tightened cap (e.g. cap=10,
    > n_agents=15) as the canonical interesting starting point.
    >
-   > **`detection_rate = nan` is a diagnostic signal**, not missing data. It means zero
+   > **`detection_rate_given_audit = nan` is a diagnostic signal**, not missing data. It means zero
    > violations occurred — which confirms a degenerate config. Treat it as a hard
    > signal to rethink the parameter regime, not as an experiment result.
 
@@ -94,7 +94,7 @@ from compute_permit_sim.schemas import ScenarioConfig
 result = run_single(config)  # returns SimulationRun
 print(result.metrics.avg_compliance)
 print(result.metrics.final_compliance)
-print(result.metrics.detection_rate)
+print(result.metrics.detection_rate_given_audit)
 ```
 
 ### Monte Carlo — `run_monte_carlo`
@@ -112,7 +112,7 @@ result = run_monte_carlo(
 # result.final_compliance.mean / .std
 # result.p10_compliance, result.p90_compliance
 # result.pct_runs_full_compliance
-# result.detection_rate.mean
+# result.detection_rate_given_audit.mean
 # result.step_compliance   — list[MetricStats], one per step
 # result.raw_seeds         — list[SeedResult] if store_raw=True
 ```
