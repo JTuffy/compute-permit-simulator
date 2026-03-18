@@ -1247,7 +1247,10 @@ def export_grid_sweep_to_excel(
         grid_sheet = workbook.add_worksheet("Grid")
         grid_sheet.set_column("A:A", 20)
         grid_sheet.write(
-            0, 0, f"{result.param_x_label} \u2192 / {result.param_y_label} \u2193", header_fmt
+            0,
+            0,
+            f"{result.param_x_label} \u2192 / {result.param_y_label} \u2193",
+            header_fmt,
         )
         for x_idx, x in enumerate(result.x_values):
             grid_sheet.write(0, x_idx + 1, x, header_fmt)
