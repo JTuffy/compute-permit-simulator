@@ -77,7 +77,7 @@ DEFAULT_SIGNAL_DEPENDENT = False  # False = pure random auditing; True = signal-
 DEFAULT_SIGNAL_EXPONENT = 1.0
 #
 # Stage 2: AUDIT OUTCOME — given audit, does it find a violation?
-#   p_catch_if_audited = (1 - FNR) + FNR × backcheck_prob
+#   p_catch_if_audited = 1 - FNR × (1 - backcheck_prob) × (1 - p_w) × (1 - p_m)
 DEFAULT_AUDIT_FALSE_POS_RATE = 0.0  # alpha: P(false alarm | compliant firm audited)
 DEFAULT_AUDIT_FALSE_NEG_RATE = 0.40  # beta: 40% miss rate in Minimal env
 # Penalty structure:

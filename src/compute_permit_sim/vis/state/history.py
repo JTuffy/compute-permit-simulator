@@ -5,10 +5,14 @@ from __future__ import annotations
 import solara
 
 from compute_permit_sim.schemas import SimulationRun
-from compute_permit_sim.schemas.batch import MonteCarloResult, SweepResult
+from compute_permit_sim.schemas.batch import (
+    GridSweepResult,
+    MonteCarloResult,
+    SweepResult,
+)
 
-# Union type for batch results — MC aggregate or sweep aggregate.
-BatchResult = MonteCarloResult | SweepResult
+# Union type for batch results — MC aggregate, 1D sweep, or 2D grid sweep.
+BatchResult = MonteCarloResult | SweepResult | GridSweepResult
 
 
 class SessionHistory:

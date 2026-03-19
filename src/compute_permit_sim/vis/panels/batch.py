@@ -28,7 +28,7 @@ from compute_permit_sim.schemas.sweep_params import (
 )
 from compute_permit_sim.vis.components.history import UnifiedHistoryList
 from compute_permit_sim.vis.components.results import SidebarLabel
-from compute_permit_sim.vis.state.run_state import RunState, mc_run, sweep_run
+from compute_permit_sim.vis.state.run_state import RunState, grid_run, mc_run, sweep_run
 
 # Pre-built lookup map (module-level constant — registry never changes at runtime)
 _PARAM_MAP: dict[str, SweepParam] = {p.path: p for p in SWEEPABLE_PARAMS}
@@ -38,6 +38,7 @@ _PARAM_MAP: dict[str, SweepParam] = {p.path: p for p in SWEEPABLE_PARAMS}
 # ---------------------------------------------------------------------------
 _mc_status = solara.reactive("")
 _sweep_status = solara.reactive("")
+_grid_status = solara.reactive("")
 
 # ---------------------------------------------------------------------------
 # Background workers
@@ -138,6 +139,59 @@ def _run_sweep_background(
     except Exception as e:  # noqa: BLE001
         sweep_run.set(RunState[SweepResult](phase="idle"))
         _sweep_status.set(f"Error: {e}")
+
+
+def _run_grid_background(
+    scenario_name: str,
+    param_x: SweepParam,
+    param_y: SweepParam,
+    x_values: list[float],
+    y_values: list[float],
+    n_runs: int,
+) -> None:
+    """Run 2D grid sweep off the event loop thread and update grid_run reactive."""
+    from compute_permit_sim.schemas.batch import GridSweepResult
+    from compute_permit_sim.services.sweep import run_grid_sweep
+
+    try:
+        config = _load_scenario_by_name(scenario_name)
+
+        if config is None:
+            _grid_status.set(f"Scenario '{scenario_name}' not found.")
+            grid_run.set(RunState[GridSweepResult](phase="idle"))
+            return
+
+        n_cells = len(x_values) * len(y_values)
+        _grid_status.set(
+            f"Grid {len(x_values)}×{len(y_values)} = {n_cells} cells × {n_runs} runs..."
+        )
+
+        result = run_grid_sweep(
+            config,
+            param_x_path=param_x.path,
+            param_y_path=param_y.path,
+            x_values=x_values,
+            y_values=y_values,
+            param_x_label=param_x.label,
+            param_y_label=param_y.label,
+            n_runs=n_runs,
+        )
+
+        from compute_permit_sim.vis.state.history import (
+            session_history,  # noqa: PLC0415
+        )
+
+        session_history.add_batch_result(result)
+        grid_run.set(RunState[GridSweepResult](phase="ready", result=result))
+        _grid_status.set(
+            f"Done: {len(x_values)}×{len(y_values)} grid — "
+            f"compliance {result.compliance_min:.1%}–{result.compliance_max:.1%}"
+        )
+    except Exception as e:  # noqa: BLE001
+        from compute_permit_sim.schemas.batch import GridSweepResult
+
+        grid_run.set(RunState[GridSweepResult](phase="idle"))
+        _grid_status.set(f"Error: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -392,8 +446,219 @@ def _SweepCard(scenario_names: list[str]) -> Any:
 
 
 @solara.component
+def _GridSweepCard(scenario_names: list[str]) -> Any:
+    """Sidebar card for configuring and launching a 2D grid sweep."""
+    selected_scenario, set_selected_scenario = solara.use_state(
+        scenario_names[0] if scenario_names else ""
+    )
+
+    all_categories = categories()
+
+    # --- X-axis param ---
+    cat_x, set_cat_x = solara.use_state(all_categories[0] if all_categories else "")
+    params_x = params_for_category(cat_x)
+    path_x, set_path_x = solara.use_state(params_x[0].path if params_x else "")
+    param_x = _PARAM_MAP.get(path_x)
+    min_x, set_min_x = solara.use_state(param_x.default_min if param_x else 0.0)
+    max_x, set_max_x = solara.use_state(param_x.default_max if param_x else 1.0)
+    step_x, set_step_x = solara.use_state(param_x.default_step if param_x else 0.1)
+
+    # --- Y-axis param ---
+    cat_y, set_cat_y = solara.use_state(all_categories[0] if all_categories else "")
+    params_y = params_for_category(cat_y)
+    path_y, set_path_y = solara.use_state(params_y[0].path if params_y else "")
+    param_y = _PARAM_MAP.get(path_y)
+    min_y, set_min_y = solara.use_state(param_y.default_min if param_y else 0.0)
+    max_y, set_max_y = solara.use_state(param_y.default_max if param_y else 1.0)
+    step_y, set_step_y = solara.use_state(param_y.default_step if param_y else 0.1)
+
+    n_runs, set_n_runs = solara.use_state(20)
+
+    is_running = grid_run.value.is_running
+    status = _grid_status.value
+
+    # Compute preview — both axes must be valid
+    n_pts_x, n_pts_y = 0, 0
+    preview_error = ""
+    if param_x and step_x > 0 and min_x <= max_x:
+        try:
+            n_pts_x = len(generate_values(param_x, min_x, max_x, step_x))
+        except Exception:
+            preview_error = "Invalid X range"
+    if param_y and step_y > 0 and min_y <= max_y:
+        try:
+            n_pts_y = len(generate_values(param_y, min_y, max_y, step_y))
+        except Exception:
+            preview_error = "Invalid Y range"
+
+    def _on_cat_x(cat: str) -> None:
+        set_cat_x(cat)
+        ps = params_for_category(cat)
+        if ps:
+            set_path_x(ps[0].path)
+            set_min_x(ps[0].default_min)
+            set_max_x(ps[0].default_max)
+            set_step_x(ps[0].default_step)
+
+    def _on_path_x(label: str) -> None:
+        path = {p.label: p.path for p in params_for_category(cat_x)}.get(label, "")
+        set_path_x(path)
+        p = _PARAM_MAP.get(path)
+        if p:
+            set_min_x(p.default_min)
+            set_max_x(p.default_max)
+            set_step_x(p.default_step)
+
+    def _on_cat_y(cat: str) -> None:
+        set_cat_y(cat)
+        ps = params_for_category(cat)
+        if ps:
+            set_path_y(ps[0].path)
+            set_min_y(ps[0].default_min)
+            set_max_y(ps[0].default_max)
+            set_step_y(ps[0].default_step)
+
+    def _on_path_y(label: str) -> None:
+        path = {p.label: p.path for p in params_for_category(cat_y)}.get(label, "")
+        set_path_y(path)
+        p = _PARAM_MAP.get(path)
+        if p:
+            set_min_y(p.default_min)
+            set_max_y(p.default_max)
+            set_step_y(p.default_step)
+
+    def on_run() -> None:
+        if not param_x or not param_y:
+            return
+        try:
+            x_vals = generate_values(param_x, min_x, max_x, step_x)
+            y_vals = generate_values(param_y, min_y, max_y, step_y)
+        except ValueError:
+            _grid_status.set("Invalid range — check min/max/step for both axes.")
+            return
+        from compute_permit_sim.schemas.batch import (  # noqa: PLC0415
+            GridSweepResult,
+            MonteCarloResult,
+            SweepResult,
+        )
+
+        grid_run.set(RunState[GridSweepResult](phase="running"))
+        mc_run.set(RunState[MonteCarloResult](phase="idle"))
+        sweep_run.set(RunState[SweepResult](phase="idle"))
+        _grid_status.set("Starting...")
+        threading.Thread(
+            target=_run_grid_background,
+            args=(selected_scenario, param_x, param_y, x_vals, y_vals, n_runs),
+            daemon=True,
+        ).start()
+
+    with solara.Card(title="Grid Sweep"):
+        if not scenario_names:
+            with solara.Column(classes=["sidebar-empty-text"]):
+                solara.Text("No scenarios found.")
+            return
+
+        solara.Select(
+            label="Scenario",
+            values=scenario_names,
+            value=selected_scenario,
+            on_value=set_selected_scenario,
+            dense=True,
+        )
+
+        # ── X-axis ──────────────────────────────────────────────────────────
+        with solara.Column(classes=["sidebar-hint-text"]):
+            solara.Text("X-axis parameter")
+        with solara.Row(style="gap: 4px;"):
+            solara.Select(
+                label="Category",
+                values=all_categories,
+                value=cat_x,
+                on_value=_on_cat_x,
+                dense=True,
+            )
+            labels_x = [p.label for p in params_for_category(cat_x)]
+            solara.Select(
+                label="Parameter",
+                values=labels_x,
+                value=param_x.label if param_x else (labels_x[0] if labels_x else ""),
+                on_value=_on_path_x,
+                dense=True,
+            )
+        with solara.Row(style="gap: 4px;"):
+            unit_x = param_x.unit if param_x else ""
+            solara.InputFloat(label=f"Min ({unit_x})", value=min_x, on_value=set_min_x)
+            solara.InputFloat(label=f"Max ({unit_x})", value=max_x, on_value=set_max_x)
+            solara.InputFloat(label="Step", value=step_x, on_value=set_step_x)
+
+        # ── Y-axis ──────────────────────────────────────────────────────────
+        with solara.Column(classes=["sidebar-hint-text"]):
+            solara.Text("Y-axis parameter")
+        with solara.Row(style="gap: 4px;"):
+            solara.Select(
+                label="Category",
+                values=all_categories,
+                value=cat_y,
+                on_value=_on_cat_y,
+                dense=True,
+            )
+            labels_y = [p.label for p in params_for_category(cat_y)]
+            solara.Select(
+                label="Parameter",
+                values=labels_y,
+                value=param_y.label if param_y else (labels_y[0] if labels_y else ""),
+                on_value=_on_path_y,
+                dense=True,
+            )
+        with solara.Row(style="gap: 4px;"):
+            unit_y = param_y.unit if param_y else ""
+            solara.InputFloat(label=f"Min ({unit_y})", value=min_y, on_value=set_min_y)
+            solara.InputFloat(label=f"Max ({unit_y})", value=max_y, on_value=set_max_y)
+            solara.InputFloat(label="Step", value=step_y, on_value=set_step_y)
+
+        # ── Replications + simulation count preview ──────────────────────────
+        solara.SliderInt(
+            label=f"Runs per cell: {n_runs}",
+            value=n_runs,
+            on_value=set_n_runs,
+            min=5,
+            max=100,
+            step=5,
+        )
+        if preview_error:
+            with solara.Column(classes=["sidebar-error-text"]):
+                solara.Text(preview_error)
+        elif n_pts_x > 0 and n_pts_y > 0:
+            total = n_pts_x * n_pts_y * n_runs
+            with solara.Column(classes=["sidebar-hint-text"]):
+                solara.Text(
+                    f"{n_pts_x}\u00d7{n_pts_y} = {n_pts_x * n_pts_y} cells"
+                    f" \u00d7 {n_runs} = {total:,} total simulations"
+                )
+
+        solara.Button(
+            "Running..." if is_running else "Run Grid Sweep",
+            on_click=on_run,
+            color="primary",
+            block=True,
+            disabled=is_running
+            or not selected_scenario
+            or not param_x
+            or not param_y
+            or n_pts_x == 0
+            or n_pts_y == 0,
+            small=True,
+        )
+        if status and (
+            "Error" in status or "not found" in status or "Invalid" in status
+        ):
+            with solara.Column(classes=["sidebar-error-text"]):
+                solara.Text(status)
+
+
+@solara.component
 def BatchPanel() -> Any:
-    """Sidebar panel with Monte Carlo and Parameter Sweep configurators."""
+    """Sidebar panel with Monte Carlo, Parameter Sweep, and Grid Sweep configurators."""
     from compute_permit_sim.vis.state.history import session_history  # noqa: PLC0415
 
     # Use the same name map as LoadScenarioDialog for consistency
@@ -403,6 +668,7 @@ def BatchPanel() -> Any:
         SidebarLabel("**BATCH ANALYSIS**")
         _MonteCarloCard(scenario_names=scenario_names)
         _SweepCard(scenario_names=scenario_names)
+        _GridSweepCard(scenario_names=scenario_names)
 
         # ── History — batch results + individual runs in one stream ────────
         solara.Markdown("---")

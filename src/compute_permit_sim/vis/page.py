@@ -4,8 +4,10 @@ Right-pane state machine (centralized here):
     basic_run.phase == "running"          → RunSpinner (basic sim)
     mc_run.phase == "running"             → RunSpinner (Monte Carlo)
     sweep_run.phase == "running"          → RunSpinner (Sweep)
+    grid_run.phase == "running"           → RunSpinner (Grid Sweep)
     mc_run.phase == "ready"               → BatchResultsPanel
     sweep_run.phase == "ready"            → BatchResultsPanel
+    grid_run.phase == "ready"             → BatchResultsPanel
     basic_run.phase == "ready" OR history → AnalysisPanel
     else                                  → EmptyState
 """
@@ -27,7 +29,12 @@ from compute_permit_sim.vis.panels.batch import BatchPanel
 from compute_permit_sim.vis.panels.batch_results import BatchResultsPanel
 from compute_permit_sim.vis.panels.config import ConfigPanel
 from compute_permit_sim.vis.state.history import session_history
-from compute_permit_sim.vis.state.run_state import basic_run, mc_run, sweep_run
+from compute_permit_sim.vis.state.run_state import (
+    basic_run,
+    grid_run,
+    mc_run,
+    sweep_run,
+)
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -109,12 +116,13 @@ def Page():
         basic = basic_run.value
         mc = mc_run.value
         sw = sweep_run.value
+        gr = grid_run.value
 
         if basic.is_running:
             RunSpinner("Simulating\u2026")
-        elif mc.is_running or sw.is_running:
+        elif mc.is_running or sw.is_running or gr.is_running:
             RunSpinner("Running batch analysis\u2026")
-        elif mc.is_ready or sw.is_ready:
+        elif mc.is_ready or sw.is_ready or gr.is_ready:
             BatchResultsPanel()
         elif basic.is_ready or session_history.selected_run.value is not None:
             AnalysisPanel()

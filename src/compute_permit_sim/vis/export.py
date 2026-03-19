@@ -21,6 +21,10 @@ Monte Carlo:
 Sweep:
     export_sweep_to_excel  — Excel with Config/Sweep/Graphs
     export_sweep_to_csv    — one row per parameter value
+
+Grid Sweep (2D heatmap):
+    export_grid_sweep_to_csv    — long-format CSV, one row per grid cell
+    export_grid_sweep_to_excel  — Excel with Config/Grid pivot/Heatmap image
 """
 
 import io
@@ -35,11 +39,12 @@ from compute_permit_sim.schemas.batch import (
     BatchColumnNames as _BCN,
 )
 from compute_permit_sim.schemas.batch import (
-    MetricStats as _MetricStats,
-)
-from compute_permit_sim.schemas.batch import (
+    GridSweepResult,
     MonteCarloResult,
     SweepResult,
+)
+from compute_permit_sim.schemas.batch import (
+    MetricStats as _MetricStats,
 )
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.services.metrics import calculate_compliance
@@ -1143,3 +1148,138 @@ def _write_sweep_graphs_sheet(sheet, result: SweepResult, workbook) -> None:
     sheet.write(0, 9, f"Audit Rate vs {param_label}")
     sheet.insert_image(1, 9, "sweep_audit.png", {"image_data": _fig_to_bytes(fig2)})
     plt.close(fig2)
+
+
+# =============================================================================
+# Grid Sweep (2D Heatmap) Exports
+# =============================================================================
+
+
+def export_grid_sweep_to_csv(
+    result: GridSweepResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a GridSweepResult to long-format CSV with one row per grid cell.
+
+    Columns: scenario, param_x_path, param_x_value, param_y_path,
+    param_y_value, n_runs, compliance.
+
+    Args:
+        result: A ``GridSweepResult`` instance.
+        output_path: ``None`` = auto-generate, ``""`` = return bytes.
+    """
+    rows = [
+        {
+            _BCN.SCENARIO: result.scenario_name,
+            _BCN.PARAM_X_PATH: result.param_x_path,
+            _BCN.PARAM_X_VALUE: x,
+            _BCN.PARAM_Y_PATH: result.param_y_path,
+            _BCN.PARAM_Y_VALUE: y,
+            _BCN.N_RUNS: result.n_runs,
+            _BCN.COMPLIANCE_RATE: result.grid[y_idx][x_idx],
+        }
+        for y_idx, y in enumerate(result.y_values)
+        for x_idx, x in enumerate(result.x_values)
+    ]
+
+    df = _pd.DataFrame(rows)
+    if output_path == "":
+        return df.to_csv(index=False).encode("utf-8")
+    if output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe_s = result.scenario_name.lower().replace(" ", "_")
+        safe_x = result.param_x_path.replace(".", "_")
+        safe_y = result.param_y_path.replace(".", "_")
+        output_path = f"outputs/grid_{safe_s}_{safe_x}_x_{safe_y}.csv"
+    df.to_csv(output_path, index=False)
+    return output_path
+
+
+def export_grid_sweep_to_excel(
+    result: GridSweepResult,
+    output_path: str | None = None,
+) -> "str | bytes":
+    """Export a GridSweepResult to a formatted Excel workbook.
+
+    Sheets:
+      ``Config``   — base scenario configuration
+      ``Grid``     — pivot table: rows=y_values, cols=x_values, cells=compliance%
+      ``Heatmap``  — embedded PNG of the compliance heatmap
+
+    Args:
+        result: A ``GridSweepResult`` instance.
+        output_path: ``None`` = auto-generate, ``""`` = return bytes.
+    """
+    import io as _io
+
+    import xlsxwriter as _xlsxwriter
+
+    from compute_permit_sim.vis.plotting import plot_sweep_heatmap
+
+    return_bytes = output_path == ""
+    output: _io.BytesIO | str
+    if return_bytes:
+        output = _io.BytesIO()
+    elif output_path is None:
+        _os.makedirs("outputs", exist_ok=True)
+        safe_s = result.scenario_name.lower().replace(" ", "_")
+        safe_x = result.param_x_path.replace(".", "_")
+        safe_y = result.param_y_path.replace(".", "_")
+        output_path = f"outputs/grid_{safe_s}_{safe_x}_x_{safe_y}.xlsx"
+        output = output_path
+    else:
+        output = output_path
+
+    workbook = _xlsxwriter.Workbook(output)
+    header_fmt = workbook.add_format(
+        {"bold": True, "bg_color": "#2196F3", "font_color": "white", "border": 1}
+    )
+    data_fmt = workbook.add_format({"border": 1})
+    pct_fmt = workbook.add_format({"border": 1, "num_format": "0.0%"})
+
+    try:
+        # === Config sheet ===
+        if result.config is not None:
+            cfg_sheet = workbook.add_worksheet("Config")
+            _write_config_sheet(cfg_sheet, result.config, header_fmt, data_fmt)
+
+        # === Grid (pivot) sheet ===
+        grid_sheet = workbook.add_worksheet("Grid")
+        grid_sheet.set_column("A:A", 20)
+        grid_sheet.write(
+            0,
+            0,
+            f"{result.param_x_label} \u2192 / {result.param_y_label} \u2193",
+            header_fmt,
+        )
+        for x_idx, x in enumerate(result.x_values):
+            grid_sheet.write(0, x_idx + 1, x, header_fmt)
+        for y_idx, y in enumerate(result.y_values):
+            grid_sheet.write(y_idx + 1, 0, y, data_fmt)
+            for x_idx, compliance in enumerate(result.grid[y_idx]):
+                grid_sheet.write(y_idx + 1, x_idx + 1, compliance, pct_fmt)
+
+        # === Heatmap sheet ===
+        heatmap_sheet = workbook.add_worksheet("Heatmap")
+        fig = plot_sweep_heatmap(
+            compliance_grid=result.grid,
+            x_values=result.x_values,
+            y_values=result.y_values,
+            x_param_label=result.param_x_label,
+            y_param_label=result.param_y_label,
+            title=f"Compliance Heatmap \u2014 {result.scenario_name}",
+        )
+        heatmap_sheet.insert_image(
+            0, 0, "heatmap.png", {"image_data": _fig_to_bytes(fig)}
+        )
+
+    finally:
+        workbook.close()
+
+    if return_bytes:
+        assert isinstance(output, _io.BytesIO)
+        output.seek(0)
+        return output.read()
+
+    assert output_path is not None
+    return output_path

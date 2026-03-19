@@ -28,6 +28,10 @@ class BatchColumnNames:
     STEP = "step"
     PARAM_PATH = "param_path"
     PARAM_VALUE = "param_value"
+    PARAM_X_PATH = "param_x_path"
+    PARAM_X_VALUE = "param_x_value"
+    PARAM_Y_PATH = "param_y_path"
+    PARAM_Y_VALUE = "param_y_value"
     N_RUNS = "n_runs"
 
     # Compliance
@@ -215,3 +219,48 @@ class SweepResult:
             if pt.result.avg_compliance.mean >= threshold:
                 return pt.param_value
         return None
+
+
+@dataclass(frozen=True)
+class GridSweepResult:
+    """Results of a 2D joint-sensitivity parameter sweep over a scenario.
+
+    Stores mean compliance at every (x, y) grid cell.
+
+    Attributes:
+        grid: ``grid[y_idx][x_idx]`` = mean compliance fraction (0–1)
+              over ``n_runs`` seeds at parameter values
+              ``(x_values[x_idx], y_values[y_idx])``.
+    """
+
+    scenario_name: str
+    param_x_path: str  # e.g. "audit.base_prob"
+    param_x_label: str  # human-readable, e.g. "Base Audit Probability"
+    param_y_path: str  # e.g. "collateral_amount"
+    param_y_label: str  # human-readable, e.g. "Collateral K (M$)"
+    config: ScenarioConfig
+    x_values: list[float]  # ordered x-axis values
+    y_values: list[float]  # ordered y-axis values
+    grid: list[list[float]]  # [y_idx][x_idx] = mean compliance in [0, 1]
+    n_runs: int
+    # Short unique identifier matching SimulationRun.sim_id convention
+    id: str = field(default_factory=lambda: str(uuid4())[:8])
+
+    def compliance_at(self, x: float, y: float) -> float | None:
+        """Return mean compliance for an exact (x, y) cell, or None if not found."""
+        try:
+            x_idx = self.x_values.index(x)
+            y_idx = self.y_values.index(y)
+        except ValueError:
+            return None
+        return self.grid[y_idx][x_idx]
+
+    @property
+    def compliance_min(self) -> float:
+        """Minimum mean compliance across all grid cells."""
+        return min(v for row in self.grid for v in row)
+
+    @property
+    def compliance_max(self) -> float:
+        """Maximum mean compliance across all grid cells."""
+        return max(v for row in self.grid for v in row)

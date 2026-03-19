@@ -51,3 +51,4 @@ python_files = ["test_*.py"]
 ignore_missing_imports = true
 check_untyped_defs = true
 plugins = ["pydantic.mypy"]
+exclude = ["agent_workspace"]
