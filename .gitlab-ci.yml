@@ -21,6 +21,8 @@ test:
   stage: test
   script:
     - uv run pytest
+    # Paper-reproduction contract: all manuscript artifacts regenerate
+    - uv run main.py --paper --smoke
 
 pages:
   stage: deploy

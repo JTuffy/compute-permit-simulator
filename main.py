@@ -235,12 +235,25 @@ def _parse_args() -> argparse.Namespace:
         type=str,
         help="Run a sweep from a JSON file in scenarios/sweeps/ (e.g. sweep_pi0_minimal.json).",
     )
+    mode.add_argument(
+        "--paper",
+        action="store_true",
+        help=(
+            "Regenerate every paper figure and table (outputs/paper/). "
+            "Uses the protocol constants in services/paper_pipeline.py."
+        ),
+    )
 
     parser.add_argument(
         "--runs-per-point",
         type=int,
         default=50,
         help="MC replications per sweep point (used with --sweep). Default: 50.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="With --paper: tiny seed counts for a fast pipeline check (not for publication).",
     )
 
     return parser.parse_args()
@@ -249,6 +262,15 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Load and run all scenarios, or run Monte Carlo / sweep."""
     args = _parse_args()
+
+    if args.paper:
+        from compute_permit_sim.services.paper_pipeline import run_paper_pipeline
+
+        if args.smoke:
+            run_paper_pipeline(mc_runs=3, sweep_runs=2, grid_runs=2)
+        else:
+            run_paper_pipeline()
+        return
 
     if args.monte_carlo:
         run_all_monte_carlo(n_runs=args.monte_carlo)

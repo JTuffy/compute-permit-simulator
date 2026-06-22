@@ -34,3 +34,8 @@ jobs:
 
       - name: Run Tests
         run: uv run pytest
+
+      # Guards the paper-reproduction contract: every manuscript figure and
+      # table must regenerate from committed configs (tiny seed counts).
+      - name: Paper pipeline smoke test
+        run: uv run main.py --paper --smoke

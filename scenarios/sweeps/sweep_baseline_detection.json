@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/baseline.json",
+    "param_path": "audit.false_negative_rate",
+    "param_label": "False-Negative Rate (1 − detection)",
+    "min_val": 0.0,
+    "max_val": 0.70,
+    "interval": 0.05,
+    "n_runs": 50
+}

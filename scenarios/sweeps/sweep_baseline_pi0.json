@@ -1,9 +1,9 @@
 {
-    "scenario_file": "basic/scenario_1_minimal.json",
+    "scenario_file": "basic/baseline.json",
     "param_path": "audit.base_prob",
     "param_label": "Base Audit Rate π₀",
     "min_val": 0.05,
-    "max_val": 1.0,
+    "max_val": 0.60,
     "interval": 0.05,
-    "n_runs": 30
+    "n_runs": 50
 }

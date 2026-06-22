@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_4_feedback_compliance.json",
+    "param_path": "audit.penalty_amount",
+    "param_label": "Penalty φ (M$)",
+    "min_val": 0.0,
+    "max_val": 300.0,
+    "interval": 10.0,
+    "n_runs": 30
+}

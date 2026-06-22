@@ -128,8 +128,10 @@ DEFAULT_LAB_AUDIT_COEFFICIENT = 0.8  # c(i): Minimal = 0.8 evasion factor
 DEFAULT_REPUTATION_ESCALATION_FACTOR = 0.0  # 0 = static; 0.5 = +50% per failure
 
 # 4.2 Audit rate escalation & decay
-# Failed audit increases audit_coefficient; decays back to 1.0 over time
-# Formula: coeff_t = 1.0 + (coeff_{t-1} - 1.0) × (1 - decay_rate) + escalation_if_caught
+# Failed audit increases audit_coefficient; decays back to base over time.
+# Within a step, escalation (game loop phase 3-4) is applied BEFORE decay
+# (phase 6), so the effective update is:
+#   coeff_t = base + (coeff_{t-1} - base + escalation_if_caught) × (1 - decay_rate)
 DEFAULT_AUDIT_ESCALATION = 0.0  # 0 = static; 1.0 = +1.0 per failure
 DEFAULT_AUDIT_DECAY_RATE = 0.2  # per-step decay fraction (0.2 = 20% decay toward 1.0)
 

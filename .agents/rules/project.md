@@ -11,19 +11,21 @@ description: Project-specific conventions — design decisions and patterns spec
 
 ## Architecture
 
-Three-layer import hierarchy: `vis` → `services` → `schemas`. Lower layers never import upward. Shared state that crosses layers lives in a neutral singleton module.
+Four-layer import hierarchy: `vis` → `services` → `core` + `schemas`. Lower layers never import upward. `core/` contains pure domain logic (agents, enforcement, market, game loop) with zero framework dependencies. `schemas/` defines all data shapes. `services/` orchestrates core and schemas. `vis/` sits on top.
+
+Shared state that crosses layers lives in a neutral singleton module.
 
 Data shapes are defined in `schemas/` before logic is written. All schema models are immutable by default; use `model_copy(update={...})` for changes.
 
 ## Run State Pattern
 
-All simulation modes (basic, Monte Carlo, sweep) share one generic `RunState[T]` in `vis/state/run_state.py`. Three module-level singletons — `basic_run`, `mc_run`, `sweep_run` — govern all run states.
+All simulation modes (basic, Monte Carlo, sweep, grid sweep) share one generic `RunState[T]` in `vis/state/run_state.py`. Four module-level singletons — `basic_run`, `mc_run`, `sweep_run`, `grid_run` — govern all run states.
 
 Transition: idle → running → ready.
 
 - Background worker computes everything; UI receives one complete result in one atomic `.set()` call
 - Set result and `phase="ready"` together — never two calls
-- When a basic run starts, clear `mc_run` and `sweep_run` to idle (and vice-versa for batch), so the page state machine always routes correctly
+- When a basic run starts, clear `mc_run`, `sweep_run`, and `grid_run` to idle (and vice-versa for batch), so the page state machine always routes correctly
 - When a history entry is selected via `view_run()`, clear batch RunState to idle so AnalysisPanel shows
 - Solara hooks (`use_state`, `use_memo`) must be called unconditionally before any early `return`
 
@@ -31,7 +33,7 @@ Transition: idle → running → ready.
 
 Right-pane rendering priority:
 1. Any run phase `running` → `RunSpinner`
-2. `mc_run` or `sweep_run` phase `ready` → `BatchResultsPanel`
+2. `mc_run` or `sweep_run` or `grid_run` phase `ready` → `BatchResultsPanel`
 3. `basic_run` phase `ready` OR `session_history.selected_run` set → `AnalysisPanel`
 4. Else → `EmptyState`
 
@@ -45,6 +47,7 @@ This is the single source of truth for what the right pane displays.
 | `basic_run` | `vis/state/run_state.py` | `RunState[SimulationRun]` for basic runs |
 | `mc_run` | `vis/state/run_state.py` | `RunState[MonteCarloResult]` for Monte Carlo |
 | `sweep_run` | `vis/state/run_state.py` | `RunState[SweepResult]` for parameter sweeps |
+| `grid_run` | `vis/state/run_state.py` | `RunState[GridSweepResult]` for 2D grid sweeps |
 | `session_history` | `vis/state/history.py` | Run list + `scenario_name_map` |
 | `engine` | `vis/state/engine.py` | `SimulationEngine` singleton |
 
@@ -81,9 +84,9 @@ All shared result-display primitives (`MetricChip`, `ResultsActions`, `DownloadC
 
 ## Batch Results and History
 
-`MonteCarloResult` and `SweepResult` both carry an `id: str` (8-char UUID prefix) and `config: ScenarioConfig` (the base config used for the run). The `id` provides a stable short identifier; `config` enables the config dialog and save-as-template features. Both fields have defaults so existing call sites only need to pass `config=` explicitly in the service functions.
+`MonteCarloResult`, `SweepResult`, and `GridSweepResult` all carry an `id: str` (8-char UUID prefix) and `config: ScenarioConfig` (the base config used for the run). The `id` provides a stable short identifier; `config` enables the config dialog and save-as-template features. Both fields have defaults so existing call sites only need to pass `config=` explicitly in the service functions.
 
-MC results are appended to `session_history.batch_results` after completion. Sweep results are stored there too (both types are `BatchResult = MonteCarloResult | SweepResult`). The run history (`session_history.run_history`) holds individual `SimulationRun` objects from basic runs only.
+All batch result types are appended to `session_history.batch_results` after completion (`BatchResult = MonteCarloResult | SweepResult | GridSweepResult`). The run history (`session_history.run_history`) holds individual `SimulationRun` objects from basic runs only.
 
 `BatchHistoryItem` intentionally mirrors `RunHistoryItem`'s row layout exactly: type-icon | ⓘ RunConfigDialog | id-label | save-template | Excel | CSV | JSON. The type icon (chart-bell vs trending-up) is the only visual distinction. Long labels truncate via `.run-history-compact .v-btn .v-btn__content` CSS rule.
 
@@ -96,7 +99,7 @@ Sweep parameters registered in `schemas/sweep_params.py` as `SweepParam` entries
 ## Exports (`vis/export.py`)
 
 All export functions return `bytes` for Solara's `FileDownload`. Key functions:
-`export_run_to_csv/excel`, `export_monte_carlo_to_csv/latex`, `export_mc_per_seed_to_csv` (requires `store_raw=True`), `export_mc_trajectory_to_csv`, `export_sweep_to_csv`.
+`export_run_to_csv/excel`, `export_monte_carlo_to_csv/latex/excel`, `export_mc_per_seed_to_csv` (requires `store_raw=True`), `export_mc_trajectory_to_csv`, `export_sweep_to_csv/excel`, `export_grid_sweep_to_csv/excel`.
 
 ## Plots (`vis/plotting.py`)
 
@@ -121,7 +124,20 @@ All functions accept typed result objects, return `matplotlib.Figure`, never imp
 
 All figures are created via `create_figure()` (standardized style, `Agg` backend). Never call `plt.figure()` or `plt.subplots()` in scripts.
 
-**Committed figure scripts** — see `scripts/README.md` for an index of existing scripts. Always check there before re-creating a script.
+`plot_compliance_violin(results)` (list of `MonteCarloResult` with `store_raw=True`) renders the paper's per-seed compliance distribution figure.
+
+`scripts/` is gitignored local tooling. Anything that produces a *published* artifact must instead live in the tracked paper pipeline (below).
+
+## Paper Reproduction (`services/paper_pipeline.py`)
+
+**No number, table, or figure enters the manuscript except from `outputs/paper/`.** Regenerate with `make paper-results`; fast end-to-end check with `make paper-smoke` (also runs in CI).
+
+- One committed JSON per figure: 1D sweeps in `scenarios/sweeps/`, 2D grids in `scenarios/grids/`. The figure↔config mapping is the `SWEEP_FIGURES` / `GRID_FIGURES` registries in `paper_pipeline.py`; `tests/services/test_paper_pipeline.py` enforces that every manuscript figure has a committed config.
+- Protocol (seed counts) is defined once: `MC_RUNS` / `SWEEP_RUNS` / `GRID_RUNS` in `paper_pipeline.py`. It must match the paper's experimental-protocol subsection (currently MC=100, sweeps=30, grids=20). Never restate seed counts elsewhere.
+- `outputs/paper/PROVENANCE.txt` records the commit hash and protocol of the last run. Appendix C's reproduction hash is copied from there, never typed from memory. A "dirty" provenance means uncommitted changes — not publishable.
+- Tables are emitted in the manuscript's exact schemas by `export_compliance_summary_to_latex` / `export_workload_to_latex`. Never hand-edit numbers in the paper's tables; fix the exporter instead.
+- When `core/` or `schemas/` logic changes, rerun `make paper-results` and diff the tables — result drift must be visible in the PR, not discovered later.
+- Scenario JSONs in `scenarios/basic/` are the team-owned experiment spec: experiments vary parameters via sweep/grid configs, never by editing scenario files.
 
 ## Testing
 

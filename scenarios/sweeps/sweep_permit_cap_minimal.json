@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_1_minimal.json",
+    "param_path": "market.permit_cap",
+    "param_label": "Permit Supply Cap Q",
+    "min_val": 1.0,
+    "max_val": 19.0,
+    "interval": 1.0,
+    "n_runs": 30
+}

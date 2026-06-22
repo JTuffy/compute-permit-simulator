@@ -13,6 +13,7 @@ Design rules:
 from __future__ import annotations
 
 import textwrap
+from typing import NamedTuple, cast
 
 import matplotlib
 import numpy as np
@@ -699,6 +700,160 @@ def plot_sweep_curve(
     return fig
 
 
+def _fmt_param(value: float) -> str:
+    """Format a swept parameter value compactly (trims trailing zeros)."""
+    if abs(value) >= 1 or value == 0:
+        return f"{value:g}"
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+class LeverSummary(NamedTuple):
+    """One lever's one-at-a-time sweep reduced to its compliance extremes.
+
+    Shared by the tornado figure and the LaTeX sensitivity table so both read
+    the same numbers. ``span`` (hi - lo) is the relative-impact metric.
+    """
+
+    label: str
+    range_str: str  # e.g. "70--190"
+    lo: float  # min compliance over the swept range
+    lo_at: float  # param value producing lo
+    hi: float  # max compliance over the swept range
+    hi_at: float  # param value producing hi
+    span: float  # hi - lo
+
+
+def lever_summary(sweep) -> LeverSummary:
+    """Reduce a single-lever ``SweepResult`` to its compliance extremes.
+
+    Args:
+        sweep: A ``SweepResult`` from sweeping one lever off the baseline.
+
+    Raises:
+        TypeError: If ``sweep`` is not a ``SweepResult``.
+    """
+    from compute_permit_sim.schemas.batch import SweepResult
+
+    if not isinstance(sweep, SweepResult):
+        raise TypeError(f"Expected SweepResult, got {type(sweep)}")
+    means = [pt.result.avg_compliance.mean for pt in sweep.points]
+    values = [pt.param_value for pt in sweep.points]
+    lo_i = int(np.argmin(means))
+    hi_i = int(np.argmax(means))
+    return LeverSummary(
+        label=sweep.param_label,
+        range_str=f"{min(values):g}--{max(values):g}",
+        lo=means[lo_i],
+        lo_at=values[lo_i],
+        hi=means[hi_i],
+        hi_at=values[hi_i],
+        span=means[hi_i] - means[lo_i],
+    )
+
+
+def plot_lever_tornado(
+    sweeps: list,
+    baseline_compliance: float,
+    title: str | None = None,
+) -> "Figure":
+    """Tornado plot: relative impact of each enforcement lever on compliance.
+
+    Each lever is a horizontal bar spanning the compliance range it produces
+    over its one-at-a-time sweep (all other levers held at the constructed
+    baseline). Bars are sorted by span so the most impactful lever sits on top.
+    A vertical reference line marks the shared baseline compliance, and each bar
+    end is annotated with the parameter value that produces it.
+
+    This is the Section 4 headline figure: one plot, every lever, read as
+    "what drives compliance" off a single mid-band reference point.
+
+    Args:
+        sweeps: List of ``SweepResult`` objects, one per lever, each swept from
+            the same baseline scenario.
+        baseline_compliance: Mean compliance at the baseline point (0–1),
+            drawn as a vertical reference line.
+        title: Optional chart title.
+
+    Returns:
+        Matplotlib Figure.
+    """
+    # Largest span on top: sort ascending, barh fills bottom-to-top
+    rows = sorted((lever_summary(s) for s in sweeps), key=lambda r: r.span)
+
+    fig, ax = create_figure(figsize=(7.5, 0.7 * len(rows) + 1.6))
+    color = CHART_COLOR_MAP.get("compliant", "#42A5F5")
+    y = list(range(len(rows)))
+
+    ax.barh(
+        y,
+        [r.hi - r.lo for r in rows],
+        left=[r.lo for r in rows],
+        height=0.6,
+        color=color,
+        alpha=0.55,
+        edgecolor="#1A237E",
+        linewidth=1.0,
+        zorder=2,
+    )
+
+    ax.axvline(
+        baseline_compliance,
+        color="#B71C1C",
+        linewidth=1.6,
+        linestyle="--",
+        alpha=0.9,
+        zorder=3,
+        label=f"Baseline ({baseline_compliance * 100:.0f}%)",
+    )
+
+    for yi, r in zip(y, rows):
+        ax.text(
+            r.lo - 0.012,
+            yi,
+            _fmt_param(r.lo_at),
+            ha="right",
+            va="center",
+            fontsize=8,
+            color="#333333",
+        )
+        ax.text(
+            r.hi + 0.012,
+            yi,
+            _fmt_param(r.hi_at),
+            ha="left",
+            va="center",
+            fontsize=8,
+            color="#333333",
+        )
+        ax.text(
+            (r.lo + r.hi) / 2,
+            yi,
+            f"{r.span * 100:.0f} pp",
+            ha="center",
+            va="center",
+            fontsize=8,
+            fontweight="bold",
+            color="#0D1B5E",
+            zorder=4,
+        )
+
+    ax.set_yticks(y)
+    ax.set_yticklabels([_wrap(r.label, width=22) for r in rows], fontsize=9)
+    ax.set_xlim(-0.05, 1.08)
+    ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(xmax=1))
+    ax.set_xlabel("Mean Compliance Rate", fontsize=11, fontweight="500")
+    ax.set_title(
+        _wrap(title or "Relative lever impact on compliance"),
+        fontsize=12,
+        fontweight="600",
+    )
+    ax.legend(fontsize=9, loc="lower right")
+    ax.xaxis.grid(True, alpha=0.25)
+    ax.yaxis.grid(False)
+    fig.tight_layout()
+    return fig
+
+
 def plot_sweep_heatmap(
     compliance_grid: list[list[float]],
     x_values: list[float],
@@ -815,6 +970,71 @@ def plot_sweep_heatmap(
 
     # Suppress grid — imshow cells provide visual separation
     ax.grid(False)
+    fig.tight_layout()
+    return fig
+
+
+def plot_compliance_violin(
+    results: list,
+    labels: list[str] | None = None,
+) -> "Figure":
+    """Violin plot of per-seed average compliance across scenarios.
+
+    Reproduces the paper's compliance-distribution figure: one violin per
+    scenario showing the density of per-seed average compliance, individual
+    seeds as jittered dots, and horizontal bars at the median, P10, and P90.
+
+    Args:
+        results: List of ``MonteCarloResult`` objects run with
+            ``store_raw=True`` (per-seed values are read from ``raw_seeds``).
+        labels: Optional display name per result; defaults to scenario names.
+
+    Returns:
+        Matplotlib Figure.
+
+    Raises:
+        ValueError: If any result lacks raw per-seed data.
+    """
+    for r in results:
+        if not r.raw_seeds:
+            raise ValueError(
+                f"MonteCarloResult '{r.scenario_name}' has no raw_seeds; "
+                "run with store_raw=True."
+            )
+
+    names = labels or [r.scenario_name for r in results]
+    data = [[s.avg_compliance * 100.0 for s in r.raw_seeds] for r in results]
+    positions = list(range(1, len(results) + 1))
+
+    fig, ax = create_figure(figsize=(8, 4.5))
+    parts = ax.violinplot(data, positions=positions, showextrema=False, widths=0.7)
+    for body in cast("list", parts["bodies"]):
+        body.set_facecolor("#1A237E")
+        body.set_alpha(0.25)
+        body.set_zorder(2)
+
+    rng = np.random.default_rng(0)  # presentation jitter only, not simulation RNG
+    for pos, values in zip(positions, data):
+        jitter = rng.uniform(-0.08, 0.08, size=len(values))
+        ax.scatter(
+            [pos + j for j in jitter],
+            values,
+            s=12,
+            color="#1A237E",
+            alpha=0.45,
+            zorder=3,
+            linewidths=0,
+        )
+        arr = np.asarray(values)
+        for q, lw in ((50, 2.2), (10, 1.2), (90, 1.2)):
+            v = float(np.percentile(arr, q))
+            ax.hlines(v, pos - 0.22, pos + 0.22, color="#B71C1C", lw=lw, zorder=4)
+
+    ax.set_xticks(positions)
+    ax.set_xticklabels(names)
+    ax.set_ylabel("Per-seed average compliance (%)")
+    ax.set_ylim(-3, 103)
+    ax.yaxis.grid(True, alpha=0.25, zorder=0)
     fig.tight_layout()
     return fig
 

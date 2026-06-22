@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_2_strict.json",
+    "param_path": "lab.economic_value_max",
+    "param_label": "Maximum Firm Valuation v_max (M$)",
+    "min_val": 80.0,
+    "max_val": 500.0,
+    "interval": 20.0,
+    "n_runs": 30
+}

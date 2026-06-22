@@ -1,0 +1,22 @@
+{
+    "scenario_file": "basic/scenario_4_feedback_compliance.json",
+    "n_runs": 20,
+    "x": {
+        "param_path": "audit.base_prob",
+        "param_label": "Base Audit Rate π₀",
+        "min_val": 0.05,
+        "max_val": 0.4,
+        "n_values": 8
+    },
+    "y": {
+        "param_path": "lab.reputation_escalation_factor",
+        "param_label": "Reputation Escalation Factor ε",
+        "min_val": 0.0,
+        "max_val": 3.5,
+        "n_values": 8
+    },
+    "highlight": [
+        0.2,
+        1.0
+    ]
+}

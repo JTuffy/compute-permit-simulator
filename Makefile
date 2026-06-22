@@ -5,9 +5,10 @@
 help:
 	@echo "Available commands:"
 	@echo "  make run           - Run the simulation once (all scenarios)"
-	@echo "  make mc            - Monte Carlo: 50 runs per scenario, exports CSV + LaTeX table"
+	@echo "  make mc            - Monte Carlo: 100 runs per scenario, exports CSV + LaTeX table"
 	@echo "  make sweep         - Sensitivity sweeps (pi_0 and collateral on minimal scenario)"
-	@echo "  make paper-results - Run MC + sweep and print LaTeX table to stdout"
+	@echo "  make paper-results - Regenerate ALL paper figures + tables (outputs/paper/)"
+	@echo "  make paper-smoke   - Fast pipeline check with tiny seed counts"
 	@echo "  make app           - Run the Solara interactive dashboard (alias: viz)"
 	@echo "  make lint          - Run linters (ruff check)"
 	@echo "  make format        - Format code (ruff format)"
@@ -21,7 +22,7 @@ run:
 	uv run main.py
 
 mc:
-	uv run main.py --monte-carlo 50
+	uv run main.py --monte-carlo 100
 
 sweep:
 	uv run main.py --sweep-file sweep_pi0_minimal.json
@@ -31,9 +32,15 @@ list-sweeps:
 	@echo "Available sweep files:"
 	@ls scenarios/sweeps/*.json 2>/dev/null || echo "  (none)"
 
-paper-results: mc sweep
-	@echo "--- LaTeX table ---"
-	@cat outputs/monte_carlo_table.tex
+# Regenerates every figure and table in the manuscript from committed configs.
+# Protocol (seed counts) lives in services/paper_pipeline.py and must match
+# the paper's experimental-protocol subsection.
+paper-results:
+	uv run main.py --paper
+	@echo "--- artifacts in outputs/paper/ ---"
+
+paper-smoke:
+	uv run main.py --paper --smoke
 
 viz: solara
 

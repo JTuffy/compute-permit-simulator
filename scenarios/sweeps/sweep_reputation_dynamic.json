@@ -1,0 +1,9 @@
+{
+    "scenario_file": "basic/scenario_4_feedback_compliance.json",
+    "param_path": "lab.reputation_escalation_factor",
+    "param_label": "Reputation Escalation Factor ε",
+    "min_val": 0.0,
+    "max_val": 5.0,
+    "interval": 0.25,
+    "n_runs": 30
+}

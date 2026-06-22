@@ -49,6 +49,7 @@ from compute_permit_sim.schemas.batch import (
 from compute_permit_sim.schemas.columns import ColumnNames
 from compute_permit_sim.services.metrics import calculate_compliance
 from compute_permit_sim.vis.plotting import (
+    lever_summary,
     plot_scatter,
     plot_time_series,
 )
@@ -700,6 +701,177 @@ def export_monte_carlo_to_latex(results: list[MonteCarloResult]) -> str:
         "",
         r"% Compliance: mean (SD); P10/P90 across seeds; payoffs in M$.",
     ]
+    return "\n".join(lines)
+
+
+def export_compliance_summary_to_latex(results: list[MonteCarloResult]) -> str:
+    """Paper Table 1 (``tab:compliance-summary``): compliance outcomes by scenario.
+
+    Columns: Scenario, Q/N, Avg Compliance, SD, P10, P90, Audit Rate,
+    Detection Rate — matches the paper's published schema exactly so the
+    table can be pasted into the manuscript without manual editing.
+    """
+
+    def _p(x: float) -> str:
+        return rf"{x * 100:.1f}\%"
+
+    n = results[0].config.n_agents
+    steps = results[0].config.steps
+    n_runs = results[0].n_runs
+    lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        rf"\caption{{Compliance outcomes by scenario ($N = {n}$ labs, {steps} simulation steps,",
+        rf"$n = {n_runs}$ Monte Carlo replications). $Q/N$ denotes the permit supply ratio.}}",
+        r"\label{tab:compliance-summary}",
+        r"\small",
+        r"\begin{tabular}{lccccccc}",
+        r"\toprule",
+        (
+            r"\textbf{Scenario} & \textbf{Q/N} & \textbf{Avg.\ Comp.} & \textbf{SD} &"
+            r" \textbf{P10} & \textbf{P90} & \textbf{Audit Rate} & \textbf{Det.\ Rate} \\"
+        ),
+        r"\midrule",
+    ]
+    for r in results:
+        qn = r.config.market.permit_cap / r.config.n_agents
+        det = r.detection_rate_given_audit.mean
+        det_s = "n/a" if det != det else _p(det)  # NaN = no violations observed
+        lines.append(
+            f"{r.scenario_name} & {qn:.2f} & {_p(r.avg_compliance.mean)} "
+            f"& {_p(r.avg_compliance.std)} & {_p(r.p10_compliance)} "
+            f"& {_p(r.p90_compliance)} & {_p(r.audit_rate.mean)} & {det_s} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    return "\n".join(lines)
+
+
+def export_workload_to_latex(results: list[MonteCarloResult]) -> str:
+    """Paper Table 2 (``tab:audit-burden``): regulatory workload by scenario.
+
+    Columns: Scenario, Audit rate, Audits/period, FP exposure (labs/period),
+    Detection rate. Audits per period = audit rate x N. FP exposure =
+    pi_0 x mean compliant labs per period (compliant firms carry no suspicion
+    signal, so their audit probability collapses to the random floor).
+    """
+
+    def _p(x: float) -> str:
+        return rf"{x * 100:.1f}\%"
+
+    n = results[0].config.n_agents
+    steps = results[0].config.steps
+    n_runs = results[0].n_runs
+    lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        rf"\caption{{Regulatory workload by scenario ($N = {n}$ labs, $T = {steps}$ steps,",
+        rf"$n = {n_runs}$ Monte Carlo replications). Audits per period and FP exposure are",
+        r"period means. FP exposure $= \pi_0 \times$ mean compliant labs per period.",
+        r"Detection rate is violations confirmed per audit encountering a violation.}",
+        r"\label{tab:audit-burden}",
+        r"\small",
+        r"\begin{tabular}{@{}lcccc@{}}",
+        r"\toprule",
+        (
+            r"\textbf{Scenario} & \textbf{Audit rate} & \textbf{Audits / period}"
+            r" & \textbf{FP exposure (labs/period)} & \textbf{Detection rate} \\"
+        ),
+        r"\midrule",
+    ]
+    for r in results:
+        audits_per_period = r.audit_rate.mean * n
+        fp_exposure = r.config.audit.base_prob * r.avg_compliance.mean * n
+        det = r.detection_rate_given_audit.mean
+        det_s = "n/a" if det != det else _p(det)
+        lines.append(
+            f"{r.scenario_name} & {_p(r.audit_rate.mean)} & {audits_per_period:.2f} "
+            f"& {fp_exposure:.2f} & {det_s} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    return "\n".join(lines)
+
+
+# Sidebar/figure parameter labels carry Unicode (π₀, p̄, φ) and literal "M$"
+# for the UI and matplotlib; LaTeX tables need these escaped/translated.
+_LATEX_ESCAPES = (("&", r"\&"), ("%", r"\%"), ("#", r"\#"), ("_", r"\_"), ("$", r"\$"))
+_LATEX_UNICODE = (
+    ("π₀", r"$\pi_0$"),  # π₀
+    ("p̄", r"$\bar{p}$"),  # p̄ (p + combining macron)
+    ("φ", r"$\phi$"),  # φ
+    ("ε", r"$\varepsilon$"),  # ε
+    ("×", r"$\times$"),  # ×
+    ("−", "-"),  # − (minus sign) → hyphen
+    ("π", r"$\pi$"),  # π (standalone, after π₀)
+)
+
+
+def _latex_label(label: str) -> str:
+    """Make a UI/matplotlib parameter label safe to compile in a LaTeX table.
+
+    Escapes literal special characters (including the ``$`` in ``M$``) first,
+    then translates the handful of Unicode glyphs used in parameter labels into
+    LaTeX math. Order matters: escaping runs before translation so the ``$`` and
+    ``_`` introduced by math commands are preserved.
+    """
+    for ch, rep in _LATEX_ESCAPES:
+        label = label.replace(ch, rep)
+    for ch, rep in _LATEX_UNICODE:
+        label = label.replace(ch, rep)
+    return label
+
+
+def export_lever_sensitivity_to_latex(
+    sweeps: list[SweepResult],
+    baseline_compliance: float,
+) -> str:
+    """Paper Section 4 table (``tab:lever-sensitivity``): one-at-a-time lever impact.
+
+    One row per lever, sorted by impact (compliance span). Columns: Lever, the
+    swept range, compliance at the low and high ends of that range (with the
+    parameter value that produces each), and the span in percentage points. All
+    levers are swept from the same constructed baseline, so the span column is
+    the headline "what drives compliance" comparison.
+
+    Args:
+        sweeps: One ``SweepResult`` per lever, all swept from the baseline.
+        baseline_compliance: Mean compliance at the baseline point (0–1).
+    """
+
+    def _p(x: float) -> str:
+        return rf"{x * 100:.1f}\%"
+
+    def _v(x: float) -> str:
+        return f"{x:g}"
+
+    rows = [lever_summary(s) for s in sweeps]
+    rows.sort(key=lambda r: r.span, reverse=True)
+
+    n_runs = sweeps[0].points[0].result.n_runs if sweeps and sweeps[0].points else 0
+    lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        rf"\caption{{One-at-a-time lever sensitivity from the constructed baseline "
+        rf"(compliance {baseline_compliance * 100:.1f}\%; $n = {n_runs}$ seeds per "
+        r"point). Each lever is swept with all others held at baseline; Span is the "
+        r"compliance range in percentage points, the relative-impact ranking.}",
+        r"\label{tab:lever-sensitivity}",
+        r"\small",
+        r"\begin{tabular}{@{}lcccc@{}}",
+        r"\toprule",
+        (
+            r"\textbf{Lever} & \textbf{Range} & \textbf{Low end} & \textbf{High end}"
+            r" & \textbf{Span (pp)} \\"
+        ),
+        r"\midrule",
+    ]
+    for r in rows:
+        lines.append(
+            f"{_latex_label(r.label)} & {r.range_str} "
+            f"& {_p(r.lo)} (@{_v(r.lo_at)}) "
+            f"& {_p(r.hi)} (@{_v(r.hi_at)}) "
+            f"& {r.span * 100:.0f} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     return "\n".join(lines)
 
 
