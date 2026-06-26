@@ -1,0 +1,116 @@
+% =============================================================================
+% SECTION 4: RESULTS  (restructured)
+% 4.1 headline comparison (kept) -> 4.2 single-lever sensitivity (NEW centrepiece)
+% -> 4.3 implications. The old per-scenario sensitivity block (11 figures) moves
+% to Appendix E (static designs) and Appendix D (dynamic). tab:sensitivity_summary
+% is cut. New artifacts (fig:lever-sensitivity, tab:lever-sensitivity) are produced
+% by the paper pipeline from the committed Neutral Reference scenario.
+% =============================================================================
+
+\section{Results}
+\label{sec:results}
+
+This section reports outcomes under the protocol of Section~\ref{sec:protocol}: a headline comparison across the four governance designs, then a single-lever decomposition isolating what drives compliance, then the implications of both. Throughout, the question is not only how much compliance each design produces, but what that compliance costs and how far each design sits from its failure point. Per-scenario sensitivity surfaces are reported in Appendix~\ref{app:sensitivity-surfaces} (static designs) and Appendix~D (dynamic feedback).
+
+\subsection{Headline Comparison}
+\label{sec:results-compliance}
+\label{sec:results-workload}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figures/fig_compliance_distribution}
+  \caption{Distribution of per-seed average compliance across 100 Monte Carlo
+  replications ($N = 20$ labs, $T = 10$ steps). Each violin shows the density
+  of outcomes; dots are individual seeds; horizontal bars mark the median,
+  P10, and P90. Smart Enforcement's spike at 100\% reflects a regime where compliance
+  is individually rational for every lab in every seed. Strict Enforcement's wide spread
+  reflects dependence on the coincidence between permit price and the draw of
+  lab valuations.}
+  \label{fig:compliance-distribution}
+\end{figure}
+
+The three headline scenarios produce markedly different equilibria (Table~\ref{tab:compliance-summary}, Figure~\ref{fig:compliance-distribution}), and the differences trace to three distinct mechanisms. Minimal Enforcement stabilises at \textbf{34.5\%} (SD\,=\,6.8\%) because permit supply binds: the rate decomposes exactly into the 25.0\% of labs holding permits ($Q/N$) plus the 9.5\% whose planned runs fall below the regulatory threshold, with enforcement-induced compliance contributing \textbf{0.0\%} --- the \$6M expected sanction deters no one, and the labs priced out of the market cannot comply at any audit intensity. Strict Enforcement reaches \textbf{88.1\%} (SD\,=\,6.7\%) through a price--valuation coincidence: roughly 87\% of labs have $v_i \geq \bar{p} = \$70$M and buy permits voluntarily, while the unpermitted remainder face an expected penalty (\$24M) below their evasion gain and defect every period --- which is why the violin's spread is wide and the outcome is a function of the seed draw. Smart Enforcement reaches \textbf{100\%} in every replication (SD\,=\,0.0\%) because the \$2M permit price caps every lab's evasion gain at \$2M against an expected penalty near \$14.7M: compliance is individually rational unconditionally, and the variance collapses to zero. These are the three mechanisms anticipated in Section~\ref{sec:scenarios}; everything that follows quantifies them.
+
+\begin{table}[htbp]
+\centering
+\caption{Compliance outcomes by scenario ($N = 20$ labs, 10 simulation steps,
+$n = 100$ Monte Carlo replications). $Q/N$ denotes the permit supply ratio.}
+\label{tab:compliance-summary}
+\small
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Scenario} & \textbf{Q/N} & \textbf{Avg.\ Comp.} & \textbf{SD} &
+  \textbf{P10} & \textbf{P90} & \textbf{Audit Rate} & \textbf{Det.\ Rate} \\
+\midrule
+Minimal & 0.25 & 34.5\% & 6.8\% & 25.0\% & 45.0\% & 4.6\%  & 61.7\% \\
+Strict  & 1.00 & 88.1\% & 6.7\% & 80.0\% & 95.0\% & 28.4\% & 100.0\% \\
+Smart & 1.00 & 100\%  & 0.0\% & 100\%  & 100\%  &  9.1\% & n/a \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Audit expenditure tells the other half of the story (Table~\ref{tab:audit-burden}). Strict Enforcement sustains its 88.1\% with \textbf{5.67 audits per period} (28.4\% of labs), of which 5.29 fall on firms that hold permits and would comply regardless; Smart Enforcement achieves strictly higher compliance with \textbf{1.82} (9.1\%) --- a \textbf{68\%} lower audit burden. The joint picture is a structural inversion: audit efficiency is highest in Smart Enforcement not because its audits are individually more powerful, but because the market design makes deterrence work unnecessary before the first inspection is conducted, freeing the audit budget for verification. Minimal Enforcement's low volume (0.92 audits per period) flatters a regime inspecting a population that is structurally barred from complying. Detection quality follows $p_{\mathrm{catch}}$ (equation~\ref{eq:catch}): 61.7\% in Minimal pooled across all audited violations ($\beta = 0.40$, no monitoring; consistent with the theoretical 60\%), certain detection in Strict ($p_m = 1.0$), and no observable rate in Smart, where universal compliance leaves no violations to detect.
+
+\begin{table}[htbp]
+\centering
+\caption{Regulatory workload by scenario ($N = 20$ labs, $T = 10$ steps,
+$n = 100$ Monte Carlo replications). Audits per period and FP exposure are
+period means. FP exposure $= \pi_0 \times$ mean compliant labs per period.
+Detection rate is violations confirmed per audit encountering a violation;
+Smart Enforcement's is n/a because 100\% compliance leaves no violations to detect.}
+\label{tab:audit-burden}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Audit rate} & \textbf{Audits / period}
+  & \textbf{FP exposure (labs/period)} & \textbf{Detection rate} \\
+\midrule
+Minimal & 4.6\%  & 0.92 & 0.34 & 61.7\%  \\
+Strict  & 28.4\% & 5.67 & 5.29 & 100.0\% \\
+Smart &  9.1\% & 1.82 & 2.00 & n/a     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{What Drives Compliance: Single-Lever Sensitivity}
+\label{sec:results-sensitivity}
+
+The cross-scenario comparison in Section~\ref{sec:results-compliance} varies roughly seven parameters at once, so it cannot attribute an outcome to any single lever. To isolate what governs compliance, we sweep each enforcement instrument one at a time from a shared, deliberately neutral reference configuration. The reference is not a governance proposal: it is constructed so that every lever has room to move compliance in either direction, rather than a design pinned at a saturated ceiling or floor. Permit supply is universal ($Q = N$), removing the supply constraint that dominates Minimal Enforcement so the enforcement levers act in isolation; with $Q = N$ an auction clears at zero, so the reference uses a fixed price. That price ($\bar{p} = \$129$M) sits where the deterrence margin is interior to the valuation distribution---gain close to the expected penalty, rather than far below it (Smart) or far above it (Strict). Audit rate and detection are held at moderate, mid-range values ($\pi_0 = 0.30$, catch rate $0.70$). Under this configuration mean compliance is \textbf{56.8\%} (SD\,$=$\,11.7\%, $n = 30$ seeds)---inside the band where slopes are readable and away from the $0$/$100\%$ boundaries.
+
+Figure~\ref{fig:lever-sensitivity} and Table~\ref{tab:lever-sensitivity} report the result. Two findings carry the subsection. First, the levers rank cleanly by impact: the \textbf{permit price} governs compliance most strongly (a 71\,pp swing across its range), followed by the \textbf{penalty} and \textbf{audit rate} (50 and 47\,pp, nearly interchangeable at the margin), then \textbf{collateral} (34\,pp), with \textbf{detection quality} last (26\,pp). Price dominates because it acts on the market-sorting channel directly, while the enforcement stack acts only on the residual population that does not buy. Second, compliance decomposes into a market-driven floor and an enforcement-driven lift: with enforcement switched off, voluntary purchase plus sub-threshold runs already deliver $\approx 51\%$ compliance, and every enforcement lever lifts the rate above that floor rather than creating compliance from nothing. The permit price is the only lever that moves compliance \emph{below} the floor, by pushing firms out of the market and into evasion.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/fig_lever_sensitivity}
+  \caption{Relative impact of each enforcement lever on mean compliance, swept one
+    at a time from the neutral reference configuration ($Q = N$, $\bar{p} = \$129$M,
+    $\pi_0 = 0.30$, FNR $= 0.30$; $N = 20$, $n = 30$ seeds per point). Each bar spans
+    the compliance range the lever produces; bar ends are annotated with the
+    parameter value, and the dashed line marks reference compliance. Bars are
+    ordered by span (relative impact). The enforcement levers share a lower edge at
+    the $\approx 51\%$ market-sorting floor; only the permit price drives compliance
+    below it.}
+  \label{fig:lever-sensitivity}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{One-at-a-time lever sensitivity from the neutral reference configuration (compliance 56.8\%; $n = 30$ seeds per point). Each lever is swept with all others held at the reference; Span is the compliance range in percentage points, the relative-impact ranking.}
+\label{tab:lever-sensitivity}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Lever} & \textbf{Range} & \textbf{Low end} & \textbf{High end} & \textbf{Span (pp)} \
+\midrule
+Permit Price $\bar{p}$ (M\$) & 70--190 & 23.2\% (@190) & 94.5\% (@70) & 71 \
+Penalty $\phi$ (M\$) & 50--600 & 50.5\% (@50) & 100.0\% (@550) & 50 \
+Base Audit Rate $\pi_0$ & 0.05--0.6 & 50.5\% (@0.05) & 97.3\% (@0.6) & 47 \
+Collateral K (M\$) & 0--300 & 50.5\% (@0) & 84.7\% (@300) & 34 \
+False-Negative Rate (1 - detection) & 0--0.7 & 50.5\% (@0.45) & 76.5\% (@0) & 26 \
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{What the Comparison Implies}
+
+Two conclusions carry the section, and the single-lever decomposition of Section~\ref{sec:results-sensitivity} sharpens both. First, the binding constraint differs by design, and misdiagnosing it wastes enforcement: in supply-constrained regimes compliance is bounded by $Q/N$ regardless of audit intensity, so audit spending buys nothing that permit supply has not already allowed. Second, among designs where compliance is accessible, robustness is a property of the mechanism, not the enforcement level. Strict Enforcement's compliance threshold moves with the valuation distribution --- a variable the regulator does not control --- while Smart Enforcement's margin depends only on the permit price relative to the expected penalty, a quantity the regulator sets; the price's dominance in the single-lever ranking (Table~\ref{tab:lever-sensitivity}) is the same point measured from the neutral reference.

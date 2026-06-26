@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 MC_RUNS = 100  # Monte Carlo replications per scenario
 SWEEP_RUNS = 30  # replications per 1D sweep point
 GRID_RUNS = 20  # replications per 2D grid cell
-BASELINE_RUNS = 50  # replications per single-lever sensitivity point
+BASELINE_RUNS = (
+    30  # replications per single-lever sensitivity point (matches 1D protocol)
+)
 
 # --- Scenario set ------------------------------------------------------------
 MC_SCENARIOS = [

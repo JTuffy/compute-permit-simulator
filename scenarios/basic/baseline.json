@@ -1,6 +1,6 @@
 {
-    "name": "Baseline (constructed)",
-    "description": "Neutral mid-compliance reference point for one-at-a-time sensitivity analysis. NOT a governance design — a deliberately balanced starting configuration so every enforcement lever has room to move compliance up or down. Lands at ~59% compliance (SD ~11%), away from the 0%/100% boundaries where the named scenarios saturate.",
+    "name": "Neutral Reference",
+    "description": "Neutral mid-compliance reference configuration for one-at-a-time sensitivity analysis. NOT a governance design — a deliberately balanced starting point so every enforcement lever has room to move compliance up or down. Lands at ~58% compliance (SD ~11%), away from the 0%/100% boundaries where the named scenarios saturate. Named 'Neutral Reference' (not 'baseline') to avoid colliding with the paper's shared default calibration.",
     "notes": "Construction (per Section 4 single-lever protocol): universal access Q=N so permit supply is not the binding constraint; fixed permit price p̄=129 M$ sits near the deterrence margin (auction would collapse to free at Q=N); moderate audit rate π₀=0.30 and moderate detection (FNR=0.30 -> 70% catch); penalty and collateral set so the deterrence margin D=π₀(1-FNR)(φ+K) sits inside the valuation support U[50,200]. Compliance decomposes into a market-sorting floor (~52%: sub-threshold labs + voluntary buyers at v>=p̄ with enforcement off) plus an enforcement-driven lift above it. Static scenario (no dynamic factors), so per-step compliance is flat and convergence-at-T is immediate.",
     "n_agents": 20,
     "steps": 10,

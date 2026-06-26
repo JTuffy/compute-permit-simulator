@@ -1,0 +1,45 @@
+% =============================================================================
+% APPENDIX D ADDITION: dynamic sensitivity (relocated from old Section 4.2).
+% Paste this block INTO appendix-d-dynamic-scenarios.tex, within/after the
+% "Scenario 4 --- Reputation Ratchet" subsection. It keeps \label{sec:sensitivity_dynamic},
+% which Section 3 now references as "Appendix~\ref{sec:sensitivity_dynamic}".
+% =============================================================================
+
+\paragraph{Feedback-Driven Compliance: the ratchet needs ignition.}
+\label{sec:sensitivity_dynamic}
+
+Reputation escalation is the operative lever: compliance rises from 25\% (the $Q/N$ floor at $\varepsilon = 0$) to 62\% at $\varepsilon = 1$ and plateaus near 77--84\% for $\varepsilon \geq 2$, with most of the gain in the first unit of escalation (Figure~\ref{fig:dynamic_reputation_escalation}). The flat penalty raises the ceiling only gradually (Figure~\ref{fig:dynamic_penalty}), reaching 100\% at $\phi = \$300$\,M --- the point at which the expected penalty first exceeds the highest valuation in this scenario's economy ($v_i \sim \text{Uniform}[\$40\text{\,M}, \$60\text{\,M}]$). The joint surface (Figure~\ref{fig:dynamic_heatmap}) adds the design's operating requirement: at $\pi_0 = 5\%$ compliance stays near the supply floor regardless of $\varepsilon$, because audits are too infrequent to initiate the ratchet; above $\pi_0 = 25\%$, $\varepsilon \geq 1.5$ reliably produces compliance above 90\%. Escalation intensity cannot compensate for insufficient detection frequency.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/dynamic_reputation_escalation}
+  \caption{Compliance rate vs.\ reputation escalation factor $\varepsilon$
+    (Feedback-Driven Compliance, $Q=5$, $N=20$, $n=30$ seeds).
+    Compliance is 25\% at $\varepsilon=0$ (the $Q/N$ supply floor)
+    and reaches approximately 77\% by $\varepsilon=2$, plateauing
+    near 84\% for $\varepsilon \geq 4$.}
+  \label{fig:dynamic_reputation_escalation}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/dynamic_penalty}
+  \caption{Compliance rate vs.\ penalty $\phi$ (Feedback-Driven
+    Compliance, $Q=5$, $N=20$, $n=30$ seeds).  Floor at 62\%
+    reflects reputation-only deterrence at the default
+    $\varepsilon=1.0$; 100\% compliance achieved at $\phi \geq \$300$\,M.}
+  \label{fig:dynamic_penalty}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_dynamic}
+  \caption{Joint compliance surface over base audit rate $\pi_0$ and
+    reputation escalation factor $\varepsilon$ (Feedback-Driven Compliance,
+    $Q=5$, $N=20$, $n=20$ seeds per cell).  Compliance spans
+    25\%--92\%; the ratchet requires $\pi_0 \geq 25\%$ to reach the
+    supply ceiling.  Red box marks the calibration point
+    ($\pi_0=20\%$, $\varepsilon=1$).}
+  \label{fig:dynamic_heatmap}
+\end{figure}
+

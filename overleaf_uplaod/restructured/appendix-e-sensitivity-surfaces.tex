@@ -1,0 +1,108 @@
+% =============================================================================
+% APPENDIX E: Per-scenario sensitivity surfaces (relocated from old Section 4.2)
+% Add to main.tex after appendix-d:  \include{appendices/appendix-e-sensitivity-surfaces}
+% =============================================================================
+
+\section{Per-scenario sensitivity surfaces}
+\label{app:sensitivity-surfaces}
+
+The single-lever decomposition of Section~\ref{sec:results-sensitivity} reads relative lever impact off one neutral reference point. This appendix gives the complementary per-scenario view: for each governance design, the one- and two-dimensional sweeps that locate its specific failure point.
+
+For each scenario we identify which parameters govern compliance and at what values the design fails. Each two-dimensional surface pairs the two parameters that governed compliance most in the one-dimensional sweeps; for price-dominated designs the default audit-rate $\times$ collateral grid is flat and uninformative, so the informative pair is price against the instrument that binds.
+
+\paragraph{Minimal Enforcement: supply policy is compliance policy.}
+
+Sweeping the permit cap, mean compliance tracks $Q/N$ across the entire range --- 13\% at $Q=1$ to 99\% at $Q=19$ (Figure~\ref{fig:Minimal Enforcement_permit_cap}) --- because firms with permits hold them and firms without permits violate; the expected penalty is too small to alter the calculus. Enforcement cannot substitute: compliance is flat at 33\% through $\pi_0 \leq 0.45$ and reaches only 76\% under certain audit (Figure~\ref{fig:Minimal Enforcement_audit_prob}). The joint surface (Figure~\ref{fig:Minimal Enforcement_heatmap}) confirms the floor is structural: below $Q \approx 10$ audit intensity is irrelevant, above $Q \approx 14$ it is redundant.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/minimal_permit_cap.png}
+  \caption{Compliance rate vs.\ permit supply cap $Q$ (Minimal
+    Enforcement, $N=20$, $n=30$ seeds).  Compliance $\approx Q/N$
+    throughout; the enforcement channel contributes negligibly.}
+  \label{fig:Minimal Enforcement_permit_cap}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/minimal_audit_prob}
+  \caption{Compliance rate vs.\ base audit rate $\pi_0$ (Minimal
+    Enforcement, $Q=5$, $N=20$, $n=30$ seeds).  The $Q/N$ floor at
+    33\% persists through the full low-enforcement range; compliance
+    begins to rise only above $\pi_0 \approx 0.45$ and reaches 76\%
+    at ceiling.}
+  \label{fig:Minimal Enforcement_audit_prob}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_minimal}
+  \caption{Joint compliance surface over permit supply cap $Q$ and
+    base audit rate $\pi_0$ (Minimal Enforcement, $N=20$, $n=20$ seeds
+    per cell).  Compliance spans 14\%--100\% along the $Q$ axis;
+    enforcement intensity is irrelevant for $Q \leq 10$ and redundant
+    for $Q \geq 14$.  Red box marks the calibration point ($Q=5$,
+    $\pi_0=5\%$).}
+  \label{fig:Minimal Enforcement_heatmap}
+\end{figure}
+
+\clearpage
+\paragraph{Strict Enforcement: a moving price cliff.}
+
+Compliance is 100\% for $\bar{p} < \$55$\,M and collapses to 8\% by \$200\,M (Figure~\ref{fig:Strict Enforcement_fixed_price}); the calibration (\$70\,M) deliberately sits above the threshold to study a partially compliant equilibrium. Holding $\bar{p}$ fixed and sweeping the valuation cap shows the mirror image: compliance rises from 39\% ($v_{\max} = \$80$\,M) to 96\% ($v_{\max} = \$500$\,M) as more labs clear the price, crossing the 95\% threshold at $v_{\max} \approx \$400$\,M (Figure~\ref{fig:Strict Enforcement_valuation_max}). The joint surface (Figure~\ref{fig:Strict Enforcement_heatmap}) shows sharply diagonal isolines --- the two effects interact, and the safe-price corridor contracts as frontier valuations rise. The regulator controls the price but not the valuation distribution; the design's compliance threshold therefore moves with the market.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/strict_fixed_price}
+  \caption{Compliance rate vs.\ fixed permit price $\bar{p}$ (Strict
+    Enforcement, $Q=N=20$, $n=30$ seeds).  Full compliance holds below
+    \$55\,M; the current calibration (\$70\,M) lies above the threshold.}
+  \label{fig:Strict Enforcement_fixed_price}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/strict_valuation_max}
+  \caption{Compliance rate vs.\ maximum firm valuation $v_{\max}$
+    (Strict Enforcement, $\bar{p}=\$70$\,M, $n=30$ seeds).
+    Compliance crosses the 95\% threshold at $v_{\max} \approx \$400$\,M.}
+  \label{fig:Strict Enforcement_valuation_max}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_strict}
+  \caption{Joint compliance surface over permit price $\bar{p}$ and
+    maximum firm valuation $v_{\max}$ (Strict Enforcement, $Q=N=20$,
+    $n=20$ seeds per cell).  Compliance spans 9\%--100\%; diagonal
+    isolines show the price--valuation interaction.  The 95\% ridge
+    lies near $\bar{p} \approx \$55$\,M at low valuations and shifts
+    rightward as valuations rise.}
+  \label{fig:Strict Enforcement_heatmap}
+\end{figure}
+
+\clearpage
+\paragraph{Smart Enforcement: one failure mode, partially backstopped.}
+
+No single enforcement parameter can break compliance: perturbing penalty, collateral, audit rate, monitoring, false-negative rate, or risk appetite individually --- even zeroing penalty and collateral together --- leaves compliance at 100\%, because the \$2\,M permit price makes compliance individually rational before enforcement enters the calculation. The sole vulnerability is the price itself (Figure~\ref{fig:Smart Enforcement_fixed_price}): compliance holds at 100\% through \$80\,M (45\% beyond Strict Enforcement's threshold), declines over [\$80\,M, \$200\,M], and stabilises near a 28\% floor sustained by the enforcement stack after the price instrument fails. The joint surface (Figure~\ref{fig:Smart Enforcement_heatmap}) shows near-vertical isolines above $\pi_0 \approx 10\%$: once the stack is active, price is the only governing variable. The layered design thus buys insurance, not compliance --- the pricing structure does the structural work.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/smart_fixed_price}
+  \caption{Compliance rate vs.\ fixed permit price $\bar{p}$ (Smart
+    Enforcement, $Q=N=20$, $n=30$ seeds).  Full compliance through
+    \$80\,M (45\% beyond the Strict Enforcement threshold at \$55\,M), declining to
+    a 28\% floor above \$200\,M owing to residual enforcement deterrence.}
+  \label{fig:Smart Enforcement_fixed_price}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_smart}
+  \caption{Joint compliance surface over permit price $\bar{p}$ and
+    base audit rate $\pi_0$ (Smart Enforcement, $Q=N=20$, $n=20$ seeds
+    per cell).  Compliance spans 25\%--100\%; isolines are near-vertical
+    above $\pi_0 = 10\%$, confirming price as the governing lever.}
+  \label{fig:Smart Enforcement_heatmap}
+\end{figure}
+

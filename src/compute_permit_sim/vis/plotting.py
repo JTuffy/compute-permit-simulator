@@ -803,7 +803,7 @@ def plot_lever_tornado(
         linestyle="--",
         alpha=0.9,
         zorder=3,
-        label=f"Baseline ({baseline_compliance * 100:.0f}%)",
+        label=f"Reference ({baseline_compliance * 100:.0f}%)",
     )
 
     for yi, r in zip(y, rows):

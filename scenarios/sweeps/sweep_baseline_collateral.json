@@ -5,5 +5,5 @@
     "min_val": 0.0,
     "max_val": 300.0,
     "interval": 25.0,
-    "n_runs": 50
+    "n_runs": 30
 }

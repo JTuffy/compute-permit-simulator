@@ -850,10 +850,10 @@ def export_lever_sensitivity_to_latex(
     lines = [
         r"\begin{table}[htbp]",
         r"\centering",
-        rf"\caption{{One-at-a-time lever sensitivity from the constructed baseline "
-        rf"(compliance {baseline_compliance * 100:.1f}\%; $n = {n_runs}$ seeds per "
-        r"point). Each lever is swept with all others held at baseline; Span is the "
-        r"compliance range in percentage points, the relative-impact ranking.}",
+        rf"\caption{{One-at-a-time lever sensitivity from the neutral reference "
+        rf"configuration (compliance {baseline_compliance * 100:.1f}\%; $n = {n_runs}$ seeds per "
+        r"point). Each lever is swept with all others held at the reference; Span is "
+        r"the compliance range in percentage points, the relative-impact ranking.}",
         r"\label{tab:lever-sensitivity}",
         r"\small",
         r"\begin{tabular}{@{}lcccc@{}}",
