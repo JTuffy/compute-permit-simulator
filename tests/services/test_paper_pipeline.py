@@ -49,7 +49,10 @@ def test_registries_cover_all_paper_figures() -> None:
 
 
 def test_all_registry_configs_exist_and_parse() -> None:
-    for d, registry in ((pp._sweep_dir(), pp.SWEEP_FIGURES), (pp._grid_dir(), pp.GRID_FIGURES)):
+    for d, registry in (
+        (pp._sweep_dir(), pp.SWEEP_FIGURES),
+        (pp._grid_dir(), pp.GRID_FIGURES),
+    ):
         for filename in registry:
             path = os.path.join(d, filename)
             assert os.path.isfile(path), f"missing config: {path}"
@@ -90,14 +93,18 @@ def test_compliance_summary_schema(mc_results) -> None:
     for col in ("Q/N", r"Avg.\ Comp.", "SD", "P10", "P90", "Audit Rate", r"Det.\ Rate"):
         assert col in tex
     # One data row per scenario, each with 7 column separators.
-    data_rows = [ln for ln in tex.splitlines() if ln.count("&") == 7 and "textbf" not in ln]
+    data_rows = [
+        ln for ln in tex.splitlines() if ln.count("&") == 7 and "textbf" not in ln
+    ]
     assert len(data_rows) == len(mc_results)
 
 
 def test_workload_schema(mc_results) -> None:
     tex = export_workload_to_latex(mc_results)
     assert r"\label{tab:audit-burden}" in tex
-    data_rows = [ln for ln in tex.splitlines() if ln.count("&") == 4 and "textbf" not in ln]
+    data_rows = [
+        ln for ln in tex.splitlines() if ln.count("&") == 4 and "textbf" not in ln
+    ]
     assert len(data_rows) == len(mc_results)
 
 
@@ -155,12 +162,18 @@ def lever_sweeps():
     base = load_scenario(pp.BASELINE_SCENARIO)
     return [
         run_sweep(
-            base, "market.fixed_price", [80.0, 130.0, 180.0],
-            param_label="Permit Price p̄ (M$)", n_runs=3,
+            base,
+            "market.fixed_price",
+            [80.0, 130.0, 180.0],
+            param_label="Permit Price p̄ (M$)",
+            n_runs=3,
         ),
         run_sweep(
-            base, "collateral_amount", [0.0, 150.0, 300.0],
-            param_label="Collateral K (M$)", n_runs=3,
+            base,
+            "collateral_amount",
+            [0.0, 150.0, 300.0],
+            param_label="Collateral K (M$)",
+            n_runs=3,
         ),
     ]
 
