@@ -1,0 +1,539 @@
+\section{Results}
+\label{sec:results}
+
+% \owner{Josh, with support from Emlyn and Sue} \status{Pending Review}
+\subsection{Compliance Rates}
+\label{sec:results-compliance}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figures/fig_compliance_distribution}
+  \caption{Distribution of per-seed average compliance across 100 Monte Carlo
+  replications ($N = 20$ labs, $T = 10$ steps). Each violin shows the density
+  of outcomes; dots are individual seeds; horizontal bars mark the median,
+  P10, and P90. Smart Enforcement's spike at 100\% reflects a regime where compliance
+  is individually rational for every lab in every seed. Strict Enforcement's wide spread
+  reflects dependence on the coincidence between permit price and the draw of
+  lab valuations.}
+  \label{fig:compliance-distribution}
+\end{figure}
+
+Three regulatory scenarios produce markedly different compliance equilibria. Permit supply ($Q/N$) determines whether firms \emph{can} comply; enforcement design determines whether they \emph{choose} to.
+
+\paragraph{Minimal Enforcement ($\pi_0 = 0.05$, $K = \$0$, $Q = 5$, $N = 20$).}
+
+Compliance stabilises at \textbf{34.5\%} (SD\,=\,6.8\%; P10\,=\,25.0\%, P90\,=\,45.0\%) and does not move. The figure lies close to the permit supply ratio $Q/N = 5/20 = 0.25$: with the auction clearing at \$160.55M, the fifteen labs priced out of the permit market cannot comply regardless of enforcement intensity. For them, the effective detection probability is $p_\mathrm{eff} = \pi_0(1-\beta) = 0.03$, yielding an expected sanction of \$6M against a mean lab economic value of \$125M---well below the deterrence threshold. The compliance rate sits modestly above $Q/N$ because a small number of labs with below-auction valuations occasionally win permits at the clearing price; the equilibrium band reflects this stochastic draw rather than any enforcement effect. The audit rate of 4.6\% covers only the random inspection floor and generates no deterrence in a market where fifteen labs are structurally excluded from participation.
+
+\paragraph{Strict Enforcement ($\pi_0 = 0.30$, $K = \$15.75\text{M}$, $Q = N = 20$).}
+
+Expanding supply to $Q = N = 20$ raises average compliance to \textbf{88.1\%} (SD\,=\,6.7\%; P10\,=\,80.0\%, P90\,=\,95.0\%). As discussed in Section~\ref{sec:scenarios}, this outcome is driven primarily by the alignment between the fixed permit price ($\bar{p} = \$70$M) and the lab valuation distribution: roughly 87\% of labs purchase permits voluntarily because $v_i \geq \bar{p}$, independent of the enforcement apparatus. Every detected violation is caught ($p_\mathrm{catch} = 1.0$), but the expected sanction for unpermitted labs ($\approx\!\$24$M) still falls short of their evasion gain, so the lowest-value firms continue to defect each period. The wide spread in Figure~\ref{fig:compliance-distribution} reflects this fragility: when low-value lab draws cluster, compliance dips toward 70\%; when most labs happen to hold values above the permit price, it approaches 100\%. The regime's compliance outcome is a function of the seed draw rather than of the regulatory design. Sustaining 88.1\% requires an audit rate of \textbf{28.4\%}---more than one in four labs inspected each step, including the large majority that would have complied regardless.
+
+\paragraph{Smart Enforcement ($\pi_0 = 0.10$, $K = \$15.75\text{M}$, $Q = N = 20$).}
+
+With the permit price fixed at $\bar{p} = \$2$M, Smart Enforcement achieves \textbf{100\%} compliance in every replication (SD\,=\,0.0\%) at an audit rate of \textbf{9.1\%}. The permit price compresses the evasion gain to $g_i = \$2$M for every lab; the baseline expected penalty of approximately \$14.7M exceeds this by a factor of seven before any signal-dependent targeting activates. Compliance is individually rational unconditionally -- which is why the variance across seeds collapses to zero, visible as the thin spike at 100\% in Figure~\ref{fig:compliance-distribution}. There are no marginal labs for whom the compliance decision is close, and no seed composition that changes the outcome. The 9.1\% audit rate is accordingly freed from producing deterrence and concentrates on verification, with signal-dependent targeting ($c(i) = 0.5$) directing even this reduced budget toward the labs most likely to deviate.
+
+\paragraph{Cross-scenario comparison.}
+
+Two findings warrant emphasis. First, permit supply is the binding constraint in Minimal Enforcement: no feasible  enforcement adjustment closes the 50--65 percentage-point gap between Minimal Enforcement and the two universal-access scenarios, because compliance is structurally infeasible for three-quarters of labs regardless of audit intensity. Second, among the universal-access scenarios, Smart Enforcement achieves strictly higher compliance at \textbf{68\%} lower audit burden (9.1\%\ vs. 28.4\%). The source of this difference is mechanism: Strict Enforcement depends on a coincidence between the permit price and the value distribution to produce voluntary compliance, while Smart Enforcement makes compliance individually rational through the pricing structure itself. This has direct implications for robustness: if firm valuations shift upward -- as one would expect in an increasingly competitive compute market -- Strict Enforcement compliance degrades automatically, while Smart Enforcement's deterrence margin is unaffected because it depends only on the permit price relative to the expected penalty. Section~\ref{sec:results-sensitivity} examines how each scenario responds to parameter perturbations.
+
+\begin{table}[htbp]
+\centering
+\caption{Compliance outcomes by scenario ($N = 20$ labs, 10 simulation steps,
+$n = 100$ Monte Carlo replications). $Q/N$ denotes the permit supply ratio.}
+\label{tab:compliance-summary}
+\small
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Scenario} & \textbf{Q/N} & \textbf{Avg.\ Comp.} & \textbf{SD} &
+  \textbf{P10} & \textbf{P90} & \textbf{Audit Rate} & \textbf{Det.\ Rate} \\
+\midrule
+Minimal & 0.25 & 34.5\% & 6.8\% & 25.0\% & 45.0\% & 4.6\%  & 62.8\% \\
+Strict  & 1.00 & 88.1\% & 6.7\% & 80.0\% & 95.0\% & 28.4\% & 100.0\% \\
+Smart & 1.00 & 100\%  & 0.0\% & 100\%  & 100\%  &  9.1\% & n/a \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Regulatory Workload}
+\label{sec:results-workload}
+
+All figures in this section are means over $n = 100$ independent Monte Carlo replications ($N = 20$ labs, $T = 10$ periods per replication), each drawn from a fresh random seed. Audit-rate and detection-rate statistics are averaged first within each replication across the $T$ periods, then across replications; reported values are the cross-replication mean. This is the same estimation protocol as Section~\ref{sec:results-compliance}.
+
+Compliance rates tell one side of the story; audit expenditure tells the other. A regime that achieves high compliance by saturating inspection is not efficient -- it has substituted enforcement cost for compliance outcome. This section decomposes the regulator's burden into three components: total audit volume (the raw inspection rate per period), false-positive exposure (audits that fall on compliant firms and return no enforcement value), and detection rate (violations confirmed per audit that encounters one).
+
+\paragraph{Audit volume.}
+
+The three scenarios differ sharply in how many audits the regulator must conduct per period. Minimal Enforcement, with a random audit floor $\pi_0 = 0.05$ and $N = 20$ labs, averages \textbf{0.92 audits per period} (4.6\%), but this low figure flatters the regime: fifteen of the twenty labs are structurally excluded from compliance by the permit supply constraint, so the regulator is inspecting a population that cannot comply regardless of audit intensity. Strict Enforcement, operating at $\pi_0 = 0.30$ with signal-dependent targeting, averages \textbf{5.67 audits per period} (28.4\%). Smart Enforcement, at $\pi_0 = 0.10$ with the same targeting mechanism, averages \textbf{1.82 audits per period} (9.1\%) -- a ratio of 3.11-to-1 relative to Strict Enforcement.
+
+\paragraph{False-positive exposure.}
+
+Compliant firms -- those holding valid permits -- generate no suspicion signal ($s(i) = 0$, since they carry no unpermitted excess compute). Under signal-dependent auditing, their audit probability therefore collapses to the random floor: $p_{\mathrm{audit}}(i) = \pi_0$. Multiplying by the mean number of compliant labs per period, Minimal Enforcement exposes \textbf{0.34 compliant labs per period} to a fruitless inspection ($0.05 \times 6.9$); Strict Enforcement exposes \textbf{5.29} ($0.30 \times 17.6$); Smart Enforcement exposes \textbf{2.00} ($0.10 \times 20.0$). These audits consume regulator resources and impose administrative costs on the firm while returning no enforcement value. Smart Enforcement's false-positive load is high in absolute terms because all twenty labs are compliant every period -- the regulator is, by design, verifying a population with nothing to hide.
+
+\paragraph{Detection rate.}
+
+Among audits that encounter a genuine violation, the rate at which they confirm it is determined by $p_{\mathrm{catch}}$ (equation~\ref{eq:catch}). In Minimal Enforcement, with $\beta = 0.40$ and $p_m = 0$, $p_{\mathrm{catch}} = 1 - 0.40 \times 1.0 = 0.60$: roughly one in three violations escapes detection even when the firm is audited. The simulated detection rate is \textbf{62.8\%}, modestly above the theoretical 60\% due to Monte Carlo variance across seeds. In Strict Enforcement, $p_{\mathrm{catch}} = 1 - 0.10 \times (1 - 1.0) = 1.0$: full monitoring coverage means an audited violation is caught with certainty (\textbf{100\%}). In Smart Enforcement, $p_{\mathrm{catch}} = 1 - 0.40 \times 0.80 = 0.68$; the theoretical detection rate is 68\%, but because Smart Enforcement produces 100\% compliance across all replications no audit encounters a violation in practice, so the empirical rate is not applicable.
+
+\paragraph{Cross-scenario comparison.}
+
+The joint picture exposes a structural inversion. Strict  enforcement runs 5.67 audits per period and catches every violation it finds; Smart Enforcement runs 1.82 and achieves strictly higher compliance (100\% vs.\ 88.1\%). The resolution echoes Section~\ref{sec:results-compliance}: Strict Enforcement's audit budget is
+largely consumed by the compliant majority---5.29 of every period's
+inspections fall on firms that were already compliant and would remain so
+regardless---while Smart Enforcement's entire inspection allocation is directed at an
+already-compliant population because the permit pricing structure eliminates
+any motive to defect. The contrast between Minimal Enforcement and the other two
+scenarios is starker still: Strict Enforcement and Smart Enforcement devote, respectively, 93\%
+and 100\% of their audit spend to verification of compliance that the regime
+itself produced; Minimal Enforcement devotes the equivalent fraction to a population
+that is structurally barred from complying. Audit efficiency---the
+compliance gain attributable to each inspection---is therefore highest in
+Smart Enforcement not because its audits are individually more powerful, but because
+the market design has made active deterrence work unnecessary before the
+first inspection is conducted.
+
+\begin{table}[htbp]
+\centering
+\caption{Regulatory workload by scenario ($N = 20$ labs, $T = 10$ steps,
+$n = 100$ Monte Carlo replications). Audits per period and FP exposure are
+period means. FP exposure $= \pi_0 \times$ mean compliant labs per period.
+Detection rate is violations confirmed per audit encountering a violation;
+Smart Enforcement's is n/a because 100\% compliance leaves no violations to detect.}
+\label{tab:audit-burden}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Audit rate} & \textbf{Audits / period}
+  & \textbf{FP exposure (labs/period)} & \textbf{Detection rate} \\
+\midrule
+Minimal & 4.6\%  & 0.92 & 0.34 & 62.8\%  \\
+Strict  & 28.4\% & 5.67 & 5.29 & 100.0\% \\
+Smart &  9.1\% & 1.82 & 2.00 & n/a     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sensitivity Analysis}
+\label{sec:results-sensitivity}
+
+We conduct one-dimensional parameter sweeps to assess how compliance
+responds to perturbations in each governance design, and two-dimensional
+grid sweeps to test whether pairs of instruments interact.  For each
+sweep, a single parameter is varied over a policy-relevant range while
+all others are held at their scenario values.  Results report mean
+compliance and a one-standard-deviation band over 30 independent seeds.
+Monetary values are in millions of USD
+(M\$); probabilities are dimensionless.  For each scenario we identify
+which parameters govern compliance and at what values the design fails.
+
+Each two-dimensional surface pairs the \emph{two parameters that
+governed compliance most in the one-dimensional sweeps}.  A uniform
+audit-rate $\times$ collateral grid would be the natural default, but
+for price-dominated designs (Strict Enforcement, Smart Enforcement) that surface is flat and
+uninformative; the informative pair is price against the instrument that
+binds.  The choice is stated explicitly at the opening of each
+subsection.  All grids use $8 \times 8 = 64$ cells at $n = 20$ seeds
+per cell, so cell-count comparisons across figures are exact.
+
+% ------------------------------------------------------------------
+\subsubsection{Scenario I: Minimal Enforcement}
+\label{sec:sensitivity_Minimal_Enforcement}
+
+The Minimal Enforcement scenario parameterizes a weak regulatory
+environment: 20 firms compete for 5 permits ($Q/N = 0.25$), the audit
+rate is 5\%, and the expected penalty of approximately \$6\,M is small
+relative to frontier training-run values.  Baseline compliance is 34.5\%.
+
+\paragraph{Permit supply, not enforcement intensity, limits compliance.}
+
+Varying the permit supply cap $Q$ from 1 to 19 reveals that mean
+compliance tracks $Q/N$ across the entire range---13\% at $Q=1$ rising
+to 99\% at $Q=19$ (Figure~\ref{fig:Minimal Enforcement_permit_cap}).  The
+relationship is mechanical: firms with permits hold them; firms without
+permits violate.  The expected penalty is too small to alter this
+calculus.  At the calibrated value of $Q=5$, compliance is 34.5\%---modestly
+above the supply ratio ($Q/N = 0.25$), as stochastic permit allocation occasionally
+allows low-value labs to win permits at the clearing price.  The standard-deviation band widens near $Q \approx 10$
+where permit lottery outcomes vary most across seeds, and narrows at the
+extremes where outcomes are nearly deterministic.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/minimal_permit_cap.png}
+  \caption{Compliance rate vs.\ permit supply cap $Q$ (Minimal
+    Enforcement, $N=20$, $n=30$ seeds).  Compliance $\approx Q/N$
+    throughout; the enforcement channel contributes negligibly.}
+  \label{fig:Minimal Enforcement_permit_cap}
+\end{figure}
+
+When deterrence is insufficient, compliance policy reduces to supply
+policy.  Sweeping the base audit rate $\pi_0$ over the full
+policy-relevant range $[0.01, 1.0]$ confirms the inequality: across the
+low-enforcement region ($\pi_0 \leq 0.45$), compliance is flat at 33\%;
+above that threshold it rises gradually, reaching 76\% at $\pi_0 = 1.0$
+(Figure~\ref{fig:Minimal Enforcement_audit_prob}).  The 76\% ceiling under certain
+audit reflects a supply accounting effect: at extreme enforcement even
+marginal firms exit the market, reducing the total population without
+increasing the number of permit holders.  Enforcement can lift compliance
+modestly above the $Q/N$ floor, but cannot close the gap to full
+compliance while permits remain scarce.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/minimal_audit_prob}
+  \caption{Compliance rate vs.\ base audit rate $\pi_0$ (Minimal
+    Enforcement, $Q=5$, $N=20$, $n=30$ seeds).  The $Q/N$ floor at
+    33\% persists through the full low-enforcement range; compliance
+    begins to rise only above $\pi_0 \approx 0.45$ and reaches 76\%
+    at ceiling.}
+  \label{fig:Minimal Enforcement_audit_prob}
+\end{figure}
+
+\paragraph{Joint sensitivity surface.}
+
+For Minimal Enforcement the standard enforcement grid (audit rate $\times$
+collateral) is not the binding constraint---supply is.  The informative
+surface therefore pairs \emph{permit supply cap $Q$} against \emph{base
+audit rate $\pi_0$}, directly testing whether enforcement can substitute
+for supply.  A $Q \times \pi_0$ grid ($Q \in [1, 19]$, $\pi_0 \in
+[5\%, 50\%]$, 64 cells, $n=20$ seeds each) shows compliance rising
+steeply along the $Q$ axis---from 14\% at $Q=1$ to 100\% at $Q=19$---
+and nearly flat along all $\pi_0$ columns below $Q \approx 10$
+(Figure~\ref{fig:Minimal Enforcement_heatmap}).  The supply floor is structural:
+even at $\pi_0 = 50\%$, compliance is bounded by $Q/N$; above $Q
+\approx 14$, audit intensity ceases to matter at all.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_minimal}
+  \caption{Joint compliance surface over permit supply cap $Q$ and
+    base audit rate $\pi_0$ (Minimal Enforcement, $N=20$, $n=20$ seeds
+    per cell).  Compliance spans 14\%--100\% along the $Q$ axis;
+    enforcement intensity is irrelevant for $Q \leq 10$ and redundant
+    for $Q \geq 14$.  Red box marks the calibration point ($Q=5$,
+    $\pi_0=5\%$).}
+  \label{fig:Minimal Enforcement_heatmap}
+\end{figure}
+
+% ------------------------------------------------------------------
+\clearpage
+\subsubsection{Scenario II: Strict Price Enforcement}
+\label{sec:sensitivity_Strict_Enforcement}
+
+In the Strict Enforcement scenario, permits are abundant ($Q = N = 20$) and priced
+at a fixed \$70\,M.  Firm valuations are drawn from
+$v_i \sim \text{Uniform}[\$50\text{\,M}, \$200\text{\,M}]$.  The
+base audit rate is $\pi_0 = 0.30$ with signal-dependent targeting, but
+the dominant compliance mechanism is price rather than enforcement:
+because roughly 87\% of labs have $v_i \geq \bar{p}$, they purchase
+permits voluntarily independent of audit risk.
+
+\paragraph{Compliance is steeply sensitive to permit price.}
+
+Sweeping $\bar{p}$ from \$5\,M to \$200\,M reveals a sharp compliance
+cliff (Figure~\ref{fig:Strict Enforcement_fixed_price}): below \$55\,M, all labs
+find compliance cost-beneficial and mean compliance is 100\%; above that
+threshold, compliance falls sharply, reaching 8\% at \$200\,M.  The
+standard-deviation band widens substantially through the transition---at
+$\bar{p} = \$100$\,M, outcomes range from below 30\% to above 80\%
+across seeds, reflecting heterogeneity in firm-level break-even prices.
+
+The scenario is calibrated at \$70\,M---above the compliance threshold
+of \$55\,M---to study a partially compliant equilibrium.  A price above
+the marginal firm's willingness-to-pay acts as a market exclusion
+mechanism, not a compliance mechanism: raising the price further expands
+the population of firms for whom cheating dominates purchasing.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/strict_fixed_price}
+  \caption{Compliance rate vs.\ fixed permit price $\bar{p}$ (Strict
+    Enforcement, $Q=N=20$, $n=30$ seeds).  Full compliance holds below
+    \$55\,M; the current calibration (\$70\,M) lies above the threshold.}
+  \label{fig:Strict Enforcement_fixed_price}
+\end{figure}
+
+\paragraph{Compliance rises when permit price is near firm valuations.}
+
+Fixing $\bar{p} = \$70$\,M and sweeping $v_{\max}$ from \$80\,M to
+\$500\,M shows that compliance rises monotonically with the valuation
+cap: 39\% when $v_{\max} = \$80$\,M (most labs have $v_i < \bar{p}$),
+88\% at the calibrated value $v_{\max} = \$200$\,M, and stabilising
+near 96\% at $v_{\max} = \$500$\,M
+(Figure~\ref{fig:Strict Enforcement_valuation_max}).  This reflects the
+mechanics of the Uniform distribution: as $v_{\max}$ rises, the share
+of labs with $v_i \geq \bar{p}$ increases, so more purchase permits
+voluntarily.  The 95\% policy threshold is crossed at $v_{\max} \approx
+\$400$\,M; below that, compliance is below the policy target.
+The scenario's vulnerability is therefore concentrated at the low end
+of the valuation range---when frontier compute values are compressed
+near the permit price.  Since frontier AI training runs are currently
+valued in the \$100\,M--\$500\,M range, well above the \$70\,M permit
+price, the scenario is operating near its compliance ceiling under
+current conditions.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/strict_valuation_max}
+  \caption{Compliance rate vs.\ maximum firm valuation $v_{\max}$
+    (Strict Enforcement, $\bar{p}=\$70$\,M, $n=30$ seeds).
+    Compliance crosses the 95\% threshold at $v_{\max} \approx \$400$\,M.}
+  \label{fig:Strict Enforcement_valuation_max}
+\end{figure}
+
+\paragraph{The price--valuation trade-off is genuinely two-dimensional.}
+
+The standard audit-rate $\times$ collateral grid is uninformative for
+Strict Enforcement: at the calibrated price, enforcement intensity leaves compliance
+invariant (every cell sits at $\approx$88.1\%) because the dominant
+mechanism is voluntary permit purchase rather than deterrence.  The
+governing pair is instead permit price against the maximum firm
+valuation.  A $\bar{p} \times v_{\max}$ grid ($\bar{p} \in
+[\$20, \$200]$\,M, $v_{\max} \in [\$80, \$500]$\,M, 64 cells,
+$n=20$ seeds each) confirms this: compliance spans 9\%--100\% with
+sharply diagonal isolines (Figure~\ref{fig:Strict Enforcement_heatmap}), showing
+that the two effects interact rather than add independently.  The 95\%
+compliance boundary shifts rightward as valuations rise---at
+$v_{\max} = \$500$\,M, compliance collapses below 95\% at
+$\bar{p} \approx \$30$\,M, a price at which full compliance holds when
+valuations are lower.  The regulator controls the price but not the
+valuation distribution, so the safe-price corridor contracts as
+frontier compute values rise.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_strict}
+  \caption{Joint compliance surface over permit price $\bar{p}$ and
+    maximum firm valuation $v_{\max}$ (Strict Enforcement, $Q=N=20$,
+    $n=20$ seeds per cell).  Compliance spans 9\%--100\%; diagonal
+    isolines show the price--valuation interaction.  The 95\% ridge
+    lies near $\bar{p} \approx \$55$\,M at low valuations and shifts
+    rightward as valuations rise.}
+  \label{fig:Strict Enforcement_heatmap}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsubsection{Scenario III: Smart Enforcement}
+\label{sec:sensitivity_Smart_Enforcement}
+
+The Smart Enforcement scenario makes compliance financially accessible
+($\bar{p} = \$2$\,M, $Q = N = 20$) and deters violations through a
+layered enforcement stack: base audit rate $\pi_0 = 0.10$; passive
+hardware monitoring at $p_m = 0.20$; signal-dependent audit targeting
+($c(i) = 0.5$); and a collateral deposit of \$15.75\,M forfeited upon
+conviction.  The design objective is to make compliance the strictly
+dominant strategy for every firm at every valuation.
+
+\paragraph{No single enforcement parameter can break compliance.}
+
+Perturbing the penalty $\phi$, collateral $K$, audit rate $\pi_0$,
+monitoring probability $p_m$, false-negative rate $\beta$, and firm risk
+appetite individually across their full policy-relevant ranges leaves
+mean compliance at 100\% in every case.  Compliance holds even when
+penalty and collateral are simultaneously zeroed ($\phi = 0$, $K = 0$),
+confirming that the \$2\,M permit price---trivial relative to lab
+valuations of \$50--200\,M---makes compliance individually rational
+before enforcement enters the calculation.  The layered enforcement
+stack (expected penalty $\pi_0 \cdot p_{\mathrm{catch}} \cdot \phi
+\approx \$13.6$\,M per step; collateral forfeiture of \$15.75\,M upon
+detection) provides insurance against future pricing stress but does not
+produce the current compliance equilibrium.  This distinguishes Smart
+Enforcement from Strict Enforcement, where compliance depends on the coincidence
+between permit price and firm valuations: here, the pricing margin is
+wide enough that enforcement is redundant at calibration.
+
+\paragraph{Permit pricing is the sole failure mode.}
+
+Sweeping $\bar{p}$ from \$2\,M to \$300\,M reveals the only
+vulnerability (Figure~\ref{fig:Smart Enforcement_fixed_price}): compliance is
+100\% through \$80\,M, declines over the interval [\$80\,M, \$200\,M],
+and stabilises near 28\% above \$200\,M.  The floor at 28\% rather than
+0\% reflects the enforcement stack continuing to operate after the price
+instrument fails---firms that decline to purchase at the elevated price
+still face meaningful audit and monitoring risk.  Comparing the two
+price sweeps is instructive: Strict Enforcement falls from 100\% to 8\% as price
+rises from \$55\,M to \$200\,M, while Smart Enforcement holds 100\% through
+\$80\,M---45\% beyond the Strict Enforcement threshold---and sustains a 28\% compliance
+floor at \$300\,M owing to the layered enforcement backstop.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/smart_fixed_price}
+  \caption{Compliance rate vs.\ fixed permit price $\bar{p}$ (Smart
+    Enforcement, $Q=N=20$, $n=30$ seeds).  Full compliance through
+    \$80\,M (45\% beyond the Strict Enforcement threshold at \$55\,M), declining to
+    a 28\% floor above \$200\,M owing to residual enforcement deterrence.}
+  \label{fig:Smart Enforcement_fixed_price}
+\end{figure}
+
+\paragraph{Audit intensity buffers pricing errors only at low detection rates.}
+
+The audit-rate $\times$ collateral grid is uniformly 100\% at the
+calibrated price, making it uninformative.  The operative 2D surface
+therefore pairs \emph{permit price} against \emph{base audit rate}
+($\bar{p} \in [\$2, \$250]$\,M, $\pi_0 \in [2\%, 40\%]$,
+64 cells, $n=20$ seeds each).  Compliance spans 25\%--100\%
+(Figure~\ref{fig:Smart Enforcement_heatmap}).  Above $\pi_0 \approx 10\%$, isolines
+are nearly vertical: once audit intensity is sufficient to activate the
+layered enforcement stack, price is the sole governing variable and
+further audit increases contribute nothing.  Below $\pi_0 \approx 5\%$,
+the boundary tilts leftward, showing that very low audit rates weaken
+the design against pricing stress.  In practice, audit intensity only
+requires active management if it falls substantially below any realistic
+regulatory floor.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_smart}
+  \caption{Joint compliance surface over permit price $\bar{p}$ and
+    base audit rate $\pi_0$ (Smart Enforcement, $Q=N=20$, $n=20$ seeds
+    per cell).  Compliance spans 25\%--100\%; isolines are near-vertical
+    above $\pi_0 = 10\%$, confirming price as the governing lever.}
+  \label{fig:Smart Enforcement_heatmap}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsubsection{Scenario IV: Feedback-Driven Compliance}
+\label{sec:sensitivity_dynamic}
+
+The Feedback-Driven Compliance scenario operates with scarce permits
+($Q=5$, $N=20$) and an auction market (no fixed price).  The intended
+mechanism is a reputation ratchet: labs caught violating face escalating
+enforcement costs that eventually tip them toward compliance.  The base
+audit rate is $\pi_0 = 0.20$, the flat penalty is $\$50$\,M, and
+\texttt{audit\_escalation}$=0.5$ with \texttt{signal\_dependent}$=\text{False}$.
+In signal-independent mode the audit-escalation coefficient is structurally
+inert (audit probability stays fixed at the base rate regardless of a
+firm's escalation coefficient); the operative feedback channel is
+therefore reputation accumulation, not heightened audit targeting.
+
+\paragraph{Reputation escalation drives compliance; gains concentrate at low-to-moderate intensity.}
+
+Sweeping the reputation escalation factor $\varepsilon$ from 0 to 5 shows
+that this parameter is the operative lever
+(Figure~\ref{fig:dynamic_reputation_escalation}).  At $\varepsilon = 0$,
+reputation costs remain flat at \$10\,M per violation regardless of
+prior history, and compliance is 25\%---the $Q/N$ supply floor with no
+compounding deterrence.  As $\varepsilon$ rises, the reputation cost compounds
+exponentially ($R_t = R_0 \times (1+\varepsilon)^n$), raising the perceived
+penalty above the break-even threshold for repeat offenders.
+Compliance reaches 43\% at $\varepsilon = 0.5$, 62\% at $\varepsilon = 1.0$,
+and plateaus near 77\%--84\% for $\varepsilon \geq 2$.  The plateau below
+100\% reflects the structural supply gap: $Q/N = 0.25$ means even very
+strong enforcement cannot give all labs permits.  Most compliance gain
+occurs in the first unit of escalation ($\varepsilon \in [0,1]$), with
+strongly diminishing returns above---a regulator captures most of the
+available improvement at moderate intensity without imposing extreme
+reputational penalties.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/dynamic_reputation_escalation}
+  \caption{Compliance rate vs.\ reputation escalation factor $\varepsilon$
+    (Feedback-Driven Compliance, $Q=5$, $N=20$, $n=30$ seeds).
+    Compliance is 25\% at $\varepsilon=0$ (the $Q/N$ supply floor)
+    and reaches approximately 77\% by $\varepsilon=2$, plateauing
+    near 84\% for $\varepsilon \geq 4$.}
+  \label{fig:dynamic_reputation_escalation}
+\end{figure}
+
+\paragraph{Penalty level raises the compliance ceiling gradually; full deterrence requires high penalties.}
+
+Sweeping the flat penalty $\phi$ from \$0 to \$300\,M reveals a
+gradual rise (Figure~\ref{fig:dynamic_penalty}).  At $\phi = 0$,
+compliance is 62\%---elevated above the $Q/N$ floor because the
+scenario's default $\varepsilon = 1.0$ ensures reputation costs alone
+provide meaningful deterrence for repeat offenders.  Compliance
+rises slowly through $\phi \approx \$200$\,M as the penalty crosses
+each firm's individual break-even threshold in sequence; it reaches
+95\% near $\phi = \$250$\,M and 100\% at $\phi = \$300$\,M, the
+point at which the expected penalty first exceeds the highest firm
+valuation in the economy ($v_i \sim \text{Uniform}[\$40\text{\,M},
+\$60\text{\,M}]$).  The wide standard-deviation band through the
+transition reflects cross-seed heterogeneity in which firms happen
+to be caught early.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/dynamic_penalty}
+  \caption{Compliance rate vs.\ penalty $\phi$ (Feedback-Driven
+    Compliance, $Q=5$, $N=20$, $n=30$ seeds).  Floor at 62\%
+    reflects reputation-only deterrence at the default
+    $\varepsilon=1.0$; 100\% compliance achieved at $\phi \geq \$300$\,M.}
+  \label{fig:dynamic_penalty}
+\end{figure}
+
+\paragraph{Joint sensitivity surface.}
+
+For Feedback-Driven Compliance the enforcement-intensity grid (audit
+rate $\times$ collateral) captures only one of the two governing
+levers---the ratchet mechanism operates through reputation, not
+collateral.  The informative surface therefore pairs \emph{base audit
+rate $\pi_0$} against \emph{reputation escalation factor $\varepsilon$},
+the two parameters that jointly determine how fast cumulative penalties
+rise for repeat offenders.  A $\pi_0 \times \varepsilon$ grid ($\pi_0 \in
+[5\%, 40\%]$, $\varepsilon \in [0, 3.5]$, 64 cells, $n=20$ seeds each)
+shows compliance rising along both axes, with largest gains in the
+lower-left quadrant (Figure~\ref{fig:dynamic_heatmap}).
+At $\pi_0 = 5\%$, compliance is 25\%--30\% regardless of $\varepsilon$:
+audits are too infrequent to initiate the ratchet.  Above $\pi_0 =
+25\%$, $\varepsilon \geq 1.5$ reliably produces compliance above 90\%.
+The practical implication is that the design requires a minimum audit
+rate to function; escalation intensity alone does not compensate for
+insufficient detection frequency.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.65\textwidth]{figures/heatmap_dynamic}
+  \caption{Joint compliance surface over base audit rate $\pi_0$ and
+    reputation escalation factor $\varepsilon$ (Feedback-Driven Compliance,
+    $Q=5$, $N=20$, $n=20$ seeds per cell).  Compliance spans
+    25\%--92\%; the ratchet requires $\pi_0 \geq 25\%$ to reach the
+    supply ceiling.  Red box marks the calibration point
+    ($\pi_0=20\%$, $\varepsilon=1$).}
+  \label{fig:dynamic_heatmap}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsubsection{Summary}
+\label{sec:sensitivity_summary}
+
+Table~\ref{tab:sensitivity_summary} reports the compliance range and
+failure threshold for each sweep.
+
+\begin{table}[htb]
+\centering
+\setlength{\tabcolsep}{5pt}
+\caption{Parameter sweep results across four governance designs.
+  Range\,=\,compliance span (pp); Threshold\,=\,value at 95\% compliance departure.}
+\label{tab:sensitivity_summary}
+\smallskip
+\begin{tabular}{lp{2.8cm}ccp{5.2cm}}
+\toprule
+\textbf{Scenario} & \textbf{Parameter} & \textbf{Range} & \textbf{Threshold} & \textbf{Note} \\
+                  &                    & \textbf{(pp)}  &                    &               \\
+\midrule
+Minimal Enforcement & Permit cap $Q$      & 86 & $Q \geq 18$              & Compliance $\approx Q/N$; 95\% requires $Q/N \geq 0.95$ \\
+Minimal Enforcement & Audit rate $\pi_0$  & 43 & None                     & Supply-constrained; max 76\% at $\pi_0=1$ \\
+\addlinespace
+Strict Enforcement  & Permit price $\bar{p}$      & 92 & $\bar{p} > \$55$\,M   & Calibration (\$70\,M) exceeds threshold \\
+Strict Enforcement  & Max valuation $v_{\max}$    & 57 & $v_{\max}>\$400$\,M   & 95\% requires $v_{\max}\gg\bar{p}$; calibration (\$200\,M) below \\
+\addlinespace
+Smart Enforcement & Any single param            &  0 & Never                 & Defence in depth; single perturbations absorbed \\
+Smart Enforcement & Permit price $\bar{p}$      & 72 & $\bar{p} > \$80$\,M   & Sole failure mode; 28\% floor retained \\
+\addlinespace
+Dynamic & Reputation factor $\varepsilon$  & 58 & $\varepsilon \geq 0.5$     & Main lever; plateau at 84\%; gains front-loaded \\
+Dynamic & Penalty $\phi$              & 38 & $\phi \approx \$250$\,M & Gradual rise; 100\% at \$300\,M (exceeds max valuation) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+Four conclusions follow.  Supply-constrained designs (Minimal Enforcement) are
+insensitive to enforcement: compliance is bounded above by $Q/N$
+regardless of audit intensity.  Price-based designs (Strict Enforcement) face a
+moving compliance threshold as frontier valuations rise.  Layered
+designs (Smart Enforcement) are robust to single-parameter enforcement degradation
+but retain a pricing vulnerability partially mitigated by the enforcement
+backstop.  Dynamic designs depend on a reputation-feedback mechanism
+that is highly effective at moderate escalation intensity ($\varepsilon
+\approx 1$) but cannot exceed the compliance ceiling imposed by supply
+scarcity.

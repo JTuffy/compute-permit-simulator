@@ -1,0 +1,45 @@
+
+% =============================================================================
+% SECTION 1: INTRODUCTION
+% =============================================================================
+
+\section{Introduction}
+
+Governments and international organizations are increasingly turning to compute thresholds as a mechanism for regulating advanced AI systems. The European Union's AI Act applies heightened obligations to models trained using more than $10^{25}$ floating-point operations (FLOP), while the United States Executive Order on AI establishes reporting requirements for training runs exceeding $10^{26}$ FLOP. These thresholds reflect a belief that computational scale serves as a useful proxy for the potential risks posed by frontier AI systems.
+
+However, the effectiveness of compute-based regulation depends critically on the ability of regulators to monitor and enforce compliance. In practice, enforcement is imperfect. Regulators cannot directly observe the computational resources used in a training run. Instead, they must rely on self-reported data from firms, supplemented by indirect signals such as hardware purchases, electricity consumption, and cloud provider logs. These signals are noisy, creating opportunities for firms to under-report their compute usage or structure training runs to remain just below regulatory thresholds.
+
+This paper examines how enforcement design affects compliance behavior in compute permit markets operating under imperfect monitoring. We develop a formal model in which firms decide whether to comply with permit requirements based on the expected costs and benefits of violation. The key trade-off facing each firm is whether the gain from evading permit requirements exceeds the expected penalty, which depends on the probability of detection and the severity of punishment if caught.
+
+We implement this model in an agent-based simulation that allows us to study how different regulatory configurations affect aggregate compliance outcomes. The simulation incorporates realistic features of enforcement, including noisy detection signals, limited audit capacity, and the possibility of false negatives in violation detection. We compare three regulatory scenarios: minimal enforcement with low audit rates and no external monitoring; strict enforcement with high audit rates and full transparency; and smart enforcement that combines moderate audit rates with targeted monitoring and upfront collateral requirements.
+
+Our central finding is that smart enforcement achieves compliance levels comparable to strict enforcement at substantially lower regulatory cost. The key mechanism is incentive alignment: by requiring firms to post refundable collateral that is forfeited upon violation, regulators can make compliance the economically rational choice even when audit rates are relatively low. This approach shifts some of the enforcement burden from costly audits to upfront financial commitments, reducing the resources required to maintain high compliance.
+
+The paper makes three contributions. First, we formalize the compliance decision facing firms in a compute permit regime under imperfect monitoring, deriving conditions under which different enforcement designs achieve deterrence. Second, we develop an agent-based simulation that operationalizes this framework and allows systematic comparison of regulatory scenarios. Third, we derive policy recommendations for the design of compute governance systems, including guidance on tolerance thresholds, collateral structures, and institutional arrangements.
+
+The remainder of the paper proceeds as follows. Section 2 presents the formal model of firm compliance decisions under imperfect monitoring. Section 3 describes the simulation design, including the agent decision rules, market mechanism, and enforcement module. Section 4 reports results from the three regulatory scenarios. Section 5 discusses policy implications, including recommendations for tolerance thresholds, scaled collateral, and institutional design. Section 6 addresses limitations and directions for future work. 
+
+% \section{Introduction}
+% \owner{Joel} \status{Draft exists, needs revision}
+
+% \placeholder{1.1 The Problem (Joel)}{
+% Write 2-3 paragraphs covering:
+% \begin{itemize}
+%     \item AI governance increasingly relies on compute thresholds (EU AI Act at $10^{25}$ FLOP, US EO at $10^{26}$ FLOP)
+%     \item Enforcement is difficult: compute is hard to measure, firms self-report, audits are costly
+%     \item Current approaches assume perfect monitoring, which is unrealistic
+% \end{itemize}
+% }
+
+% \placeholder{1.2 Our Contribution (Joel)}{
+% Write 2 paragraphs covering:
+% \begin{itemize}
+%     \item We develop a formal model of permit markets under imperfect monitoring
+%     \item We simulate three regulatory scenarios to identify which enforcement designs achieve compliance at acceptable cost
+%     \item We derive practical policy recommendations: tolerance thresholds, collateral requirements, institutional design
+% \end{itemize}
+% }
+
+% \placeholder{1.3 Paper Outline (Joel)}{
+% One paragraph: Section 2 presents the model. Section 3 describes the simulation. Section 4 reports results. Section 5 discusses policy implications. Section 6 addresses limitations.
+% }

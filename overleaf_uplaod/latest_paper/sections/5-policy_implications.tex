@@ -1,0 +1,248 @@
+
+% =============================================================================
+% SECTION 5: POLICY IMPLICATIONS
+% =============================================================================
+\section{Policy Implications: AI Governance Under Imperfect Monitoring}
+
+
+
+Regulatory systems for advanced AI increasingly rely on \textbf{threshold-based decision rules}, where oversight actions such as audits, reporting requirements, or restrictions are triggered when measurable indicators such as compute usage exceed predefined limits. Although such thresholds provide a clear and operationalizable basis for governance, \textbf{they implicitly assume that regulators can accurately observe and interpret the underlying signals that determine when intervention is required}. 
+
+However, \textbf{in practice}, these signals are noisy, incomplete, and subject to both measurement error and strategic manipulation. \textbf{As a result, AI governance is fundamentally a problem of decision-making under uncertainty}, where the effectiveness of regulation depends not only on the thresholds themselves, but on how reliably observed signals translate into correct policy actions. Many of the challenges in existing approaches, such as inefficient audits, parameter arbitrage, and over- or under--enforcement, arise from failures at this decision boundary rather than from the thresholds alone.
+
+To address this, \textbf{threshold calibration should be treated as a core technical requirement} for AI governance systems, rather than a secondary implementation detail. Standard approaches that ensure accuracy on average are insufficient, as regulatory outcomes \textbf{depend disproportionately on model performance near critical thresholds}. Methods such as those developed by Sahoo et al. provide a framework for improving the reliability of decisions specifically at these boundaries, ensuring that regulatory triggers better reflect the true underlying risk. 
+
+Incorporating such approaches allows policymakers to move beyond the unrealistic assumption of perfect oversight and instead design systems that are robust to noise and evolving technological conditions. This perspective provides a unifying foundation for the policy proposals that follow, framing audit design, market mechanisms, and institutional structures as tools to improve the reliability of threshold-based decisions in a dynamic AI development landscape.
+
+In the current landscape, Artificial Intelligence (AI) regulations, such as the EU Artificial Intelligence Act, which proposes oversight of AI models based on compute thresholds ($10^{25}$ FLOPs) the most detailed regulation to date, aim to oversee AI models and software based on compute thresholds. However, due to the rapid advancement of these technologies, state oversight capacity can be overwhelmed, creating different problems when it comes to auditing, monitoring, and enforcing laws based on established parameters ($10^{25}$ FLOPs for systemic risk models).
+
+This regulatory design falls into the \textbf{“paradox of perfect supervision,”} which assumes that a government or institutions possess the technical and operational capabilities to accurately verify compliance with established limits. \textbf{This strict audit model leads to inefficient analysis, false positives, regulatory arbitrage, high audit costs, etc.}
+
+This operational inefficiency, described as “the supervision paradox,” is clearly evident when observing the scenario of strict application of the model. In this scenario, despite a high probability of detection ($\pi_0$), the administrative cost to the regulator grows exponentially, creating friction that incentivizes regulatory arbitrage. In contrast, the Smart Enforcement Scenario—which underpins our proposal—demonstrates that it is possible to achieve optimal levels of compliance by aligning economic incentives, making the cost of the bond the primary barrier against non-compliance, thereby overcoming the need for exhaustive physical surveillance.
+
+
+Aspiring to maintain perfect oversight of AI technologies through strict regulations requires analyzing their cost-benefit ratio. Following this governance model could lead to failures such as:
+
+\begin{itemize}
+    \item Computing oversight is not a direct measurement, as a margin of error must be considered when auditing.
+    
+    \item Purely punitive laws create an incentive for some companies to risk breaking the law if they believe the benefit gained exceeds the cost of fines or simply ignore the legislation.
+    \begin{itemize}
+        \item In this case, fines stop being a punishment and become an ``operating cost,'' allowing Big Tech companies with large capital to continue operating outside the rules and keeping a larger profit margin due to lack of competition.
+    \end{itemize}
+    
+    \item Having only one static measurement parameter encourages companies to operate just below the allowed threshold, creating a gray zone where models can evade oversight and audits.
+\end{itemize}
+
+Creating regulations based on a static parameter in a dynamic and variable environment could sacrifice real safety for an illusion of control. Given the impossibility of total oversight, it is feasible to opt for the analysis of imperfect monitoring in compute permit markets. This proposal is structured around different axes:
+
+\begin{itemize}
+    \item \textbf{Audits as a response to noisy signals:} instead of auditing all companies equally, the regulator adjusts the monitoring probability ($P_m$) based on noisy physical signals. This includes hardware observability (GPU and/or CPU usage, processor cores, network usage, memory consumed), electricity consumption reports, cloud provider logs (AWS, Google Cloud, Azure), self-hosted services, and self-reported training runs. 
+    
+    \item I\textbf{mpact on market fluidity:} rigid legislation has a limiting impact on small and medium companies, as reducing the number of permits or increasing costs can encourage companies to hide their activities.
+    \begin{itemize}
+        \item An imperfect monitoring system allows for a more fluid market where the permit price reflects real risk, reducing the pressure to operate illegally.
+\end{itemize}
+    
+    \item \textbf{Calibrating the tolerance threshold} is an exercise in regulatory balance. After analyzing the extremes, we can observe that:
+    \begin{itemize}
+        \item Setting a threshold of $10^{25}$ FLOPs without considering margins of error could saturate systems with false positives, punishing or fining companies for technical errors or minor fluctuations in measurements.
+        
+        \item Allowing a 40\% tolerance margin would permit real violations and considerable systemic risks under the guise of technical errors, without considering the development and use of developed capabilities.
+        
+        \item To neutralize this parameter arbitrage problem, dynamic control mechanisms can be implemented between gradual audit probability within a 15-20\% margin and the introduction of random audits.
+    \end{itemize}
+    
+    \item \textbf{Refundable guarantees (K):} to solve the problem of insufficient fines (limited liability), it is possible to require guaranty payments that incentivize companies to voluntarily comply with safety obligations and standards to recover their capital. If a company commits a violation, the bond is forfeited.
+\end{itemize}
+
+\subsection{Strategic Governance Model}
+
+For a permit market to be viable, it needs clarity, objectivity, institutional realism, and economic equity that takes into account the different risk levels and different types of companies in the AI development market.
+
+Scaled bonds and refundable guarantees serve as incentives for companies to guarantee the safety of their models. A tiered model can be developed according to company size and capacity:
+
+\begin{itemize}
+    \item \textbf{Innovation level (Startups $< 10^{23}$ FLOPs):} exempt from bonds. They are not considered a systemic risk; however, they can be audited as part of operational monitoring.
+    
+    \item \textbf{Growth level ($10^{23}$ to $10^{25}$ FLOPs):} bond valued between 5\%-7\% of the company's annual revenue for model development. This ensures that growing companies have responsibility without compromising their operational liquidity.
+    
+    \item \textbf{Frontier level (Big Tech $> 10^{25}$ FLOPs):} bond valued between 8\%-15\% of annual revenue. At this level, where systemic risk is real, the bond must be high enough that compliance is the most economically rational option.
+\end{itemize}
+
+The calculation of bonds can be determined based on the company's total annual revenue, taking into account different points to determine these percentages:
+
+\begin{enumerate}
+    \item Many companies in the growth stage operate at a loss or with profits close to zero, so the percentage would be 0\% if they operate below $10^{23}$ FLOPs.
+    
+    \item Annual revenue reporting is harder to manipulate through net accounting engineering.
+    
+    \item It aligns our proposal with international standards, such as the fines in the EU AI Act, which are based on global turnover.
+\end{enumerate}
+
+We can define the bond {(K)} as a function that depends on Annual Revenue {(R)} and a Risk Factor {($\eta$)} associated with the compute level (C).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+{Compute Level (C)} & {Coefficient $\eta$} & {Description} \\
+\hline
+$C < 10^{23}$ FLOPs & $\eta = 0$ & Innovation Level (Startups) \\
+\hline
+$10^{23} \leq C \leq 10^{25}$ FLOPs & $\eta = [0.05, 0.07]$ & Growth Level (Scale-ups) \\
+\hline
+$C > 10^{25}$ FLOPs & $\eta = [0.08, 0.15]$ & Frontier Level (Big Tech) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{equation}
+{K = R \times \eta(C)}
+\end{equation}
+
+Where:
+
+\begin{itemize}
+    \item {K}: is the total amount of the refundable bond (\textit{Collateral}).
+    
+    \item {R}: {represents the Total Annual Revenue} (\textit{Annual Revenue}) of the company.
+    
+    \item {$\eta(C)$}: \textbf{is the risk coefficient} that varies according to the computing power used (C).
+\end{itemize}
+
+The significance of this dynamic \textit{upfront guarantee} is clearly demonstrated in the sensitivity analysis of our model. Our findings indicate that when the cost of training permits exceeds \textbf{\$120 million}, traditional penalty-based systems lose their deterrent effect, leading firms to strategically opt for \textit{non-compliance}. By calibrating the \textbf{collateral} {($K$)} such that the cost of forfeiture consistently outweighs the potential gains from evading the permit market, we ensure that compliance remains the only economically rational path for the firm. This mechanism effectively safeguards market integrity, even under high-price volatility.
+
+It is important to understand that the \textbf{security bond} does not represent a loss for the company, rather it is a \textbf{guarantee asset} that ensures systemic security and mitigates potential negative impacts during technological development. This mechanism is governed by the principle of operational efficiency and responsibility for the safe technology development.
+
+To reduce administrative and financial burden, as well as avoid constant flows of deposits and returns, an annual balance adjustment system is proposed where the bond remains in the guarantee account. The company will only need to cover the proportional difference if its annual revenue increases or if it scales within the threshold. If the company reduces its risk profile or its revenue decreases, the surplus will be returned, ensuring that the immobilized capital is always the minimum necessary according to the formula:
+
+By calculating the bond based on companies' annual revenue, the bond and refund system can be scaled according to the permitted threshold of permits. If permit limits are exceeded without authorization or safety standards are ignored, the bond is forfeited proportionally to the severity of the violation, transforming security into a feasible path for sustainable business development.
+
+\subsection{Difference Between Use and Power for the Permit Market}
+
+Effective AI governance requires making a clear distinction between the objective, purpose, or uses of AI models and their potential. Considering the regulatory framework of the EU AI Act, which focuses primarily on regulations for the use and development of these technologies, classification systems according to their impact on safety and rights based on different risk levels that their specific applications represent in critical sectors such as health, justice, or biometric surveillance (minimal, limited, high, and unacceptable).
+
+Our proposal introduces a layer of \textbf{regulation by power}, focused on technical capacity measured through imperfect oversight of compute thresholds (FLOPs). The technical justification for regulating this area lies in the emerging capabilities in the development of AI technologies. By managing a permit market system with imperfect oversight, the potential risk can be evaluated and analyzed based on computing resources and power. This system acts as a complementary mechanism by overseeing the system's power that enables the existence of AI models.
+
+By integrating both approaches, the oversight gap is closed, allowing the regulator to manage both the use of AI models and the technical safety of computing infrastructure.
+
+\subsection{Institutional Design}
+
+For the design of an institution that audits and monitors both the public and private sectors, a structure is needed that guarantees objectivity, transparency, and equity to avoid two potential risks: slowness of centralized bureaucracy and possible political capture by governments in power. Here, we will explore how each of the different institutional models works and make a proposal following a decentralized institutional model.
+
+\subsection*{National Autonomous Agency}
+
+This model is based on creating a regulatory entity within each state's borders (such as COFEPRIS in Mexico or the FDA in the U.S.). It operates through the exercise of national sovereignty, where each country dictates its own technical standards and uses its legal force to inspect data centers and audit companies operating in its territory. Oversight is direct, and the chain of command is clear, so legislation and activities are usually reported to the local executive or legislative power.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|p{5cm}|p{5cm}|}
+\hline
+\textbf{Benefits} & \textbf{Potential Risks} \\
+\hline
+a. \textbf{Legal agility:} can act quickly under its own country's legal and criminal framework without waiting for international consensus.
+
+\vspace{0.2cm}
+b. \textbf{Local context:} better understands the specific social and economic dynamics of its territory.
+
+\vspace{0.2cm}
+c. \textbf{Direct implementation:} easier to finance and launch using institutions the state already has. 
+& 
+a. \textbf{Political capture:} depending on national budgets, it is highly vulnerable to pressures from the government in power.
+
+\vspace{0.2cm}
+b. \textbf{Cross-border blindness:} AI has no borders; a national agency cannot see if a company moves its compute to a server abroad.
+
+\vspace{0.2cm}
+c. \textbf{Regulatory arbitrage:} companies can threaten to move to neighboring countries with more relaxed laws, causing a ``regulatory paradise''. \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection*{International Centralized Bodies}
+
+This model proposes a single global institution, similar to the International Atomic Energy Agency (IAEA). It operates through an international treaty in which countries cede part of their regulatory sovereignty to a superior entity. This central office sends international inspectors anywhere in the world to verify compliance with compute thresholds, centralizes all monitoring data in a single headquarters, and has the power to issue global sanctions.
+
+
+\begin{center}
+\begin{tabular}{|p{5cm}|p{5cm}|}
+\hline
+\textbf{Benefits} & \textbf{Potential Risks} \\
+\hline
+a. \textbf{Single standards:} avoids fragmentation; the rules are the same worldwide, making compliance easier for global companies.
+
+\vspace{0.2cm}
+b. \textbf{Weighty authority:} has the diplomatic power to negotiate on equal terms with Big Tech.
+
+\vspace{0.2cm}
+c. \textbf{Concentrated resources:} brings together the world's best scientists and technicians in a single regulatory ``brain.'' 
+& 
+a. \textbf{Extreme bureaucracy:} decision-making processes in international bodies are usually slow and cumbersome.
+
+\vspace{0.2cm}
+b. \textbf{Geopolitical vulnerability:} can be paralyzed by conflicts between powers (e.g., if a country vetoes an audit for ``national security'').
+
+\vspace{0.2cm}
+c. \textbf{Operational distance:} it is very difficult for a single office in Vienna or Geneva to effectively monitor what happens in a data center in Querétaro or Singapore. \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Decentralized Network of Regulators}
+
+This model combines the best of both previous approaches. It is based on creating \textbf{independent technical agencies in each country} (similar to Mexico's autonomous bodies like the National Institute of Transparency), but interconnected through a \textbf{cooperation protocol with unified technical standards}. It operates where each country maintains its own autonomous agency with technical personnel and its own budget, independent of the government in power. These agencies share a common protocol that defines what a FLOP is, how to measure it, what the thresholds are, and what infractions exist. They operate as a network: if a company operates in multiple countries, all affected agencies coordinate to audit it jointly.
+
+\begin{center}
+\begin{tabular}{|p{5cm}|p{5cm}|}
+\hline
+\textbf{Benefits} & \textbf{Potential Risks} \\
+\hline
+a. \textbf{Technical independence:} the ``mutual evaluation'' system (countries auditing other countries) reduces the risk of corruption or local political capture.
+
+\vspace{0.2cm}
+b. \textbf{Cross-border tracking:} by sharing data on a network, they can track compute even if the company distributes its servers across several countries.
+
+\vspace{0.2cm}
+c. \textbf{Shared sovereignty:} allows each country to maintain its agency, but with international ``teeth'' and unified standards. 
+& 
+a. \textbf{Coordination costs:} keeping all nodes synchronized and communicating requires constant logistical investment.
+
+\vspace{0.2cm}
+b. \textbf{Unequal capacity:} a weak node (a country with little technology) can become a security hole for the entire network.
+
+\vspace{0.2cm}
+c. \textbf{Governance complexity:} requires very detailed technical cooperation treaties that may take time to negotiate. \\
+\hline
+\end{tabular}
+\end{center}
+
+The recommendation for this model leans toward a decentralized model. Unlike the other models, autonomous agencies have the power to audit with the same rigor both the \textbf{private sector (Big Tech)} and the \textbf{public sector (governments)}. This is vital to prevent the development of these technologies from being used for partisan purposes, unregulated state surveillance, etc. Autonomy ensures that auditors are high-level technical profiles, so they are unaffected by the electoral cycles of participating countries, political agendas, or corporate pressures.
+
+By operating as an interconnected network, \textbf{the regulatory arbitrage problem} can be solved, as each agency understands the market and its physical infrastructure. So, if a company tries to evade oversight by moving its processing units (chips/GPUs) or its compute load from one country to another, the network shares alerts in real time, allowing tracking that isolated national agencies could not achieve.
+
+Similarly, to prevent countries with fewer resources from becoming ``gray zones'' of oversight, the proposal includes a \textbf{Shared Technical Assistance Fund}:
+
+\begin{enumerate}
+    \item This fund is fed by a percentage of security bonds and contributions from countries with greater capacity.
+    
+    \item It allows developing countries to access hardware monitoring tools and training for their auditors, ensuring a uniform oversight standard throughout the world.
+    
+    \item By reducing the technical gap, companies get clear and stable rules at any node of the network where they decide to operate.
+\end{enumerate}
+
+Finally, the implementation of \textbf{dynamic tolerance thresholds (15--20\%)} in technical measurements is essential for the system’s operational viability. As the \textit{Smart Enforcement} scenario demonstrates, this measured flexibility does not compromise systemic security. Instead, it enables regulators to optimize \textit{resource allocation} by focusing on large-scale violators, ensuring a robust yet agile governance framework that remains resilient against the inherent \textbf{stochastic noise} of technical monitoring.
+
+This design offers firm, but flexible governance. Just as the \textbf{Basel Committee} sets standards for global banking without need for a fixed headquarters, the network establishes the standard by monitoring compute thresholds with AI safety as a priority through technical, decentralized, and sovereign oversight.
+
+\subsection{Threshold Calibration as a Standard}
+
+Permit-based regulatory systems are fundamentally built on threshold decisions, where policy actions such as audits, sanctions, or additional reporting requirements, are triggered once an observed or estimated variable crosses a predefined boundary (e.g., compute usage exceeding a FLOPs threshold). In practice, however, these decisions rely on noisy and imperfect signals, including hardware telemetry, energy consumption, and self-reported training data. This introduces a critical challenge: regulatory effectiveness depends not only on the chosen threshold, but on how reliably observed signals map to true underlying risk. 
+
+Standard approaches to model validation typically emphasize average calibration, ensuring that predicted probabilities align with observed outcomes across the full distribution. However, such guarantees are insufficient in regulatory contexts, because decisions are made at \textbf{specific cutoff }points, not on average. A model can be well-calibrated overall while still producing systematic errors near the decision boundary, leading to inefficient audits, false positives, or missed violations.
+
+To address this limitation, we argue that \textbf{threshold calibration should be treated as a minimum technical requirement for AI governance systems}. Threshold calibration focuses explicitly on ensuring that predictive accuracy holds conditional on decision-relevant regions, particularly around the points where regulatory triggers are activated. Methods developed by Sahoo et al. provide a principled framework for recalibrating predictive models so that decisions induced by thresholds correspond more closely to true outcomes. Their approach uses iterative recalibration such as isotonic adjustments within decision partitions to minimize the gap between predicted and realized decision loss at the threshold level. 
+
+As a policy recommendation, any predictive system used in compute permit enforcement should undergo mandatory threshold calibration audits, with periodic recalibration as data distributions, monitoring technologies, and firm behavior evolve. Embedding such requirements into governance frameworks ensures that permit triggers remain statistically reliable, reducing both enforcement errors and opportunities for strategic manipulation in high-stakes AI development environments.
+
+ 

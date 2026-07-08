@@ -1,0 +1,191 @@
+
+\section{Simulator Documentation}
+
+This appendix provides a technical guide to the compute permit simulator.
+The simulator is an open-source Python package available at:
+\begin{center}
+\url{https://github.com/JTuffy/compute-permit-simulator}
+\end{center}
+
+% ---------------------------------------------------------------------------
+\subsection*{C.1\quad Installation}
+% ---------------------------------------------------------------------------
+
+The simulator requires Python~3.13 and uses \texttt{uv} for dependency management.
+
+\begin{lstlisting}[language=bash, caption={Installing the simulator}]
+# Install uv (if not already present)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository and install all dependencies
+git clone https://github.com/JTuffy/compute-permit-simulator.git
+cd compute-permit-simulator
+uv sync
+\end{lstlisting}
+
+To verify the installation:
+\begin{lstlisting}[language=bash]
+uv run pytest -q          # all tests should pass
+\end{lstlisting}
+
+The interactive Solara dashboard requires no additional setup beyond \texttt{uv sync}. The simulator has been tested on Linux, macOS, and Windows~(WSL2).
+
+% ---------------------------------------------------------------------------
+\subsection*{C.2\quad Module Descriptions}
+% ---------------------------------------------------------------------------
+
+The domain logic is organised under \texttt{src/compute\_permit\_sim/} in four layers:
+
+\begin{description}
+    \item[\texttt{core/}] Pure simulation logic, no UI dependencies.
+    \begin{description}
+        \item[\texttt{agents.py}] Implements the \texttt{Lab} class. Each lab holds its private attributes (economic value, risk profile, audit coefficient, reputation sensitivity, racing factor) and exposes a \texttt{decide\_compliance()} method that evaluates the deterrence condition $p_{\mathrm{detect}} \cdot B \geq g$ each period.
+        \item[\texttt{market.py}] Implements \texttt{SimpleClearingMarket}, a marginal-bid clearing mechanism. Supports both auction mode (Qth-price clearing) and fixed-price mode (administrative price cap). Computes the clearing permit price $p^*$ and allocates permits to qualifying bidders up to the supply cap.
+        \item[\texttt{enforcement.py}] Implements the two-stage audit model. Stage~1 generates suspicion signals and determines audit occurrence (random or signal-dependent). Stage~2 applies the nested detection channels (direct pass, backcheck, whistleblower, monitoring) to compute $p_{\mathrm{catch}}$ and issue penalties. Manages dynamic updating of per-firm audit coefficients and reputation sensitivity.
+        \item[\texttt{game\_loop.py}] Orchestrates the seven-phase within-period event sequence: (1)~collateral posting, (2)~permit trading, (3)~compliance decisions, (4)~signal generation, (5)~audit and penalty application, (6)~value realisation, (7)~dynamic factor updates.
+    \end{description}
+
+    \item[\texttt{schemas/}] Pydantic data models for configuration and results.
+    \begin{description}
+        \item[\texttt{config.py}] \texttt{ScenarioConfig} — top-level scenario configuration (nested \texttt{AuditConfig}, \texttt{LabConfig}, \texttt{MarketConfig}).
+        \item[\texttt{data.py}] \texttt{SimulationRun} — structured results for a single simulation run, including per-step compliance rates, permit prices, and audit outcomes.
+        \item[\texttt{batch.py}] \texttt{MonteCarloResult}, \texttt{SweepResult} — aggregated results with per-seed breakdowns and summary statistics.
+        \item[\texttt{sweep\_params.py}] \texttt{SweepParam} definitions and \texttt{generate\_values()} for parameter grid construction.
+    \end{description}
+
+    \item[\texttt{services/}] Orchestration services.
+    \begin{description}
+        \item[\texttt{simulation\_runner.py}] Runs a single scenario end-to-end from a \texttt{ScenarioConfig}, returning a \texttt{SimulationRun}.
+        \item[\texttt{monte\_carlo.py}] Runs $n$ seeds of a scenario and aggregates results into a \\ \texttt{MonteCarloResult} with means and standard deviations.
+        \item[\texttt{sweep.py}] Varies a single parameter across a grid and runs Monte Carlo at each grid point, returning a \texttt{SweepResult}.
+        \item[\texttt{config\_manager.py}] Loads and validates scenario JSON files; applies parameter overrides for sweep runs.
+    \end{description}
+
+    \item[\texttt{vis/}] Solara interactive dashboard (UI only; no domain logic).
+    The dashboard exposes \textbf{Simulate}, \textbf{Batch}, and \textbf{Run History} tabs. All parameter configuration, run execution, and result visualisation are accessible without writing code.
+\end{description}
+
+% ---------------------------------------------------------------------------
+\subsection*{C.3\quad Running the Scenarios}
+% ---------------------------------------------------------------------------
+
+\subsubsection*{Interactive Dashboard}
+
+\begin{lstlisting}[language=bash, caption={Launching the dashboard}]
+make app
+# Opens http://localhost:8765 in the browser
+\end{lstlisting}
+
+In the \textbf{Simulate} tab: select a scenario from the dropdown, adjust parameters in the sidebar, and click \emph{Run}. The step-by-step explorer shows per-period compliance rates, permit prices, audit outcomes, and firm-level deterrence diagnostics.
+
+In the \textbf{Batch} tab: choose \emph{Monte Carlo} (many seeds, fixed scenario) or \emph{Parameter Sweep} (vary one parameter across a grid). Results include confidence bands and downloadable CSV exports.
+
+\subsubsection*{Command-Line Interface}
+
+\begin{lstlisting}[language=bash, caption={CLI entry points (via Makefile)}]
+make run            # single run of all scenarios
+make mc             # Monte Carlo (50 seeds) for each scenario
+make sweep          # parameter sweep from a sweep JSON file
+make paper-results  # mc + sweep + print LaTeX summary table
+\end{lstlisting}
+
+\subsubsection*{Scenario Configuration Files}
+
+Scenarios are defined as JSON files in \texttt{scenarios/basic/}. The file structure mirrors the \texttt{ScenarioConfig} Pydantic model:
+
+\begin{lstlisting}[language=json, caption={Minimal scenario configuration (scenario\_1\_minimal.json)}]
+{
+    "name": "Minimal Enforcement",
+    "description": "Scarce permits, weak random auditing, high false-negative rate.",
+    "steps": 10,
+    "n_agents": 20,
+    "audit": {},
+    "market": {
+        "permit_cap": 5.0
+    }
+}
+\end{lstlisting}
+
+All monetary values are in millions of USD; compute capacities are in FLOPs. Scenario files for all five scenarios are included in the repository under \texttt{scenarios/basic/}.
+
+\subsubsection*{Parameter Sweep Files}
+
+Sweeps are defined as JSON files in \texttt{scenarios/sweeps/}:
+
+\begin{lstlisting}[language=json, caption={Sweep configuration example}]
+{
+    "scenario_file": "basic/scenario_5_enforcement_cycles.json",
+    "param_path": "audit.audit_decay_rate",
+    "param_label": "Audit Decay Rate delta",
+    "min_val": 0.0,
+    "max_val": 0.90,
+    "interval": 0.10,
+    "n_runs": 50
+}
+\end{lstlisting}
+
+\texttt{param\_path} uses dot notation to address nested fields within \texttt{ScenarioConfig}. Any scalar parameter in the configuration is sweepable.
+
+\subsubsection*{Programmatic Access}
+
+\begin{lstlisting}[language=Python, caption={Running a scenario programmatically}]
+from compute_permit_sim.services.config_manager import load_scenario
+from compute_permit_sim.services.simulation_runner import run_single
+from compute_permit_sim.services.monte_carlo import run_monte_carlo
+
+# Load and run a single scenario
+config = load_scenario("scenarios/basic/scenario_4_feedback_compliance.json")
+result = run_single(config)
+
+# Monte Carlo (200 seeds)
+mc_result = run_monte_carlo(config, n_runs=200)
+print(f"Final compliance: {mc_result.final_compliance.mean:.1%}")
+\end{lstlisting}
+
+% ---------------------------------------------------------------------------
+\subsection*{C.4\quad Interpreting Output}
+% ---------------------------------------------------------------------------
+
+\subsubsection*{Single-Run Outputs}
+
+A \texttt{SimulationRun} object contains:
+
+\begin{description}
+    \item[\texttt{compliance\_rate}] Per-step fraction of \emph{all} labs that are compliant, where permit-holding labs count as compliant automatically and unpermitted labs count as compliant if deterred (i.e.\ they chose not to run). Ranges from 0 (all cheat) to 1 (all comply). Matches the equilibrium expression in Section~2.
+    \item[\texttt{permit\_price}] Clearing price $p^*$ per period. In fixed-price scenarios this is constant; in auction scenarios it reflects aggregate demand.
+    \item[\texttt{audits\_per\_step}] Number of audits conducted each period, split by detection outcome (caught / not caught / false positive).
+    \item[\texttt{audit\_source}] Detection channel that found each violation: \textsc{Direct}, \textsc{Backcheck}, \textsc{Whistleblower}, or \textsc{Monitoring}.
+    \item[\texttt{per\_lab\_state}] Per-firm audit coefficients $c_i^{(t)}$, reputation sensitivities $R_i^{(t)}$, and compliance decisions across all steps.
+\end{description}
+
+\subsubsection*{Batch / Monte Carlo Outputs}
+
+A \texttt{MonteCarloResult} adds:
+
+\begin{description}
+    \item[\texttt{final\_compliance.mean}, \texttt{final\_compliance.std}] Mean and standard deviation of the step-$T$ compliance rate across $n$ seeds. Accessed as attributes of a \texttt{MetricStats} object.
+    \item[\texttt{compliant\_audit\_fraction}] Fraction of total audits directed at compliant firms (a measure of audit targeting efficiency, not the FNR $\beta$).
+    \item[\texttt{detection\_rate\_given\_audit}] Fraction of violations detected among audited violating firms ($p_{\mathrm{catch}}$; distinct from the population-level detection rate).
+\end{description}
+
+CSV exports (accessible from the dashboard or via \texttt{vis/export.py}) include one row per scenario/seed combination, with all summary statistics as columns.
+
+\subsubsection*{Sweep Outputs}
+
+A \texttt{SweepResult} provides a table of \texttt{MonteCarloResult} objects indexed by the swept parameter value. The dashboard renders this as a compliance-vs-parameter plot with mean~$\pm$~1 s.d.\ bands; CSV export includes one row per grid point. Tipping points (the parameter value at which mean final compliance crosses 50\%) are highlighted automatically.
+
+% ---------------------------------------------------------------------------
+\subsection*{C.5\quad Repository and Reproducibility}
+% ---------------------------------------------------------------------------
+
+Repository: \url{https://github.com/JTuffy/compute-permit-simulator}
+
+All results in this paper were produced with commit \texttt{c2935f9} on the \texttt{main} branch. To reproduce:
+
+\begin{lstlisting}[language=bash]
+git checkout c2935f9
+uv sync
+make paper-results      # runs mc + sweep, prints LaTeX table
+\end{lstlisting}
+
+The default random seed for single runs is 42. Monte Carlo and sweep runs iterate seeds sequentially from 0, ensuring that adding seeds does not alter earlier runs' outcomes.

@@ -1,0 +1,147 @@
+\section{Dynamic feedback in the audit system}
+\label{sec:results-dynamic}
+
+The static scenarios hold enforcement parameters fixed across periods.
+The simulator also supports two forms of dynamic feedback, specified
+by equations~\eqref{eq:coeff}--\eqref{eq:rep}. The first multiplies
+each firm's perceived reputational cost by $(1 + \varepsilon)$ after
+every catch, with no decay between catches, so the accumulated
+penalty grows exponentially in the cumulative number of past
+violations. The second adds an increment $\Delta$ to the firm's
+audit-targeting coefficient on a catch and decays the coefficient
+back to its baseline at rate $\delta$ in subsequent periods, so the
+elevated deterrence is bounded and dissipates over time. The two are
+stylised representations of distinct deterrence intuitions: permanent
+reputational memory in the first case, and time-limited regulatory
+attention in the second. To avoid relying on extreme parameter values,
+we identify the weakest setting of each mechanism that still produces
+the characteristic behaviour and report the per-step trajectory at
+that setting.
+
+\subsection{Scenario 4 --- Reputation Ratchet}
+
+A sweep over the reputation escalation factor $\varepsilon$ between
+0 and 1.5 (30 seeds, 50 steps, audit channel off) shows mean
+final-step compliance fixed at the supply floor of 25\% up to
+$\varepsilon = 0.2$, rising sharply through the interval
+$\varepsilon \in [0.3, 0.7]$, and saturating above
+$\varepsilon \approx 1.0$. Compliance crosses 90\% at
+$\varepsilon \approx 0.6$ and 95\% at $\varepsilon \approx 0.7$.
+We adopt $\varepsilon^* = 0.7$ as the weakest setting reaching 95\%
+and report the per-step trajectory at this value over 200 Monte
+Carlo runs and 80 simulation steps (Figure~\ref{fig:ratchet}). Mean
+compliance crosses 90\% near step 46, reaches 98\% by step 60, and
+converges to \textbf{99.9\%} (SD\,=\,0.6\%) by step 80, at an audit
+rate of 20.0\%. The trajectory is monotone because reputational
+costs accumulate without decay: a firm caught enough times never
+returns to a state in which violation is again the rational choice.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.85\textwidth,
+    height=6cm,
+    xlabel={Step},
+    ylabel={Compliance rate},
+    ymin=0.2, ymax=1.05,
+    xmin=1, xmax=80,
+    ytick={0, 0.2, 0.4, 0.6, 0.8, 1.0},
+    yticklabels={0\%, 20\%, 40\%, 60\%, 80\%, 100\%},
+    grid=major,
+    grid style={gray!30},
+    legend pos=south east,
+]
+\addplot[name path=upper, draw=none, forget plot]
+    table[x=step, y=upper, col sep=comma]{data/compliance_ratchet.csv};
+\addplot[name path=lower, draw=none, forget plot]
+    table[x=step, y=lower, col sep=comma]{data/compliance_ratchet.csv};
+\addplot[blue!25, fill opacity=0.6] fill between[of=upper and lower];
+\addplot[blue, thick]
+    table[x=step, y=mean, col sep=comma]{data/compliance_ratchet.csv};
+\addlegendentry{Mean $\pm$ 1 s.d.\ (200 runs)}
+\end{axis}
+\end{tikzpicture}
+\caption{Scenario 4 (Reputation Ratchet) per-step compliance at
+  $\varepsilon^* = 0.7$, the weakest reputation escalation that
+  converges to full compliance ($Q=5$, $N=20$, $\pi_0 = 0.20$,
+  audit-channel feedback off). Compliance rises monotonically as
+  repeated violations compound each lab's perceived reputational
+  cost above the deterrence threshold, reaching 99.9\% by step 80.
+  Shaded band is mean $\pm$ 1 standard deviation across 200 Monte
+  Carlo runs.}
+\label{fig:ratchet}
+\end{figure}
+
+\subsection{Scenario 5 --- Enforcement Cycles}
+
+A joint sweep over audit escalation $\Delta \in \{0.5, 1.0, 1.5,
+2.0, 3.0\}$ and decay rate $\delta \in \{0.05, 0.10, 0.20, 0.40,
+0.60\}$ (reputation off, signal-dependent auditing on, 30 seeds, 60
+steps) yields three regions in the parameter grid. At low decay
+($\delta \leq 0.10$) the elevated audit coefficient persists long
+enough that mean compliance settles above 85\%. At high decay
+($\delta \geq 0.40$) deterrence dissipates between successive catches
+and mean compliance collapses toward the supply floor. The
+intermediate band around $\delta = 0.20$ produces visible cycles
+while holding mean compliance well above the floor. We adopt
+$\Delta^* = 1.0$, $\delta^* = 0.20$ as the weakest setting in this
+band and report the per-step trajectory over 200 Monte Carlo runs
+(Figure~\ref{fig:oscillation}). Mean compliance is \textbf{77.5\%}
+(SD\,=\,0.9\% across seeds) with a five- to six-step cycle period at
+an audit rate of 19.1\%. This is close to Strict Enforcement's
+88.1\% compliance, achieved at roughly two-thirds the inspection
+burden (19.1\% vs.\ 28.4\%).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.85\textwidth,
+    height=6cm,
+    xlabel={Step},
+    ylabel={Compliance rate},
+    ymin=0.2, ymax=1.0,
+    xmin=1, xmax=60,
+    ytick={0, 0.2, 0.4, 0.6, 0.8, 1.0},
+    yticklabels={0\%, 20\%, 40\%, 60\%, 80\%, 100\%},
+    grid=major,
+    grid style={gray!30},
+    legend pos=south east,
+]
+\addplot[name path=upper, draw=none, forget plot]
+    table[x=step, y=upper, col sep=comma]{data/compliance_oscillation.csv};
+\addplot[name path=lower, draw=none, forget plot]
+    table[x=step, y=lower, col sep=comma]{data/compliance_oscillation.csv};
+\addplot[red!25, fill opacity=0.6] fill between[of=upper and lower];
+\addplot[red, thick]
+    table[x=step, y=mean, col sep=comma]{data/compliance_oscillation.csv};
+\addlegendentry{Mean $\pm$ 1 s.d.\ (200 runs)}
+\end{axis}
+\end{tikzpicture}
+\caption{Scenario 5 (Enforcement Cycles) per-step compliance at the
+  weakest audit-escalation setting that holds mean compliance well
+  above the supply floor, $\Delta^* = 1.0$, $\delta^* = 0.20$
+  ($Q=5$, $N=20$, $\pi_0 = 0.05$, signal-dependent auditing on,
+  reputation off). Compliance oscillates around 77.5\% as
+  audit-coefficient decay erodes deterrence between catches; the
+  cycle period is roughly five to six steps. Shaded band is mean
+  $\pm$ 1 standard deviation across 200 Monte Carlo runs.}
+\label{fig:oscillation}
+\end{figure}
+
+\paragraph{Comparison.}
+
+The two mechanisms produce qualitatively different equilibria because
+their memory structures differ. Permanent reputational escalation
+drives monotone convergence to high compliance, but rests on the
+assumption that firms and observers do not discount past sanctions
+over time. Audit-targeting escalation with decay is a more plausible
+representation of how regulatory attention is allocated in practice;
+the resulting equilibrium is an oscillating one rather than an
+absorbing one. Within Scenario 5, the $(\Delta, \delta)$ surface
+describes a trade-off between audit cost and mean compliance. At the
+values used here, the mechanism approaches Strict Enforcement's
+compliance with a noticeably lower audit burden, suggesting that the
+more conservative form of dynamic feedback has policy value despite
+not converging to full compliance.

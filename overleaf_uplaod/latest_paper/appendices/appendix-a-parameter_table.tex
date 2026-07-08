@@ -1,0 +1,121 @@
+\section{Parameter Table with Scenario Calibration}
+\owner{Sue} \status{Done, needs formatting for paper}
+
+%\placeholder{Appendix A: Full Parameter Table (Sue)}{
+%Copy the Constraint-to-Parameter Mapping Table here. Format as a proper LaTeX table with:
+%\begin{itemize}
+
+\subsection*{Relationship between Regulatory Constraint and Model Parameter}
+
+This section details the calibration of model parameters based on existing regulatory constraints and empirical evidence. These parameters define the structural and behavioral environment that firms operate and regulators enforce compliance. 
+
+\begin{itemize}
+    \item \textbf{Limited audit capacity ($\pi_0$):} Regulatory monitoring is structurally constrained by limited budgets and personnel. Drawing from institutional realities such as those found in the EU Emissions Trading Systems (EU ETS), where on-the-spot inspections are often limited, and the baseline audit rate is set low. To achieve meaningful compliance, regulators must rely on higher penalties ($\phi$) or upfront collateral ($K$). 
+    
+    \item \textbf{Measurement uncertainty ($\beta$):} Compute measurement relies on proxies and estimations because direct observation is often technically not feasible. In the model, this is represented as a false-negative rate, where an audit may fail to catch a violation that occurred, directly reducing the effective detection probability. 
+    
+    \item \textbf{Information asymmetry ($p_m$):} FLOPs are largely unobservable to external parties. Similar to findings in urban pollution studies, monitoring proxies is more critical than direct audits for maintaining oversight.
+    
+    \item \textbf{Decentralized Infrastructure ($c(i)$):} AI training is frequently distributed across multiple cloud providers and global jurisdictions, allowing firms to restructure runs (run-splitting) to reduce visibility. Firms with highly distributed infrastructure effectively lower their individual detection probability compared to those using single, visible data centers.
+    
+    \item \textbf{Incentive to Cheat ($\Delta C$):} Unlike carbon emissions, there is no universally accepted unit of AI risk. This ambiguity allows firms to exploit "noise" in metrics to report activity just below regulatory thresholds. This maximizes permit cost savings and creates a significant financial incentive to bypass the permit market.
+    
+    \item \textbf{Limited Liability and Upfront Collateral ($K$):} While frameworks like the EU AI Act rely primarily on ex-post fines, this parameter introduces a refundable collateral requirement. This mechanism addresses the limited liability problem by ensuring deterrence even if a firm is insolvent when a violation is detected. It requires a financial commitment at the start of market participation, with the amount benchmarked against the maximum fine caps established in the EU AI Act.
+\end{itemize}
+
+\subsection*{Scenario Descriptions}
+
+\noindent\textbf{Scenario 1: Minimal Enforcement} \\
+This scenario represents minimal oversight where high information asymmetry ($p_m = 0$) and low base audit frequency ($\pi_0$ = 0.05) create a high-evasion environment. In this setting, the regulator relies almost entirely on firm self-reports without external verification. Since the potential permit cost savings ($\Delta C = \$70M$) are not neutralized by upfront collateral ($K = \$0$), the financial gain from non-compliance significantly outweighs the risk of detection. Consequently, evasion becomes the rational business choice for firms operating in this market. \\
+
+\noindent\textbf{Scenario 2: Strict Enforcement} \\
+The Strict Enforcement scenario represents maximum safety by attempting to force a near-perfect monitoring accuracy. This is achieved through intrusive telemetry that reduces the uncertainty of measurement ($\epsilon_{II} = 0.10$) and pushes the audit rates to a capacity ceiling of $\pi_0$ = 0.30. Although this effectively removes information asymmetry by requiring total transparency of hardware and energy usage ($p_m = 1.0$), it results in extremely high administrative costs and creates significant friction for regulators and developers. \\
+
+\noindent\textbf{Scenario 3: Smart Enforcement} \\
+Smart enforcement focuses on monitoring high-impact hardware proxies ($p_m = 0.20$) to maintain a credible threat while minimizing administrative burdens. By driving the permit cost down to \$2M through an efficient market mechanism, the regulator ensures that compliance is the most economically rational path for companies. This scenario specifically calibrates the savings from cheating $\Delta C$ to counteract the strategic "Racing Factor" that typically encourages firms to evade regulation in competitive environments. \\
+
+
+\begin{table}[h!]
+\label{tab:params}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{3cm}|}
+\hline
+\textbf{Regulatory Constraint}& \textbf{Model Parameter} & \textbf{Minimal Enforcement} & \textbf{Strict Enforcement} & \textbf{Smart Enforcement} & \textbf{Source} \\ \hline
+
+1. Audit capacity& $\pi_0$ \newline baseline audit rate & 
+0.05
+
+\vspace{0.2cm}Negligent oversight & 
+0.3
+
+\vspace{0.2cm}Regulator investigates nearly 1 in 3 firms. & 
+0.1
+
+\vspace{0.2cm}Targeted efficiency. High enough to be a credible threat but keeps the administrative burden low for the agency. &
+\cite{WorldBank2021EmissionsTrading}\\\hline
+2. Measurement uncertainty and estimation & $\epsilon_{II}$ \newline type-II error&
+0.4
+
+\vspace{0.2cm}High noise environment where violations are easily missed. &
+0.1
+
+\vspace{0.2cm}Assumes high-cost telemetry to force near-perfect accuracy. &
+0.4
+
+\vspace{0.2cm}Accepts real-word noise as a fixed technical constraint. &
+\cite{erben2025jrc}\\\hline
+3. Information asymmetry & $p_m$ \newline monitoring detection probability&
+0
+
+\vspace{0.2cm}Reliance on self-reports with no external verification. &
+1.0
+
+\vspace{0.2cm}Total transparency of all chips and energy at all times. &
+0.2
+
+\vspace{0.2cm}Uses hardware/CSP proxy checks which are cheaper than full audits. &
+\cite{montero2005pollution}\\\hline
+4. Decentralized Infrastructure & $c(i)$ \newline firm-specific coefficient &
+0.8
+
+\vspace{0.2cm}High evasion; labs effectively hide 80\% of runs via run-splitting. &
+0.1
+
+\vspace{0.2cm}Strict controls to make evasion nearly impossible. &
+0.5
+
+\vspace{0.2cm}Some privacy remains, but hardware traceability limits large-scale evasion. &
+\cite{singh2024distributed}\\\hline
+5. Incentive to Cheat& $\Delta C$ \newline permit cost savings&
+\$70M
+
+\vspace{0.2cm}Savings from gaming thresholds to skip permits for frontier runs (assume 1026 FLOPS). &
+\$70M
+
+\vspace{0.2cm}The incentive to cheat is identical (i.e. \$70M) even thought the regular is strict. &
+\$2M
+
+\vspace{0.2cm}Market efficiency lowers the permit cost to a level complaince becomes the cheapest business strategy.&
+\cite{heim2024compute}\\\hline
+6. Limited Liability & $K$ \newline Refundable Collateral &
+\$0
+
+\vspace{0.2cm}No upfront commitment; labs only pay if caught and solvent. &
+\$15.75M
+
+\vspace{0.2cm}Upfront bond secures the penalty. Take ref from EU AI Act fine caps, €15M (\$15.75M).&
+\$15.75M
+
+\vspace{0.2cm}Upfront bond secures the penalty; forfeited upon violation to ensure deterrence. &
+\cite{eu_ai_act_2024}\\\hline
+\end{tabular}
+}
+\caption{Parameter with Scenario Calibration}
+\end{table}
+
+
+
+
+ 

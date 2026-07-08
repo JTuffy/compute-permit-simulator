@@ -1,0 +1,267 @@
+\section{Simulation Design}
+
+\subsection{Architecture}
+
+
+The simulator is implemented in Python and organised into four layers with a strict one-way dependency hierarchy. The full codebase is publicly available at
+\url{https://github.com/JTuffy/compute-permit-simulator}.
+
+The \textbf{core} layer contains the domain logic with zero framework dependencies. The agents module (\texttt{agents.py}) encapsulates each lab's private attributes and its period-by-period permit-buying decision. The market module (\texttt{market.py}) implements a marginal-bid clearing mechanism that determines the permit price and allocates permits to the highest bidders each period. The enforcement module (\texttt{enforcement.py}) implements the regulator's two-stage audit process: signal generation followed by audit occurrence and outcome determination. The game loop (\texttt{game\_loop.py}) orchestrates a seven-phase simulation step---collateral posting, permit trading, compliance decisions, signal generation, audit and penalty application, value realisation, and dynamic factor updates.
+
+The \textbf{schemas} layer defines all data shapes as immutable Pydantic models: scenario configuration (\texttt{ScenarioConfig} with nested \texttt{AuditConfig}, \texttt{LabConfig}, \texttt{MarketConfig}), single-run results (\texttt{SimulationRun}), and batch results (\texttt{MonteCarloResult}, \texttt{SweepResult}, \texttt{GridSweepResult}).
+
+The \textbf{services} layer orchestrates core and schemas. A Mesa~\cite{ter2025mesa} wrapper (\texttt{mesa\_model.py}) provides step-based scheduling and a \texttt{DataCollector} for time-series recording. Additional service modules expose single-run (\texttt{run\_single}), Monte Carlo (\texttt{run\_monte\_carlo}), and parameter sweep (\texttt{run\_sweep}) entry points.
+
+The \textbf{visualisation} layer is a Solara interactive dashboard that exposes all key parameters at runtime and renders compliance rates, permit prices, and enforcement outcomes across periods. A publicly hosted instance is available at \url{https://compute-permit-simulator.onrender.com/}.
+
+\subsection{Firm Decision Logic}
+
+Each firm agent $i$ is characterised by a private gross valuation $v_i$ drawn heterogeneously at initialisation, a risk profile $\rho_i \in \mathbb{R}_{>0}$ scaling perceived penalties, a firm-specific audit coefficient $c_i^{(t)}$, a reputation sensitivity $R_i^{(t)}$, a racing factor $r_i$, and a baseline capability value $V_i$. The latter two factors together capture competitive pressure to run regardless of permit status.
+
+Each period, the firm's decision is binary: comply or violate. Firms holding a valid permit comply unconditionally. Unpermitted firms evaluate the deterrence condition
+%
+\begin{equation}
+    p_{\mathrm{detect},i}^{(t)} \cdot B_i^{(t)} \geq g_i,
+    \label{eq:deterrence}
+\end{equation}
+%
+and comply if and only if~\eqref{eq:deterrence} holds. The gain from violation is:
+%
+\begin{equation}
+    g_i = \min(p^*, v_i) + r_i V_i,
+\end{equation}
+%
+where $p^*$ is the current market clearing price for permits (the cost avoided by not purchasing) and $r_i V_i$ is the capability value of running. The $\min$ operator captures the fact that a firm whose
+valuation $v_i < p^*$ would not have purchased a permit regardless, so the savings from cheating are bounded by $v_i$.
+
+The total perceived punishment is:
+%
+\begin{equation}
+    B_i^{(t)} = \bigl(\phi + K_i + R_i^{(t)}\bigr) \cdot \rho_i,
+\end{equation}
+%
+
+where $\phi$ is the posted fine, $K_i$ is the collateral posted at the start of the period (and seized upon detection), $R_i^{(t)}$ is the current reputation sensitivity, and $\rho_i$ is the risk profile multiplier.
+
+The period detection probability entering~\eqref{eq:deterrence} is the product of the audit probability and the conditional catch probability (full derivation in Appendix~C and the companion technical note \texttt{audit\_model.tex}):
+%
+\begin{equation}
+    p_{\mathrm{detect},i}^{(t)} = p_{\mathrm{audit},i}^{(t)} \cdot p_{\mathrm{catch}},
+\end{equation}
+%
+where under signal-dependent auditing $p_{\mathrm{audit},i}^{(t)} = \min\!\bigl(1,\, \pi_0 + c_i^{(t)} \cdot s(i) \cdot (1 - \pi_0)\bigr)$
+and under random auditing $p_{\mathrm{audit},i}^{(t)} = \pi_0$.
+
+When dynamic updating is enabled, the audit coefficient and reputation sensitivity evolve:
+%
+\begin{align}
+    c_i^{(t)} &= c_i^{\mathrm{base}} + \bigl(c_i^{(t-1)} - c_i^{\mathrm{base}}\bigr)\cdot(1 - \delta) + \Delta \cdot \mathbf{1}[\text{caught}_{t}], \label{eq:coeff} \\
+    R_i^{(t)} &= R_i^{(0)} \cdot \bigl(1 + \varepsilon\bigr)^{n_i}, \label{eq:rep}
+\end{align}
+%
+where $c_i^{\mathrm{base}}$ is the firm's configured baseline coefficient (the long-run floor), $\delta \in [0,1]$ is the per-period decay rate, $\Delta \geq 0$ is the escalation increment, $\varepsilon \geq 0$ is the reputation escalation factor, and $n_i$ is the cumulative failed-audit count. Reputation escalation is permanent (no decay); setting $\Delta = \varepsilon = 0$ recovers a static enforcement environment.
+
+The dynamics of the audit coefficient and reputation sensitivity were chosen as representative of two forms of feedback-driven deterrence -- strong feedback (exponential increase) and weak feedback (capped increase and a decay).
+The per-step effects of both mechanisms on compliance trajectories are explored empirically in Appendix~\ref{sec:results-dynamic}.
+
+\subsection{Permit Market}
+A permit grants the right to conduct compute up to a threshold
+$F_{\text{permit}}$ FLOPs---it is a \emph{quantity} licence, not a binary permission. A firm requiring a run of size $C$ submits a demand of $\lceil C / F_{\text{permit}} \rceil$ permit units based on its declared compute needs. Under the baseline calibration, $F_{\text{permit}}$ is set equal to one standard frontier training run, so the large majority of labs demand either zero or one permit and the mechanics appear nearly binary -- but the general case accommodates multi-permit demand for larger runs or smaller permit units. The permit supply is fixed at $Q$ units per period, and the market clears each step against this cap.
+
+The model supports two clearing modes, chosen per scenario to reflect different regulatory philosophies. Auction mode allows price to emerge from competition, making the permit cost endogenous to compliance behaviour. Fixed-price mode decouples price from demand, letting the regulator directly set the permit-cost term that enters each lab's deterrence calculation -- at the cost of sacrificing
+the informational content of market prices.
+
+In \emph{auction mode}, each firm $i$ submits a triple $(\text{id}_i,\, q_i,\, b_i)$, where $q_i$ is the number of permits demanded and $b_i$ is the willingness-to-pay per permit. Bids are expanded into $q_i$ individual permit-unit offers each priced at $b_i$, sorted descending, and the top $Q$ units are allocated. The market-clearing price $p^*$ is the bid of the marginal ($Q$th highest) unit; all winning firms pay this uniform price. When
+aggregate demand falls weakly below supply -- $\sum_i q_i \leq Q$ -- every firm receives its requested allocation at $p^* = 0$.
+
+In \emph{fixed-price mode}, the regulator posts an administrative price $\bar{p}$ rather than discovering price through competition. Any firm whose bid $b_i \geq \bar{p}$ qualifies for permits at cost $\bar{p}$ per unit; if qualifying demand exceeds $Q$, permits are allocated by uniform random draw among qualifying units up to the cap. 
+
+A consequence of the auction case is that non-compliant labs, by abstaining from permit bidding, soften aggregate demand and can \emph{lower} $p^*$ -- reducing $\Delta C$ and thereby weakening the deterrence condition for marginal evaders. This is a compliance externality: each lab's decision not to comply makes non-compliance marginally more attractive for the remaining labs, creating a self-reinforcing dynamic that can accelerate deterioration toward a low-compliance equilibrium. Fixed-price mode eliminates this channel by construction -- the permit cost is invariant to how many labs choose not to bid -- which is one reason the enforcement-design scenarios adopt it. We return to the stability implications of this externality in Section~\ref{sec:limitations}.
+
+\subsection{Audits and Detection}
+The enforcement model implements a two-stage process fully documented in \\ \texttt{audit\_model.tex}. Stage~1 determines audit occurrence via a suspicion signal $s(i)$, and Stage~2 determines detection probability conditional on an audit, combining four channels (direct pass, backcheck, whistleblower, monitoring) in a sequential structure that yields
+\begin{equation}
+p_{\text{catch}} = 1 - \beta \cdot (1 - p_b) \cdot (1 - p_w) \cdot (1 - p_m).
+\end{equation}
+All monetary values are in millions of USD (M\$). Compute is measured in FLOPs.
+
+Firms whose planned training run exceeds the regulatory threshold $\tau$ (FLOPs) generate a suspicion signal proportional to their unpermitted excess compute:
+\begin{equation}
+    s(i) = \min\!\left(1,\ \left(\frac{e(i)}{\tau}\right)^{\!\gamma}\right)
+    \label{eq:signal}
+\end{equation}
+where $e(i)$ is firm $i$'s unpermitted excess FLOPs, $\tau$ is the regulatory threshold, and $\gamma > 0$ is the signal exponent. At $\gamma = 1$ the mapping is linear; $\gamma < 1$ makes small violations more visible (concave), while $\gamma > 1$ makes only large violations prominent (convex).
+
+
+The audit probability for firm $i$ depends on the regulatory mode. When the regulator conditions audits on observed signals:
+
+\begin{equation}
+    p_{\text{audit}}(i) = \min\!\Big(1,\ \pi_0 + c(i)\cdot s(i)\cdot\big(1 - \pi_0\big)\Big)
+    \label{eq:audit-signal}
+\end{equation}
+
+
+When audits are allocated uniformly at random:
+\begin{equation}
+    p_{\text{audit}}(i) = \pi_0
+    \label{eq:audit-random}
+\end{equation}
+
+Here $\pi_0 \in [0,1]$ is the baseline (random) audit rate applied equally to all firms, and $c(i) \geq 0$ is a firm-specific audit coefficient reflecting visibility or regulatory scrutiny.
+
+$\pi_0$ represents the minimum audit rate guaranteed by the regulatory regime---akin to random compliance checks. In signal-dependent mode, $c(i)$ scales how much a firm's excess compute signal boosts its audit probability above that floor. Crucially, $c(i)$ does not affect $\pi_0$: firm-specific differences in audit exposure arise from \emph{violation visibility}, not from the random audit baseline. When signal-dependent auditing is disabled ($s(i)$ ignored), all firms face the same probability $\pi_0$ regardless of $c(i)$.
+
+Note that at $s(i) = 1$ and $c(i) = 1$, equation~\eqref{eq:audit-signal} yields $p_{\text{audit}} = 1$; the regulator audits firms whose excess compute reaches the threshold with certainty.
+
+
+If a maximum number of audits per period $N_{\max}$ is set, the regulator prioritises: under signal-dependent auditing, triggered firms are ranked by $s(i)$ descending and the top $N_{\max}$ are selected; under random auditing, $N_{\max}$ triggered firms are sampled uniformly.
+
+
+Given that firm $i$ is audited, the probability that a real violation is detected is:
+\begin{equation}
+    p_{\text{catch}} = 1 - \underbrace{\beta \cdot (1 - p_b) \cdot (1 - p_w) \cdot (1 - p_m)}_{\text{probability of missing the violation}}
+    \label{eq:catch}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\beta \in [0,1]$ is the false negative rate (FNR) ---the probability that the direct audit pass misses a genuine violation;
+    \item $p_b \in [0,1]$ is the backcheck probability ---the probability that a historical audit review catches a violation that the direct pass missed;
+    \item $p_w \in [0,1]$ is the whistleblower detection probability ---the probability that internal disclosure surfaces the violation within the audit;
+    \item $p_m \in [0,1]$ is the monitoring detection probability ---the probability that hardware or electricity metering detects the violation within the audit.
+\end{itemize}
+
+Detection channels are nested: the miss probability is the joint probability that \emph{all} channels fail---direct audit, backcheck, whistleblower, and monitoring. In sequential terms, the violation is caught if any of the following fire:
+\begin{enumerate}
+    \item Direct pass: probability $1 - \beta$;
+    \item Backcheck: probability $p_b$, \emph{conditional} on the direct pass missing;
+    \item Whistleblower: probability $p_w$, conditional on steps 1--2 both missing;
+    \item Monitoring: probability $p_m$, conditional on steps 1--3 all missing.
+\end{enumerate}
+This sequential structure is equivalent to equation~\eqref{eq:catch} and ensures that $p_w$ and $p_m$ inform the \emph{audit event}---they represent information sources that regulators use within the audit process, not independent enforcement channels. The audit is the only mechanism that can produce a legally demonstrable finding.
+
+
+Compliant firms face a false positive rate $\alpha$ on the direct pass and can be flagged by the backcheck channel. Whistleblower and monitoring channels do not generate false positives (no real violation to find).
+
+
+The total probability that firm $i$'s violation is detected in a given period is:
+\begin{equation}
+    p_{\text{detect}}(i) = p_{\text{audit}}(i) \cdot p_{\text{catch}}
+    \label{eq:detect}
+\end{equation}
+
+
+Firm $i$ compares the expected cost of a violation against the gain from running unpermitted compute. The firm complies if and only if:
+\begin{equation}
+    p_{\text{detect}}(i) \cdot B(i) \;\geq\; g(i)
+    \label{eq:compliance}
+\end{equation}
+
+where the total expected burden is:
+\begin{equation}
+    B(i) = \big(\phi + K + R(i)\big) \cdot \rho(i)
+    \label{eq:burden}
+\end{equation}
+and:
+\begin{itemize}
+    \item $g(i)$ is the economic value of the unpermitted training run (M\$);
+    \item $\phi$ is the flat penalty on detection (M\$);
+    \item $K$ is the collateral posted before market participation---refunded if no violation found, seized on detection (M\$);
+    \item $R(i)$ is the firm's perceived reputational cost if caught (M\$);
+    \item $\rho(i) \geq 0$ is the firm's risk profile (scaling factor on perceived losses).
+\end{itemize}
+
+Collateral $K$ enters $B(i)$ additively alongside the penalty: $P_{\text{eff}} = \min(K + \phi,\, L)$ where $L$ is the liability cap. Even when the penalty alone is insufficient to deter a firm, collateral can restore deterrence without increasing the ex-post fine.
+
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+Parameter & Symbol & Role \\
+\midrule
+Baseline audit rate    & $\pi_0$    & Uniform random audit floor \\
+Signal exponent        & $\gamma$   & Shape of excess-compute $\to$ signal curve \\
+Audit coefficient      & $c(i)$     & Firm-specific signal boost (signal mode only) \\
+False negative rate    & $\beta$    & Direct audit miss rate \\
+Backcheck probability  & $p_b$      & Historical review catch rate \\
+Whistleblower prob.    & $p_w$      & Disclosure-based catch rate (within audit) \\
+Monitoring probability & $p_m$      & Hardware/metering catch rate (within audit) \\
+False positive rate    & $\alpha$   & Rate of spurious findings on compliant firms \\
+Penalty                & $\phi$     & Flat fine on detection (M\$) \\
+Collateral             & $K$        & Refundable deposit, seized on violation (M\$) \\
+Reputation sensitivity & $R(i)$     & Perceived brand cost if caught (M\$) \\
+Risk profile           & $\rho(i)$  & Multiplier on perceived losses \\
+\bottomrule
+\end{tabular}
+\caption{Audit and enforcement parameters. When dynamic updating is enabled, $c(i)$ and $R(i)$ evolve over time.}
+\end{table}
+
+Following a detected violation, the firm's audit coefficient increases. Between periods it decays exponentially toward its base:
+\begin{equation}
+    c_t(i) = c_i^{base} + \big(c_{t-1}(i) - c_i^{base}\big)\cdot(1 - \delta) + \Delta \cdot \mathbf{1}[\text{caught}_{t-1}]
+\end{equation}
+where $\delta \in [0,1]$ is the per-period decay rate and $\Delta \geq 0$ is the escalation increment per failure.
+
+Each failed audit multiplies the firm's reputation sensitivity:
+\begin{equation}
+    R_t(i) = R_0(i)\cdot\big(1 + \varepsilon\big)^{n_{\text{fail}}(i)}
+\end{equation}
+where $\varepsilon \geq 0$ is the escalation factor and $n_{\text{fail}}(i)$ is the cumulative number of failed audits.
+
+\subsection{Scenarios}
+\label{sec:scenarios}
+
+The three scenarios vary permit supply $Q$ and enforcement design while holding $N = 20$ firms and $T = 10$ periods constant. Full parameter values appear in Table~\ref{tab:params} (Appendix~A); the discussion below focuses on which side of the deterrence condition each scenario manipulates and to what end.
+
+\paragraph{Scenario 1 -- Minimal Enforcement.}
+
+The Minimal Enforcement scenario depresses both $p$ and $B$ to their practical floors while simultaneously constraining supply to $Q = 5$. At most a quarter of labs can hold permits in any period, so compliance is infeasible for fifteen of the twenty firms regardless of preferences. Those excluded from the permit market face no meaningful enforcement alternative: audits are random at $\pi_0 = 0.05$, measurement is unreliable ($\beta = 0.40$), monitoring is absent ($p_m = 0$), and no collateral bond is posted ($K = 0$). The effective detection probability is $p_{\mathrm{eff}} = \pi_0(1-\beta) = 0.03$, yielding an expected fine of $0.03 \times \$200\text{M} = \$6\text{M}$ per period against permit-cost savings an order of magnitude larger. The deterrence condition fails on both the $p$ and $B$ sides simultaneously, and the supply constraint ensures that raising either alone cannot restore compliance. Even the five labs that do hold permits do so because the auction cleared below their private valuations -- not because enforcement made non-compliance unattractive.
+
+The Minimal Enforcement scenario is therefore not merely an enforcement failure; it is a market structure failure that enforcement cannot correct, and both problems must be addressed before the scenarios that follow can be meaningfully compared.
+
+\paragraph{Scenario 2 -- Strict Enforcement.}
+
+Strict Enforcement relaxes the supply constraint to $Q = N = 20$ and then saturates the
+detection side of the deterrence condition: $\pi_0 = 0.30$ with signal-dependent
+targeting, $\beta = 0.10$, $p_m = 1.0$. Because $p_{\mathrm{catch}} = 1 -
+\beta(1-p_m) = 1.0$, an audited violation is detected with certainty. Collateral
+is set at $K = \$15.75$M, the permit price at $\bar{p} = \$70$M, and the fine
+at $\phi = \$50$M. Crucially, the racing factor $r_i$ and baseline capability value $V_i$
+are non-zero in this scenario, meaning labs face competitive pressure to run regardless
+of permit status.
+
+The compliance outcome illustrates a subtlety that the formal model flags but
+aggregate statistics can obscure. With $\bar{p} = \$70$M and lab valuations
+distributed on $[\$50\text{M},\,\$200\text{M}]$, roughly 87\% of labs have
+$v_i \geq \bar{p}$ and purchase permits voluntarily---the permit is worth
+buying regardless of enforcement. The remaining 13\% are unpermitted and face
+an expected penalty of approximately \$24M. However, because their total evasion gain
+includes both the avoided costs and the capability value of completing the run ($r_i V_i$),
+this \$24M expected penalty falls well short of deterring them. 
+
+High compliance in Strict
+Enforcement is therefore a consequence of the permit-price-to-valuation ratio, not of
+the audit design, and it holds only as long as that ratio remains favourable. Should the
+value distribution shift upward---as it plausibly would in a more competitive or
+capability-driven market---or should racing pressures intensify, compliance would erode
+without any change in enforcement intensity. The audit apparatus, operating at 28\% of
+all firms per period, bears costs disproportionate to its contribution and offers no
+mechanism to adjust when the economic environment changes.
+
+\paragraph{Scenario 3 -- Smart Enforcement.}
+
+Smart Enforcement targets the right-hand side of the deterrence condition rather than the left. The permit price is fixed at $\bar{p} = \$2$M, compressing every lab's evasion gain to $g_i = \min(\$2\text{M},\,v_i) = \$2\text{M}$. Against this gain, even a modest detection probability suffices: with $\pi_0 = 0.10$, $\beta = 0.40$, $p_m = 0.20$, and the default fine $\phi = \$200$M, the expected penalty at baseline is
+%
+\[
+  \pi_0 \cdot p_{\mathrm{catch}} \cdot (\phi + K)
+  = 0.10 \times 0.68 \times \$215.75\text{M}
+  \approx \$14.7\text{M} \gg \$2\text{M}.
+\]
+%
+
+The deterrence condition holds for every lab before signal-dependent targeting activates. Crucially, this margin is robust to shifts in the value distribution: because the gain is capped at the permit price rather than tied to firm valuations, higher-value labs are no harder to deter than lower-value ones. The collateral bond ($K = \$15.75$M) adds margin and resolves the limited-liability problem for asset-light firms. Signal-dependent auditing ($c(i) = 0.5$) then reallocates inspections toward at-risk labs, reducing false-positive burden on the compliant majority---an efficiency gain on top of a compliance rate that the pricing structure already achieved. The audit design operates on the margin, not at the core; the permit price does the structural work.
+
+\paragraph{Cross-scenario structure.}
+
+Three features of the scenario design are worth drawing together before turning to the results. First, the supply structure is the prerequisite: Strict Enforcement and Smart Enforcement both achieve outcomes that Minimal Enforcement cannot, not primarily because of their enforcement parameters but because $Q = N$ makes compliance accessible. Second, Strict Enforcement and Smart Enforcement achieve similar compliance rates through entirely different mechanisms---one by pricing permits below most firms' valuations, the other by pricing them so low that evasion offers no meaningful gain. Third, and most consequentially for the paper's argument, the Smart Enforcement mechanism is structurally more resilient: its deterrence margin does not depend on the distribution of firm valuations, only on the permit price relative to the expected penalty. Whether this structural advantage translates into a measurable efficiency gain in audit burden is what Section~\ref{sec:results} examines.

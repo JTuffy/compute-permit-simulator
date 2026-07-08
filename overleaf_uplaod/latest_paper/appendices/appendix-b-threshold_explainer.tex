@@ -1,0 +1,135 @@
+
+\section{Threshold Calibration: Technical Note}
+\owner{Adebayo} \status{Done, needs formatting for paper}
+
+\placeholder{Appendix B: Threshold Calibration Explainer (Adebayo)}{
+Copy the content from the two calibration notes here. Structure as:
+\begin{itemize}
+    \item B.1 The Problem: Reliability Gap
+    \item B.2 Why Average Calibration Is Insufficient
+    \item B.3 Threshold Calibration: Definition
+    \item B.4 The Key Theorem
+    \item B.5 Recalibration Algorithm
+    \item B.6 Application to Compute Permit Regimes
+\end{itemize}
+}
+
+\textbf{
+\subsection{The Problem: Reliability Gap}
+}
+
+Modern governance systems frequently rely on threshold-based triggers:
+\begin{itemize}
+    \item Grant permit if predicted risk $\le \tau$
+    \item  Require review if predicted capability $\ge \tau$
+    \item Allocate resources if predicted wealth $\le \tau$
+    \item Schedule admission if predicted length-of-stay $\le \tau$
+\end{itemize}
+
+These are binary threshold decisions.
+
+Decision-makers rely on probabilistic forecasts not only to determine whether the trigger fires, but also to estimate the expected cost of deploying that trigger. The key quantity is decision loss, the expected cost induced by the decision rule.
+
+\textbf{Reliability Gap:}
+
+$\gamma(\delta, \ell) = | \mathbb{E}_{X,\hat{Y} \sim h[X]}[\ell(X,\hat{Y},\delta(X))] - \mathbb{E}_{X,Y \sim h^*[X]}[\ell(X,Y,\delta(X))] |$
+
+
+The reliability gap measures the difference between predicted average decision loss and the true average decision loss. If nonzero, regulators cannot trust pre-deployment cost estimates.
+
+\subsection{Why Average Calibration Is Insufficient}
+Standard average calibration requires:
+
+$Pr(h[X](Y) \le c) = c$
+
+This guarantees correct frequencies globally.
+
+However, permit triggers condition on subsets of predictions (e.g., all cases where predicted risk $\ge \tau$). Calibration must hold within those subsets, not just overall. A model can be perfectly average-calibrated yet systematically miscalibrated at the regulatory boundary — precisely where permit triggers operate.
+
+\subsection{Threshold Calibration: Definition}
+The formal setup:
+\begin{itemize}
+    \item  Action space: $A = \{0,1\}$
+    \item Threshold loss defined by decision threshold $y_0$ and cost parameters
+    \item Bayes-optimal rule: $\delta^*_h(x) = I(h[x](y_0) \ge \alpha)$
+\end{itemize}
+
+This structure exactly matches permit systems: if predicted probability exceeds cutoff $\alpha$, the trigger fires.
+
+A forecaster is threshold-calibrated if calibration holds within:
+\begin{itemize}
+    \item The subset where the trigger fires
+    \item The subset where it does not fire
+\end{itemize}
+
+For all thresholds $y_0$ and cutoffs $\alpha$, calibration must hold conditional on $h[X](y_0) \le \alpha$ and $h[X](y_0) > \alpha$.
+
+\subsection{The Key Theorem }
+Theorem:
+A forecaster satisfies threshold calibration if and only if the reliability gap is zero for all threshold decision rules and threshold loss functions.
+
+Threshold calibration is therefore the exact condition required for reliable permit cost estimation.
+
+\subsection{Recalibration Algorithm }
+Iterative recalibration procedure:
+\begin{enumerate}
+    \item  Identify threshold and cutoff with largest calibration error.
+    \item Partition data into trigger-fire and trigger-not-fire subsets.
+    \item Apply isotonic recalibration separately in each subset.
+    \item Repeat until error $\le \epsilon$.
+\end{enumerate}
+
+The procedure converges in $O(1/\epsilon^2)$ iterations and can be applied post-hoc without retraining the original model.
+
+\subsection{Application to Compute Permit Regimes}
+\subsubsection{ Empirical Findings}
+Across hospital scheduling, wealth allocation, and multiple regression benchmarks, threshold calibration:
+• Minimizes reliability gap across thresholds and cost ratios  
+• Maintains or improves decision loss  
+• Outperforms average calibration  
+• Avoids performance degradation seen in distribution calibration with complex models  
+
+This demonstrates both theoretical soundness and practical viability.
+
+\subsubsection{Application: AI Compute Permit Regimes}
+Example:
+\begin{itemize}
+    \item  A model predicts probability that a training run exceeds a capability risk threshold.
+    \item  Permit required if $P(\text{risk} \ge y_0) \ge \alpha$.
+\end{itemize}
+
+Without threshold calibration:
+\begin{itemize}
+    \item Oversight workload projections may be biased.
+    \item Risk of over-approval or over-restriction increases.
+\end{itemize}
+
+With threshold calibration:
+\begin{itemize}
+    \item True high-risk frequency among flagged runs matches predictions.
+    \item Compliance costs are accurately estimated.
+    \item Policy simulations become trustworthy.
+\end{itemize}
+
+\subsubsection{Governance Implications}
+For regulatory systems built around predictive triggers:
+
+\begin{enumerate}
+    \item Audit reliability gap.
+    \item  Require threshold calibration certification.
+    \item  Apply recalibration before deployment.
+    \item Treat threshold calibration as a minimum governance standard.
+\end{enumerate}
+
+This connects machine learning calibration theory directly to institutional reliability.
+
+\subsubsection{Bottom Line}
+Permit triggers are threshold decisions. Threshold calibration is:
+\begin{itemize}
+    \item Necessary and sufficient for reliable loss prediction
+    \item Practically achievable
+    \item Empirically validated
+    \item Directly applicable to AI governance and regulatory systems
+\end{itemize}
+
+If a regulatory system depends on a predictive boundary, threshold calibration is the condition that makes the boundary trustworthy.

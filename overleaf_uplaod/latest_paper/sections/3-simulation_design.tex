@@ -1,0 +1,63 @@
+\section{Simulation Design}
+
+The model of Section~2 is implemented as an agent-based simulation. This section describes the implementation architecture and the experimental design: the regulatory scenarios whose outcomes Section~\ref{sec:results} reports. The mathematical content of the simulation---decision rules, market clearing, and the audit process---is exactly the model already presented; what the implementation adds is an explicit ordering of events within each period, a reproducible source of randomness, and instrumentation for recording outcomes.
+
+\subsection{Architecture}
+
+The simulator is implemented in Python and organised into four layers with a strict one-way dependency hierarchy. The full codebase is publicly available at
+\url{https://github.com/JTuffy/compute-permit-simulator}.
+
+The \textbf{core} layer contains the domain logic with zero framework dependencies. The agents module (\texttt{agents.py}) encapsulates each lab's private attributes and its period-by-period permit-buying decision (Section~2.2). The market module (\texttt{market.py}) implements the marginal-bid clearing mechanism of Section~\ref{sec:permit-market}. The enforcement module (\texttt{enforcement.py}) implements the regulator's two-stage audit process of Section~\ref{sec:detection}: signal generation followed by audit occurrence and outcome determination. The game loop (\texttt{game\_loop.py}) orchestrates a seven-phase simulation step---collateral posting, permit trading, compliance decisions, signal generation, audit and penalty application, value realisation, and dynamic factor updates. This fixed within-period ordering resolves the sequencing that the formal model leaves implicit: collateral is committed before the compliance decision is made, and audits act on the decisions of the current period before dynamic factors update for the next.
+
+The \textbf{schemas} layer defines all data shapes as immutable Pydantic models: scenario configuration (\texttt{ScenarioConfig} with nested \texttt{AuditConfig}, \texttt{LabConfig}, \texttt{MarketConfig}), single-run results (\texttt{SimulationRun}), and batch results (\texttt{MonteCarloResult}, \texttt{SweepResult}, \texttt{GridSweepResult}).
+
+The \textbf{services} layer orchestrates core and schemas. A Mesa~\cite{ter2025mesa} wrapper (\texttt{mesa\_model.py}) provides step-based scheduling and a \texttt{DataCollector} for time-series recording. Additional service modules expose single-run (\texttt{run\_single}), Monte Carlo (\texttt{run\_monte\_carlo}), and parameter sweep (\texttt{run\_sweep}) entry points.
+
+The \textbf{visualisation} layer is a Solara interactive dashboard that exposes all key parameters at runtime and renders compliance rates, permit prices, and enforcement outcomes across periods. A publicly hosted instance is available at \url{https://compute-permit-simulator.onrender.com/}.
+
+All stochastic elements---valuation draws, audit selection, detection outcomes, and fixed-price rationing---draw from a single seeded random number generator, so any run is exactly reproducible from its scenario configuration and seed. Monte Carlo and sweep runs iterate seeds sequentially, ensuring that enlarging a batch never alters earlier runs' outcomes. The codebase is covered by a unit test suite spanning the market, enforcement, and game-loop logic; installation instructions, configuration file formats, and the commit hash used to produce the results in this paper are documented in Appendix~C.
+
+\subsection{Calibration and Initialization}
+\label{sec:calibration}
+
+All scenarios simulate $N = 20$ firms over $T = 10$ periods. At the start of each run, three firm attributes are drawn independently from the seeded generator: the private valuation $v_i \sim \mathrm{Uniform}[v_{\min}, v_{\max}]$ (baseline $[\$50\text{M}, \$200\text{M}]$), the planned training run size $C_i \sim \mathrm{Uniform}[10^{24}, 10^{26}]$ FLOP, and the risk profile $\rho_i$ (degenerate at $1$ in the baseline calibration, so firms are risk-neutral unless a scenario specifies otherwise). Against the regulatory threshold $\tau = 10^{25}$ FLOP, the run-size distribution places roughly nine in ten firms above the permit requirement in expectation. The remaining attributes---audit coefficient $c_i^{\mathrm{base}}$, racing factor $r_i$, capability value $V_i$, and reputation sensitivity $R_i^{(0)}$---are homogeneous within a scenario and set by its configuration; per-scenario values appear in Table~\ref{tab:params} (Appendix~A). The racing factor is held constant throughout every published scenario (the implementation supports capability-gap-driven racing dynamics, but they are disabled in all experiments reported here), and the dynamic updating of $c_i$ and $R_i$ (Section~\ref{sec:dynamics}) is active only in Scenario 4.
+
+The monetary scale is anchored to contemporary estimates of frontier development costs: training runs at the $10^{25}$ FLOP threshold cost on the order of \$100M--\$500M~\citep{heim2024compute}, motivating the valuation range, while the default fine of \$200M is commensurate with the EU AI Act's penalty ceiling of 7\% of global turnover for major developers~\citep{eu_ai_act_2024}. These magnitudes position the calibration as a stylized near-future frontier regime rather than a forecast; Section~\ref{sec:limitations} discusses the sensitivity of conclusions to this anchoring.
+
+\subsection{Experimental Protocol}
+\label{sec:protocol}
+
+Each scenario is evaluated by Monte Carlo: $n = 100$ independent replications, each with a fresh seed governing the initialization draws and all stochastic events (audit selection, detection outcomes, and rationing). Reported statistics are averaged first within each replication across the $T$ periods, then across replications. Sensitivity analyses use one-dimensional parameter sweeps ($n = 30$ seeds per grid point) in which a single parameter varies over a policy-relevant range while all others hold at scenario values, and two-dimensional grid sweeps ($8 \times 8 = 64$ cells, $n = 20$ seeds per cell) that pair the two parameters found to govern compliance most strongly in the one-dimensional sweeps. Section~\ref{sec:results} reports outcomes under this protocol.
+
+\subsection{Scenarios}
+\label{sec:scenarios}
+
+A scenario is not a separate model: it is a named calibration of the Section~2 model, committed as a configuration file in the repository, with every parameter individually overridable. The first three scenarios vary permit supply $Q$ and enforcement design under the common calibration of Section~\ref{sec:calibration}; a fourth activates the dynamic enforcement mechanisms of Section~\ref{sec:dynamics}. The sensitivity analyses of Section~\ref{sec:results} exploit the override mechanism directly, perturbing one or two parameters at a time from these baselines. Full parameter values appear in Table~\ref{tab:params} (Appendix~A); the discussion below records each scenario's specification and design intent --- which side of the deterrence condition it manipulates and what question it is built to answer. Outcomes are deferred entirely to Section~\ref{sec:results}.
+
+\paragraph{Scenario 1 -- Minimal Enforcement.}
+
+Minimal Enforcement depresses both sides of the deterrence condition to their practical floors while constraining supply to $Q = 5$: random audits at $\pi_0 = 0.05$, unreliable measurement ($\beta = 0.40$), no monitoring ($p_m = 0$), no collateral ($K = 0$), and an auction market in which at most a quarter of labs can hold permits. The ex-ante arithmetic makes the design intent explicit: effective detection is $p_{\mathrm{eff}} = \pi_0(1-\beta) = 0.03$, so the expected fine of $\$6$M per period faces permit-cost savings an order of magnitude larger, while the supply cap makes compliance infeasible for fifteen of twenty firms regardless of preferences. The scenario is the floor case --- a simultaneous market-structure and enforcement failure --- against which the universal-access designs are measured.
+
+\paragraph{Scenario 2 -- Strict Enforcement.}
+
+Strict Enforcement relaxes the supply constraint to $Q = N = 20$ and saturates the detection side of the deterrence condition: $\pi_0 = 0.30$ with signal-dependent targeting, $\beta = 0.10$, and $p_m = 1.0$, so that $p_{\mathrm{catch}} = 1 - \beta(1-p_m) = 1.0$ and an audited violation is detected with certainty. Permits are administratively priced at $\bar{p} = \$70$M, collateral at $K = \$15.75$M, and the fine at $\phi = \$50$M; uniquely among the scenarios, the racing terms are active ($r_i V_i > 0$), so labs face competitive pressure to run regardless of permit status. The calibration is deliberately mixed: with valuations on $[\$50\text{M}, \$200\text{M}]$, roughly 87\% of labs clear the permit price ex ante and the price sits above the willingness-to-pay of the remainder. The design question is whether saturated detection deters the labs the price excludes --- that is, whether enforcement intensity can carry the part of the market that pricing does not.
+
+\paragraph{Scenario 3 -- Smart Enforcement.}
+
+Smart Enforcement targets the right-hand side of the deterrence condition rather than the left. The permit price is fixed at $\bar{p} = \$2$M, compressing every lab's evasion gain to $g_i = \min(\$2\text{M},\,v_i) = \$2\text{M}$. Against this gain, even a modest detection probability suffices: with $\pi_0 = 0.10$, $\beta = 0.40$, $p_m = 0.20$, and the default fine $\phi = \$200$M, the ex-ante expected penalty is
+%
+\[
+  \pi_0 \cdot p_{\mathrm{catch}} \cdot (\phi + K)
+  = 0.10 \times 0.68 \times \$215.75\text{M}
+  \approx \$14.7\text{M} \gg \$2\text{M},
+\]
+%
+so the deterrence condition holds for every lab by construction, before signal-dependent targeting ($c(i) = 0.5$) or the collateral bond ($K = \$15.75$M, addressing limited liability for asset-light firms) contribute anything. The design question is the converse of Strict Enforcement's: whether a regime whose pricing already guarantees compliance can shed audit intensity without consequence, and how much pricing stress the enforcement backstop absorbs when the guarantee is removed.
+
+\paragraph{Scenario 4 -- Feedback-Driven Compliance.}
+
+The first three scenarios hold enforcement pressure constant within a run; the fourth asks whether feedback can substitute for it. Feedback-Driven Compliance returns to the scarce-supply auction environment of Minimal Enforcement ($Q = 5$, $N = 20$, no fixed price) but activates the dynamic mechanisms of Section~\ref{sec:dynamics}: each detected violation permanently escalates the firm's reputation sensitivity ($\varepsilon = 1.0$ at calibration), compounding the perceived penalty for repeat offenders. The base audit rate is $\pi_0 = 0.20$ with random (signal-independent) auditing and a flat fine of $\phi = \$50$M---enforcement parameters that, held static, would leave compliance near the supply floor. The design question is therefore whether a reputation ratchet, seeded by moderate random auditing, can lift compliance above what the static deterrence condition predicts, and how quickly the escalation saturates. Because auditing is signal-independent in this scenario, the audit-coefficient channel is structurally inert; reputation accumulation is the operative feedback mechanism. Sensitivity results for this scenario appear in Section~\ref{sec:sensitivity_dynamic}, and per-period compliance trajectories are examined in Appendix~D.
+
+\paragraph{Cross-scenario structure.}
+
+By design, the four calibrations partition the policy space: Minimal Enforcement withholds both supply and deterrence; Strict Enforcement grants supply and saturates the left-hand side of the deterrence condition; Smart Enforcement grants supply and compresses the right-hand side; Feedback-Driven Compliance withholds supply but lets deterrence compound over time. Whether these mechanism choices produce different compliance, different audit burdens, and different robustness to parameter stress is what Section~\ref{sec:results} measures.

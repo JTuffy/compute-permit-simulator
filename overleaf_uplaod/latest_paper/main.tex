@@ -1,0 +1,165 @@
+% =============================================================================
+% Compute Permit Markets under Imperfect Monitoring
+% AISC 2026 Working Paper
+% Filename: compute_permit_markets_paper.tex
+% =============================================================================
+
+\documentclass[12pt, a4paper]{article}
+
+% -----------------------------------------------------------------------------
+% Packages
+% -----------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{graphicx, array}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{fillbetween}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!8},
+    keywordstyle=\color{blue!70!black},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!60!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=5pt,
+}
+% Language aliases
+\lstdefinelanguage{json}{
+    morestring=[b]",
+    literate={:}{{{\color{gray}:}}}1
+             {,}{{{\color{gray},}}}1,
+}
+
+% -----------------------------------------------------------------------------
+% Custom Commands for Placeholders
+% -----------------------------------------------------------------------------
+\newcommand{\placeholder}[2]{%
+    \begin{tcolorbox}[colback=yellow!10, colframe=orange!50, title={\textbf{#1}}]
+    #2
+    \end{tcolorbox}
+}
+
+\newcommand{\owner}[1]{\textcolor{blue}{\textbf{[Owner: #1]}}}
+\newcommand{\status}[1]{\textcolor{gray}{\textit{Status: #1}}}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{TODO: #1}}}
+
+% -----------------------------------------------------------------------------
+% Document Info
+% -----------------------------------------------------------------------------
+\title{Compute Permit Markets under Imperfect Monitoring: \\
+A Simulation-Based Analysis of Enforcement Design}
+
+\author{
+    Joel Christoph\textsuperscript{1} \and
+    Emlyn Graham\textsuperscript{2} \and
+    Josh Tuffy\textsuperscript{3} \and
+    Cheng Wing Yin\textsuperscript{4} \and
+    Adebayo Mubarak\textsuperscript{5} \and
+    Pilar Moncada\textsuperscript{6} \and
+    Patrick Duffy\textsuperscript{7}
+}
+
+\date{Draft: \today}
+
+% =============================================================================
+\begin{document}
+% =============================================================================
+
+\maketitle
+
+% =============================================================================
+% ABSTRACT - Replace the placeholder in compute_permit_markets_paper.tex
+% =============================================================================
+
+\begin{abstract}
+\noindent Compute thresholds are emerging as a key mechanism for regulating advanced AI systems, with the EU AI Act and US Executive Order establishing requirements for training runs exceeding $10^{25}$ and $10^{26}$ FLOP respectively. However, the effectiveness of such regulations depends on enforcement, which operates under imperfect monitoring: regulators cannot directly observe compute usage and must rely on noisy signals from audits, hardware telemetry, and self-reporting. This paper develops a formal model of firm compliance decisions in compute permit markets and implements it in an agent-based simulation to compare three regulatory scenarios. We find that smart enforcement, combining moderate audit rates with upfront collateral and efficient permit pricing, achieves compliance levels comparable to strict enforcement at substantially lower regulatory cost. The key mechanism is incentive alignment: collateral requirements make compliance economically rational even when detection probability is moderate, while efficient permit pricing reduces the gain from evasion. Our analysis supports tolerance margins of 15-20\% to account for measurement uncertainty, scaled collateral based on firm size, and investment in monitoring infrastructure as a complement to audits. These findings offer guidance for policymakers designing compute governance regimes under realistic constraints on regulatory capacity.
+\end{abstract}
+
+% \begin{abstract}
+% \placeholder{Abstract (Joel, final pass)}{
+% Write 150-200 words summarizing:
+% \begin{itemize}
+%     \item The problem: AI governance relies on compute thresholds but enforcement is imperfect
+%     \item The approach: We model permit markets with noisy monitoring and simulate three regulatory scenarios
+%     \item Key finding: Smart enforcement (Maxwell scenario) achieves high compliance at low cost by aligning incentives
+%     \item Policy implication: Threshold calibration and upfront collateral are more effective than high audit rates
+% \end{itemize}
+% }
+% \end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\include{sections/1-introduction}
+
+\include{sections/2-model}
+
+\include{sections/3-simulation_design}
+
+\include{sections/4-results}
+
+\include{sections/5-policy_implications}
+
+\include{sections/6-limitations}
+
+\include{sections/7-conclusion}
+
+% =============================================================================
+% REFERENCES
+% =============================================================================
+\newpage
+\bibliographystyle{apalike}
+
+%\placeholder{References}{
+%Add citations as you write. \todo{Suggest we start using cite commands and build out our bibliography.bib file with bibtex references early to replace this list and ensure references are consistent.}
+%Key sources to include:
+%\begin{itemize}
+%Erben, Negele, Heim, Sevilla (JRC 2025): Training Compute Thresholds for EU AI Act
+%Sahoo, Zhao, Chen, Ermon (NeurIPS 2021): Reliable Decisions with Threshold Calibration
+%Heim \& Koessler (2024): Compute cost estimates
+%Montero (2025): Urban pollution monitoring proxies
+%Singh et al. (2024): Distributed training and run-splitting
+%EU AI Act (Regulation 2024/1689), Article 99(4)
+%\end{itemize}
+%}
+\nocite{*}
+\bibliography{bibliography}
+
+% =============================================================================
+% APPENDICES
+% =============================================================================
+\newpage
+\appendix
+
+\include{appendices/appendix-a-parameter_table}
+
+\include{appendices/appendix-b-threshold_explainer}
+
+\include{appendices/appendix-c-simulator_documentation}
+
+\include{appendices/appendix-d-dynamic-scenarios}
+
+\include{appendices/appendix-e-sensitivity-surfaces}
+
+% =============================================================================
+\end{document}
+% =============================================================================

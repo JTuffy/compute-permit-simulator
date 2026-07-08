@@ -1,0 +1,36 @@
+% =============================================================================
+% SECTION 7: CONCLUSION
+% =============================================================================
+
+\section{Conclusion}
+
+This paper has examined the design of enforcement mechanisms for compute permit markets under imperfect monitoring. We developed a formal model of firm compliance decisions, implemented it in an agent-based simulation, and compared three regulatory scenarios that represent different approaches to enforcement.
+
+Our central finding is that smart enforcement achieves high compliance at substantially lower cost than strict enforcement. The key insight is that enforcement design matters more than enforcement intensity. By combining efficient permit pricing, upfront collateral requirements, and targeted monitoring, regulators can align firm incentives toward compliance without requiring the high audit rates and full transparency that characterize strict enforcement regimes.
+
+Three specific findings emerge from our analysis:
+
+First, collateral requirements are a powerful deterrence mechanism. When firms must post refundable deposits that are forfeited upon violation, compliance becomes the economically rational choice even when audit probabilities are moderate. This shifts enforcement costs from ongoing audits to upfront financial commitments, reducing the regulatory burden while maintaining deterrence.
+
+Second, tolerance thresholds must be calibrated carefully. Setting thresholds too tight generates excessive false positives, burdening compliant firms and undermining regulatory legitimacy. Setting them too loose permits genuine violations under the guise of measurement error. Our analysis supports a tolerance margin of 15-20\%, combined with graduated audit probabilities and randomization to prevent gaming.
+
+Third, monitoring infrastructure complements but does not replace audits. Hardware telemetry, electricity monitoring, and cloud provider reporting can substantially increase detection probability without requiring direct regulatory access to firm operations. However, these systems are most effective when combined with a baseline audit rate that maintains deterrence even for firms that evade monitoring.
+
+These findings have implications for policymakers designing compute governance regimes. The EU AI Act and similar regulations establish compute thresholds as regulatory triggers, but provide limited guidance on enforcement. Our analysis suggests that enforcement design should prioritize incentive alignment over monitoring intensity. Specifically, policymakers should consider scaled collateral requirements based on firm size and compute usage, tolerance margins that account for measurement uncertainty, and investment in monitoring infrastructure that provides independent detection channels.
+
+Several limitations of our analysis point to directions for future research. The model assumes rational profit-maximizing firms, which may not capture the behavior of state-backed laboratories or ideologically motivated organizations. We also model a single centralized regulator, abstracting from the multi-jurisdictional complexity of real-world AI governance. Future work should extend the framework to incorporate heterogeneous firm motivations, regulatory competition across jurisdictions, and dynamic co-evolution between monitoring technologies and evasion strategies.
+
+Despite these limitations, the core insight of this paper is robust: under imperfect monitoring, smart enforcement design can achieve compliance outcomes comparable to strict enforcement at a fraction of the cost. As governments move toward implementing compute-based AI regulations, this finding offers a path toward effective governance that does not require unrealistic levels of regulatory capacity or intrusive monitoring. The challenge for policymakers is to design permit systems that make compliance the path of least resistance, rather than relying solely on the threat of detection and punishment.
+
+% \section{Conclusion}
+% \owner{Joel} \status{Not started}
+
+% \placeholder{7.1 Summary (Joel)}{
+% Write 2-3 paragraphs:
+% \begin{itemize}
+%     \item Restate the problem: compute governance requires enforcement under imperfect monitoring
+%     \item Summarize findings: Maxwell scenario shows smart enforcement is possible
+%     \item Key policy recommendations: 15-20\% tolerance, scaled collateral, threshold calibration, decentralized regulators
+%     \item Final sentence: Compliance is an economic function; by aligning incentives, we can make safety profitable
+% \end{itemize}
+% }
